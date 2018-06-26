@@ -7,7 +7,7 @@
 # 	tool = ediff
 #
 # [mergetool "ediff"]
-# 	cmd = /path/to/plume-lib/bin/ediff-merge-script "$LOCAL" "$REMOTE" "$MERGED" "$BASE"
+# 	cmd = /path/to/plume-scripts/ediff-merge-script "$LOCAL" "$REMOTE" "$MERGED" "$BASE"
 # 	trustExitCode = true
 
 ## USER CUSTOMAZATION:
