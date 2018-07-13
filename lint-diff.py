@@ -6,6 +6,7 @@
 #         If lint-output is omitted, use standard input.
 # Options: --strip-diff=N means to ignore N leading "/" in diff.txt.
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
+#              Affects matching, but not output, of lines.
 # Output: all lines in lint-output that are on a changed line
 #         Output status is 1 if it produced any output, 0 if not, 2 if error.
 
