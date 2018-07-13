@@ -2,7 +2,7 @@
 # No "-f" argument above?
 
 # This script reads standard input, and if not empty calls the "mail"
-# program.
+# program on it.
 
 # In other words it is a version of "mail" that assumes the -e argument:
 #     -e      Don’t send empty mails.  If the body is empty skip the mail.

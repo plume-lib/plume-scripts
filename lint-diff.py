@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-# Filter the ouput of lint, to only show output for changed lines.
+# Filter the output of lint, to only show output for changed lines.
 
 # Usage:  lint-diff.py [options] diff.txt [lint-output.txt]
 #         If lint-output is omitted, use standard input.
+# Output: all lines in lint-output that are on a changed line
+#         Output status is 1 if it produced any output, 0 if not, 2 if error.
 # Options: --strip-diff=N means to ignore N leading "/" in diff.txt.
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
 #              Affects matching, but not output, of lines.
-# Output: all lines in lint-output that are on a changed line
-#         Output status is 1 if it produced any output, 0 if not, 2 if error.
 
 # The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
 # suggests it has this same functionality, but my tests indicate it does not.
