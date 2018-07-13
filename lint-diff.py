@@ -7,6 +7,12 @@
 # Output: all lines in lint-output that are on a changed line
 #         Output status is 1 if it produced any output, 0 if not, 2 if error.
 
+# The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
+# suggests it has this same functionality, but my tests indicate it does not.
+
+# It may be possible to achieve a similar result using diff (but not `git diff`):
+# https://unix.stackexchange.com/questions/34874/diff-output-line-numbers
+
 from __future__ import print_function
 
 import re
