@@ -12,6 +12,36 @@ email when an error has occurred.  Documentation
 [at top of file](cronic) and at
 http://habilis.net/cronic/.
 
+
+## Cygwin wrappers
+
+### cygwin-runner
+
+Takes a command with arguments and translates those arguments from
+Cygwin-style filenames into Windows-style filenames.  Its real advantage
+is the little bit of intelligence it has as far as which things are files
+and which are not.
+[Documentation](cygwin-runner) at top of file.
+
+### java-cygwin
+
+A wrapper for calling Java from Cygwin, that tries to convert any
+arguments that are Unix-style paths into Windows-style paths.
+[Documentation](java-cygwin) at top of file.
+
+### javac-cygwin
+
+A wrapper for calling the Java compiler from Cygwin, that tries to convert any
+arguments that are Unix-style paths into Windows-style paths.
+[Documentation](javac-cygwin) at top of file.
+
+### javadoc-cygwin
+
+A wrapper for calling Javadoc from Cygwin, that tries to convert any
+arguments that are Unix-style paths into Windows-style paths.
+[Documentation](javadoc-cygwin) at top of file.
+
+
 ## ediff-merge-script
 
 A script for use as a git mergetool; runs Emacs ediff as the mergetool.
