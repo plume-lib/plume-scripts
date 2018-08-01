@@ -119,8 +119,10 @@ with open(diff_filename) as diff:
             try:
                 filename = strip_dirs(m.group(1), strip_diff)
             except TypeError:
-                eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(strip_diff, m.group(1)))
-                sys.exit(2)
+                filename = "diff filename above common directory"
+                ## It's not an error; it just means this file doesn't appear in lint output.
+                # eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(strip_diff, m.group(1)))
+                # sys.exit(2)
             if filename not in changed:
                 changed[filename] = set()
             continue
@@ -154,8 +156,10 @@ for lint_line in lint:
         try:
             filename = strip_dirs(m.group(1), strip_lint)
         except TypeError:
-            eprint('Bad --strip-lint={0} ; line has fewer "/": {1}'.format(strip_lint, m.group(1)))
-            sys.exit(2)
+            filename = "lint filename above common directory"
+            ## It's not an error; it just means this file doesn't appear in lint output.
+            # eprint('Bad --strip-lint={0} ; line has fewer "/": {1}'.format(strip_lint, m.group(1)))
+            # sys.exit(2)
         if filename.startswith("/") and relative_diff and strip_lint == 0:
             if not relative_diff_warned:
                 eprint("warning:", sys.argv[1], "uses relative paths but", lint_filename, "uses absolute paths")
