@@ -51,6 +51,21 @@ def strip_dirs(filename, num_dirs):
         return filename
     else:
         return os.path.join(*(filename.split(os.path.sep)[num_dirs:]))
+## Tests:
+"""
+import os
+assert strip_dirs("/a/b/c/d", 0) == '/a/b/c/d'
+assert strip_dirs("/a/b/c/d", 1) == 'a/b/c/d'
+assert strip_dirs("/a/b/c/d", 2) == 'b/c/d'
+assert strip_dirs("/a/b/c/d", 3) == 'c/d'
+assert strip_dirs("/a/b/c/d", 4) == 'd'
+assert strip_dirs("/a/b/c/", 0) == '/a/b/c/'
+assert strip_dirs("/a/b/c/", 1) == 'a/b/c/'
+assert strip_dirs("/a/b/c/", 2) == 'b/c/'
+assert strip_dirs("/a/b/c/", 3) == 'c/'
+assert strip_dirs("/a/b/c/", 4) == ''
+"""
+
 
 ### Main routine
 
@@ -100,7 +115,11 @@ with open(diff_filename) as diff:
         if m:
             if m.group(1).startswith("b/"): # heuristic
                 relative_diff = True
-            filename = strip_dirs(m.group(1), strip_diff)
+            try:
+                filename = strip_dirs(m.group(1), strip_diff)
+            except TypeError:
+                eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(strip_lint, m.group(1)))
+                sys.exit(2)
             if filename not in changed:
                 changed[filename] = set()
             continue
@@ -131,7 +150,11 @@ filename_lineno_re = re.compile('([^:]*):([0-9]+):.*')
 for lint_line in lint:
     m = filename_lineno_re.match(lint_line)
     if m:
-        filename = strip_dirs(m.group(1), strip_lint)
+        try:
+            filename = strip_dirs(m.group(1), strip_lint)
+        except TypeError:
+            eprint('Bad --strip-lint={0} ; line has fewer "/": {1}'.format(strip_lint, m.group(1)))
+            sys.exit(2)
         if filename.startswith("/") and relative_diff and strip_lint == 0:
             if not relative_diff_warned:
                 eprint("warning:", sys.argv[1], "uses relative paths but", lint_filename, "uses absolute paths")
