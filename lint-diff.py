@@ -15,7 +15,8 @@
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
 #              Affects matching, but not output, of lines.
 
-# Here is how you could use this in Travis to make a requirement for pull requests:
+# Here is how you could use this in Travis require that pull requests
+# satisfy the command `command-that-issues-warnings`:
 #
 # (git diff "${TRAVIS_COMMIT_RANGE/.../..}" > /tmp/diff.txt 2>&1) || true
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
@@ -118,7 +119,7 @@ with open(diff_filename) as diff:
             try:
                 filename = strip_dirs(m.group(1), strip_diff)
             except TypeError:
-                eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(strip_lint, m.group(1)))
+                eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(strip_diff, m.group(1)))
                 sys.exit(2)
             if filename not in changed:
                 changed[filename] = set()
