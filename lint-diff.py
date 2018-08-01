@@ -9,7 +9,7 @@
 
 # Usage:  lint-diff.py [options] diff.txt [lint-output.txt]
 #         If lint-output is omitted, use standard input.
-# Output: all lines in lint-output that are on a changed line
+# Output: all lines in lint-output that are on a changed line.
 #         Output status is 1 if it produced any output, 0 if not, 2 if error.
 # Options: --strip-diff=N means to ignore N leading "/" in diff.txt.
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
@@ -95,15 +95,12 @@ if len(sys.argv) != 2 and len(sys.argv) != 3:
     eprint(sys.argv[0], "needs 1 or 2 arguments, got", len(sys.argv)-1)
     sys.exit(2)
 
-# A dictionary from file names to a set of ints
+# A dictionary from file names to a set of ints (line numbers)
 changed = {}
-
-# 1 if this produced any output, 0 if not
-status = 0
 
 diff_filename = sys.argv[1]
 with open(diff_filename) as diff:
-    ppp_re = re.compile('\+\+\+ (\S*).*')
+    plusplusplus_re = re.compile('\+\+\+ (\S*).*')
     atat_re = re.compile('@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*')
     content_re = re.compile('[ +-].*')
 
@@ -112,7 +109,7 @@ with open(diff_filename) as diff:
     for diff_line in diff:
         if diff_line.startswith("---"):
             continue
-        m = ppp_re.match(diff_line)
+        m = plusplusplus_re.match(diff_line)
         if m:
             if m.group(1).startswith("b/"): # heuristic
                 relative_diff = True
@@ -149,6 +146,9 @@ else:
     lint = sys.stdin
 
 filename_lineno_re = re.compile('([^:]*):([0-9]+):.*')
+
+# 1 if this produced any output, 0 if not
+status = 0
 
 for lint_line in lint:
     m = filename_lineno_re.match(lint_line)
