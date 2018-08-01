@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 
 # Filter the output of lint, to only show output for changed lines.
+#
+# This is useful when you want to enforce some style guideline, but
+# making the changes globally in your project would be too burdensome.
+# You can make the requirement only for new and and lines, so your
+# codebase will conform to the new standard gradually, as you edit it.
 
 # Usage:  lint-diff.py [options] diff.txt [lint-output.txt]
 #         If lint-output is omitted, use standard input.
@@ -10,11 +15,21 @@
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
 #              Affects matching, but not output, of lines.
 
-# The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
+# Here is how you could use this in Travis to make a requirement for pull requests:
+#
+# (git diff "${TRAVIS_COMMIT_RANGE/.../..}" > /tmp/diff.txt 2>&1) || true
+# (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
+# [ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty" && false)
+# wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
+# python lint-diff.py --strip-diff=1 --strip-lint=2 /tmp/diff.txt /tmp/warnings.txt
+
+
+# Implementation notes:
+# 1. It may be possible to achieve a similar result using diff (but not `git diff`):
+# https://unix.stackexchange.com/questions/34874/diff-output-line-numbers .
+# 2. The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
 # suggests it has this same functionality, but my tests indicate it does not.
 
-# It may be possible to achieve a similar result using diff (but not `git diff`):
-# https://unix.stackexchange.com/questions/34874/diff-output-line-numbers
 
 from __future__ import print_function
 
