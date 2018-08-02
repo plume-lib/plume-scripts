@@ -98,6 +98,9 @@ if len(sys.argv) != 2 and len(sys.argv) != 3:
 # A dictionary from file names to a set of ints (line numbers)
 changed = {}
 
+# This many line around each changed one are also considered changed
+context_lines = 2
+
 diff_filename = sys.argv[1]
 with open(diff_filename) as diff:
     plusplusplus_re = re.compile('\+\+\+ (\S*).*')
@@ -128,11 +131,15 @@ with open(diff_filename) as diff:
             lineno = int(m.group(3))
             continue
         if diff_line.startswith("+"):
-            changed[filename].add(lineno)
+            # Not just the changed line: changed[filename].add(lineno)
+            for changed_lineno in range(lineno-context_lines, lineno+context_lines + 1):
+                changed[filename].add(changed_lineno)
             lineno += 1
         if diff_line.startswith(" "):
             lineno += 1
         if diff_line.startswith("-"):
+            for changed_lineno in range(lineno-context_lines, lineno+context_lines):
+                changed[filename].add(changed_lineno)
             continue
 
 if relative_diff and strip_diff == 0:
