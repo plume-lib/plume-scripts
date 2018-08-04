@@ -52,7 +52,7 @@ A script for use as a git mergetool; runs Emacs ediff as the mergetool.
 
 ### git-find-fork
 
-Finds a fork of a Git repository, or returns the upstream repository
+Finds a fork of a GitHub repository, or returns the upstream repository
 if the fork does not exist.
 [Documentation](git-find-fork) at top of file.
 

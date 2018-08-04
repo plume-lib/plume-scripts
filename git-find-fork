@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# find-git-fork:  finds a fork of a Git repository, or returns the upstream
+# find-git-fork:  finds a fork of a GitHub repository, or returns the upstream
 #   repository if the fork does not exist.
 # Usage:  find-git-fork ORG UPSTREAM_ORG REPONAME
 # Prints the first one of these that exists:
@@ -19,10 +19,15 @@ ORG=$1
 UPSTREAM_ORG=$2
 REPONAME=$3
 
-git ls-remote https://github.com/${ORG}/${REPONAME}.git &>-
-if [ "$?" -ne 0 ]; then
-   OWNER=$UPSTREAM_ORG
-else
+# Problem with "git ls-remote": it may ask for GitHub credentials.
+# (It also downloads more information than wget does.)
+# export GITEXISTS="git ls-remote"
+export GITEXISTS="wget -q --spider"
+
+
+if ( ${GITEXISTS} https://github.com/${ORG}/${REPONAME}.git > /dev/null ); then
    OWNER=${ORG}
+else
+   OWNER=${UPSTREAM_ORG}
 fi
 echo https://github.com/${OWNER}/${REPONAME}.git
