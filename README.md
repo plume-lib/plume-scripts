@@ -71,13 +71,13 @@ Suppose you have two related Git repositories:\
 In a Travis job that is testing branch BR in fork F of *MY-REPO*,
 you would like to use fork F of *MY-OTHER-REPO* if it exists,
 and you would like to use branch BR if it exists.
-Here is to accomplish that:
+Here is how to accomplish that:
 
 ```
-    (cd .. && git clone --depth 1 https://github.com/plume-lib/plume-scripts.git)
-    REPO=`../plume-scripts/git-find-fork ${SLUGOWNER} MY-ORG MY-OTHER-REPO`
-    BRANCH=`../plume-scripts/git-find-branch ${REPO} ${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}`
-    (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
+  (cd .. && git clone --depth 1 https://github.com/plume-lib/plume-scripts.git)
+  REPO=`../plume-scripts/git-find-fork ${SLUGOWNER} MY-ORG MY-OTHER-REPO`
+  BRANCH=`../plume-scripts/git-find-branch ${REPO} ${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}`
+  (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
 ```
 
 
