@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# find-git-branch:  tests whether a branch exists in a Git repository;
+#   prints the branch, or prints "master" if the branch does not exist.
+# Usage:  find-git-branch REPO BRANCH
+# Prints either BRANCH, if it exists in REPO, or else "master".
+
+git ls-remote --heads ${REPO} ${BRANCH} | grep ${BRANCH} >/dev/null
+if [ "$?" == "1" ] ; then
+  echo "master"
+else
+  echo $BRANCH
+fi

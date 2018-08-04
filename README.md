@@ -48,6 +48,41 @@ A script for use as a git mergetool; runs Emacs ediff as the mergetool.
 [Documentation](ediff-merge-script) at top of file.
 
 
+## Git utilities
+
+### git-find-fork
+
+Finds a fork of a Git repository, or returns the upstream repository
+if the fork does not exist.
+[Documentation](git-find-fork) at top of file.
+
+### git-find-branch
+
+Tests whether a branch exists in a Git repository;
+#  prints the branch, or prints "master" if the branch does not exist.
+[Documentation](git-find-branch) at top of file.
+
+### Usage of git-find-{fork,branch}
+
+Suppose you have two related Git repositories:\
+  *MY-ORG*`/`*MY-REPO*\
+  *MY-ORG*`/`*MY-OTHER-REPO*
+
+In a Travis job that is testing branch BR in fork F of *MY-REPO*,
+you would like to use fork F of *MY-OTHER-REPO* if it exists
+(otherwise use the repo owned by MY-ORG),
+and you would like to use branch BR if it exists
+(otherwise use the `master` branch)
+Here is to accomplish that:
+
+```
+    (cd .. && git clone --depth 1 https://github.com/plume-lib/plume-scripts.git)
+    REPO=../plume-scripts/git-find-repo ${SLUGOWNER} MY-ORG MY-OTHER-REPO
+    BRANCH=../plume-scripts/git-find-branch ${REPO} ${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH} 
+    (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
+```
+
+
 ## latex-process-inputs
 
 Determines all files that are recursively `\input` by a given
@@ -116,4 +151,3 @@ directory, in sorted order; then, process subdirectories recursively, in
 sorted order. This is useful for users (e.g., when printing) and for making
 output deterministic.
 [Documentation](sort-directory-order) at top of file.
-

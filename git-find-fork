@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# find-git-fork:  finds a fork of a Git repository, or returns the upstream
+#   repository if the fork does not exist.
+# Usage:  find-git-fork ORG UPSTREAM_ORG REPONAME
+# Prints the first one of these that exists:
+#   https://github.com/${ORG}/${REPO}.git
+#   https://github.com/${UPSTREAM_ORG}/${REPO}.git
+
+git ls-remote https://github.com/${ORG}/${REPONAME}.git &>-
+if [ "$?" -ne 0 ]; then
+   OWNER=$UPSTREAM_ORG
+else
+   OWNER=${ORG}
+fi
+echo https://github.com/${OWNER}/${REPONAME}.git
