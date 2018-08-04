@@ -5,9 +5,19 @@
 # Usage:  find-git-branch REPO BRANCH
 # Prints either BRANCH, if it exists in REPO, or else "master".
 
-git ls-remote --heads ${REPO} ${BRANCH} | grep ${BRANCH} >/dev/null
-if [ "$?" == "1" ] ; then
-  echo "master"
+# For example usage within a Travis build, see
+# https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 REPO BRANCH"
+    exit 1
+fi
+
+REPO=$1
+BRANCH=$2
+
+if (git ls-remote --quiet --exit-code --heads ${REPO} ${BRANCH} > /dev/null) ; then
+  echo ${BRANCH}
 else
-  echo $BRANCH
+  echo "master"
 fi

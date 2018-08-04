@@ -7,6 +7,18 @@
 #   https://github.com/${ORG}/${REPO}.git
 #   https://github.com/${UPSTREAM_ORG}/${REPO}.git
 
+# For example usage within a Travis build, see
+# https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
+
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 ORG UPSTREAM_ORG REPONAME"
+    exit 1
+fi
+
+ORG=$1
+UPSTREAM_ORG=$2
+REPONAME=$3
+
 git ls-remote https://github.com/${ORG}/${REPONAME}.git &>-
 if [ "$?" -ne 0 ]; then
    OWNER=$UPSTREAM_ORG

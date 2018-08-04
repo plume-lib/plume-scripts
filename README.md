@@ -59,7 +59,7 @@ if the fork does not exist.
 ### git-find-branch
 
 Tests whether a branch exists in a Git repository;
-#  prints the branch, or prints "master" if the branch does not exist.
+prints the branch, or prints "master" if the branch does not exist.
 [Documentation](git-find-branch) at top of file.
 
 ### Usage of git-find-{fork,branch}
@@ -69,16 +69,14 @@ Suppose you have two related Git repositories:\
   *MY-ORG*`/`*MY-OTHER-REPO*
 
 In a Travis job that is testing branch BR in fork F of *MY-REPO*,
-you would like to use fork F of *MY-OTHER-REPO* if it exists
-(otherwise use the repo owned by MY-ORG),
-and you would like to use branch BR if it exists
-(otherwise use the `master` branch)
+you would like to use fork F of *MY-OTHER-REPO* if it exists,
+and you would like to use branch BR if it exists.
 Here is to accomplish that:
 
 ```
     (cd .. && git clone --depth 1 https://github.com/plume-lib/plume-scripts.git)
-    REPO=../plume-scripts/git-find-repo ${SLUGOWNER} MY-ORG MY-OTHER-REPO
-    BRANCH=../plume-scripts/git-find-branch ${REPO} ${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH} 
+    REPO=`../plume-scripts/git-find-fork ${SLUGOWNER} MY-ORG MY-OTHER-REPO`
+    BRANCH=`../plume-scripts/git-find-branch ${REPO} ${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}`
     (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
 ```
 
