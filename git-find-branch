@@ -9,6 +9,7 @@
 # https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
 
 if [ "$#" -ne 2 ]; then
+    echo "Error: $0 requires 2 arguments, got $#"
     echo "Usage: $0 REPO BRANCH"
     exit 1
 fi

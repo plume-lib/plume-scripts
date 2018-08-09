@@ -25,6 +25,7 @@ _EMACSCLIENT=emacs
 
 # test args
 if [ ! ${#} -ge 3 ]; then
+    echo 1>&2 "Error: ${0} requires 4 arguments, got ${#}"
     echo 1>&2 "Usage: ${0} LOCAL REMOTE MERGED BASE"
     echo 1>&2 "       (LOCAL, REMOTE, MERGED, BASE can be provided by \`git mergetool'.)"
     exit 1
