@@ -31,6 +31,14 @@
 # 2. The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
 # suggests it has this same functionality, but my tests indicate it does not.
 
+# TODO: Add a --guess-strip command-line argument that guesses the --strip command-line arguments.
+# It would be nicest to make a prepass over all file names and compute the smallest values for the
+# --strip functions that match.  That's only possible if this script reads and stores the whole lint
+# output, to iterate over it twice.  That may greatly increase storage requirements, but so be it.
+# For the diff file, two possibilites:
+#  * create the dictionary with no --strip-diff value, then iterate over it changing the map keys.
+#  * prepass over the file to compute --strip-diff, then iterate over the file again to create the
+#    dictionary
 
 from __future__ import print_function
 
