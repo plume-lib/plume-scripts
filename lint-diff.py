@@ -23,6 +23,11 @@
 # [ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty" && false)
 # wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
 # python lint-diff.py --strip-diff=1 --strip-lint=2 /tmp/diff.txt /tmp/warnings.txt
+#
+# If /tmp/diff is empty, that is usually a configuration error on your part.
+# It can be correct in some situations, such as when pulling master into a
+# branch that already contains all of master's changes.  To be more lenient:
+# [ -s /tmp/diff.txt ] || (echo "WARNING: /tmp/diff.txt is empty")
 
 
 # Implementation notes:
