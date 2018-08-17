@@ -11,8 +11,9 @@
 # https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
 
 if [ "$#" -ne 3 ]; then
-    echo "Error: $0 requires 3 arguments, got $#"
-    echo "Usage: $0 ORG UPSTREAM_ORG REPONAME"
+    script=$(basename -- "$0")
+    >&2 echo "Error: $script requires 3 arguments, got $#"
+    >&2 echo "Usage: $script ORG UPSTREAM_ORG REPONAME"
     exit 1
 fi
 

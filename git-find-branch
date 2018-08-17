@@ -8,9 +8,11 @@
 # For example usage within a Travis build, see
 # https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
 
-if [ "$#" -ne 2 ]; then
-    echo "Error: $0 requires 2 arguments, got $#"
-    echo "Usage: $0 REPO BRANCH"
+if [ "$#" -eq 1 ]; then
+    script=$(basename -- "$0")
+    >&2 echo "Error: $script requires 2 arguments, got $#, using \"master\""
+    >&2 echo "Usage: $script REPO BRANCH"
+    echo "master"
     exit 1
 fi
 
