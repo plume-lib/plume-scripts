@@ -8,9 +8,15 @@ Maybe they will help you too.
 ## cronic
 
 A small shim shell script for wrapping cron jobs so that cron only sends
-email when an error has occurred.  Documentation
-[at top of file](cronic) and at
-http://habilis.net/cronic/.
+email when an error has occurred.
+Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
+
+
+## classfile_check_version
+
+Check that a class file's version is &leq; the specified version.
+This ensures that the class will run on a particular version of Java.
+Documentation [at top of file](classfile_check_version).
 
 
 ## Cygwin wrappers
