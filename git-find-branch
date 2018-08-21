@@ -10,7 +10,7 @@
 
 if [ "$#" -eq 1 ]; then
     script=$(basename -- "$0")
-    >&2 echo "Error: $script requires 2 arguments, got $#"
+    >&2 echo "Warning: $script requires 2 arguments, got $#"
     >&2 echo "Usage: $script REPO BRANCH"
     >&2 echo "Returning \"master\""
     echo "master"
