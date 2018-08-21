@@ -14,7 +14,7 @@ if [ "$#" -eq 1 ]; then
     >&2 echo "Usage: $script REPO BRANCH"
     >&2 echo "Returning \"master\""
     echo "master"
-    exit 1
+    exit 0
 fi
 
 REPO=$1
