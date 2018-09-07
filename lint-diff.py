@@ -20,14 +20,13 @@
 #
 # (git diff "${TRAVIS_COMMIT_RANGE/.../..}" > /tmp/diff.txt 2>&1) || true
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
-# [ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty" && false)
+# [ -s /tmp/diff.txt ] || ([[ "${TRAVIS_BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty" && false))
 # wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
 # python lint-diff.py --strip-diff=1 --strip-lint=2 /tmp/diff.txt /tmp/warnings.txt
 #
 # If /tmp/diff is empty, that is usually a configuration error on your part.
-# It can be correct in some situations, such as when pulling master into a
-# branch that already contains all of master's changes.  To be more lenient:
-# [ -s /tmp/diff.txt ] || (echo "WARNING: /tmp/diff.txt is empty")
+# It's acceptable when pulling unrelated changes from master into a branch, or
+# when pulling master into a branch that already contains all of master's changes.
 
 
 # Implementation notes:
