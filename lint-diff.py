@@ -4,7 +4,7 @@
 #
 # This is useful when you want to enforce some style guideline, but
 # making the changes globally in your project would be too burdensome.
-# You can make the requirement only for new and and lines, so your
+# You can make the requirement only for new and changed lines, so your
 # codebase will conform to the new standard gradually, as you edit it.
 
 # Usage:  lint-diff.py [options] diff.txt [lint-output.txt]
