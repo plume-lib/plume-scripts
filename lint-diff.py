@@ -18,7 +18,7 @@
 # Here is how you could use this in Travis require that pull requests
 # satisfy the command `command-that-issues-warnings`:
 #
-# (git diff "${TRAVIS_COMMIT_RANGE/.../..}" > /tmp/diff.txt 2>&1) || true
+# (git diff $TRAVIS_COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # [ -s /tmp/diff.txt ] || ([[ "${TRAVIS_BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty; try pulling base branch into compare branch" && false))
 # wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
