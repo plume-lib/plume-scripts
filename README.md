@@ -56,6 +56,11 @@ A script for use as a git mergetool; runs Emacs ediff as the mergetool.
 
 ## Git utilities
 
+### git-authors
+
+Lists all the authors of commits in a get repository.
+[Documentation](git-authors) at top of file.
+
 ### git-find-fork
 
 Finds a fork of a GitHub repository, or returns the upstream repository
