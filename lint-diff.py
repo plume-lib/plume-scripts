@@ -14,6 +14,8 @@
 # Options: --strip-diff=N means to ignore N leading "/" in diff.txt.
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
 #              Affects matching, but not output, of lines.
+#          --context=N is how many lines adjacent to the changed ones
+#              are also considered changed; the default is 2.
 
 # Here is how you could use this in Travis require that pull requests
 # satisfy the command `command-that-issues-warnings`:
@@ -87,9 +89,12 @@ relative_diff = False
 # True if a warning has been issued about relative directories.
 relative_diff_warned = False
 
+# This many lines around each changed one are also considered changed
+context_lines = 2
+
 # TODO: Use argparse instead?  I don't see how to indicate that
 # the lint-output.txt argument is optional.
-while len(sys.argv) > 1 and sys.argv[1].startswith("--strip-"):
+while len(sys.argv) > 1 and sys.argv[1].startswith("--"):
     m = re.match('^--strip-diff=([0-9]+)$', sys.argv[1])
     if m:
         strip_diff = int(m.group(1))
@@ -98,6 +103,11 @@ while len(sys.argv) > 1 and sys.argv[1].startswith("--strip-"):
     m = re.match('^--strip-lint=([0-9]+)$', sys.argv[1])
     if m:
         strip_lint = int(m.group(1))
+        del sys.argv[1]
+        continue
+    m = re.match('^--context=([0-9]+)$', sys.argv[1])
+    if m:
+        context_lines = int(m.group(1))
         del sys.argv[1]
         continue
     eprint("Bad argument:", sys.argv[1])
@@ -110,8 +120,6 @@ if len(sys.argv) != 2 and len(sys.argv) != 3:
 # A dictionary from file names to a set of ints (line numbers)
 changed = {}
 
-# This many line around each changed one are also considered changed
-context_lines = 2
 
 diff_filename = sys.argv[1]
 with open(diff_filename) as diff:
