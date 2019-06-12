@@ -14,15 +14,16 @@
 # Options: --strip-diff=N means to ignore N leading "/" in diff.txt.
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
 #              Affects matching, but not output, of lines.
+#          --guess-strip means guess values for --strip-diff and --strip-lint.
 
-# Here is how you could use this in Travis require that pull requests
+# Here is how you could use this in Travis to require that pull requests
 # satisfy the command `command-that-issues-warnings`:
 #
 # (git diff $TRAVIS_COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # [ -s /tmp/diff.txt ] || ([[ "${TRAVIS_BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty; try pulling base branch into compare branch" && false))
 # wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
-# python lint-diff.py --strip-diff=1 --strip-lint=2 /tmp/diff.txt /tmp/warnings.txt
+# python lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
 #
 # If /tmp/diff is empty, that is usually a configuration error on your part.
 # It's acceptable when pulling unrelated changes from master into a branch, or
@@ -35,14 +36,6 @@
 # 2. The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
 # suggests it has this same functionality, but my tests indicate it does not.
 
-# TODO: Add a --guess-strip command-line argument that guesses the --strip command-line arguments.
-# It would be nicest to make a prepass over all file names and compute the smallest values for the
-# --strip functions that match.  That's only possible if this script reads and stores the whole lint
-# output, to iterate over it twice.  That may greatly increase storage requirements, but so be it.
-# For the diff file, two possibilites:
-#  * create the dictionary with no --strip-diff value, then iterate over it changing the map keys.
-#  * prepass over the file to compute --strip-diff, then iterate over the file again to create the
-#    dictionary
 
 from __future__ import print_function
 
@@ -52,7 +45,14 @@ import sys
 
 strip_diff = 0
 strip_lint = 0
+guess_strip = False
 
+
+plusplusplus_re = re.compile('\+\+\+ (\S*).*')
+
+filename_lineno_re = re.compile('([^:]*):([0-9]+):.*')
+
+max_pair = (1000,1000)
 
 def eprint(*args, **kwargs):
     """Print to stderr."""
@@ -79,6 +79,74 @@ assert strip_dirs("/a/b/c/", 3) == 'c/'
 assert strip_dirs("/a/b/c/", 4) == ''
 """
 
+def min_strips(filename1, filename2):
+    """Returns a 2-tuple of 2 integers, indicating the smallest strip values that make the two filenames equal, or max_pair if the files have different basenames."""
+    components1 = filename1.split(os.path.sep)
+    components2 = filename2.split(os.path.sep)
+    if components1[-1] != components2[-1]:
+        ## TODO: is this special case necessary?
+        return max_pair
+    while len(components1) > 0 and len(components2) > 0 and components1[-1] == components2[-1]:
+        del components1[-1]
+        del components2[-1]
+    return (len(components1), len(components2))
+## Tests:
+"""
+import os
+assert min_strips("/a/b/c/d", "/a/b/c/d") == (0,0)
+assert min_strips("e1/e2/a/b/c/d", "/a/b/c/d") == (2,1)
+assert min_strips("/e1/e2/a/b/c/d", "/a/b/c/d") == (3,1)
+assert min_strips("e1/e2/a/b/c/d", "a/b/c/d") == (2,0)
+assert min_strips("/e1/e2/a/b/c/d", "a/b/c/d") == (3,0)
+assert min_strips("/a/b/c/d", "/e/f/g/h") == (0,0)
+"""
+
+def pair_min(pair1, pair2):
+    if pair1[0] <= pair2[0] and pair1[1] <= pair2[1]:
+        return pair1
+    if pair1[0] >= pair2[0] and pair1[1] >= pair2[1]:
+        return pair2
+    assert False, "incomparable pairs: " + pair1 + " " + pair2
+## Tests:
+"""
+import os
+assert pair_min((3,4), (5,6)) == (3,4)
+assert pair_min((4,3), (6,5)) == (4,3)
+assert pair_min((30,40), (5,6)) == (5,6)
+assert pair_min((40,30), (6,5)) == (6,5)
+"""
+
+def diff_filenames(diff_filename):
+    result = []
+    with open(diff_filename) as diff:
+        for diff_line in diff:
+            m = plusplusplus_re.match(diff_line)
+            if m:
+                result.append(m.group(1))
+    return result
+
+def lint_filenames(lint_filename):
+    result = []
+    with open(lint_filename) as lint:
+        for lint_line in lint:
+            m = filename_lineno_re.match(lint_line)
+            if m:
+                result.append(m.group(1))
+    return result
+
+
+def guess_strip_filenames(diff_filenames, lint_filenames):
+    """Arguments are two lists of file names."""
+    result = max_pair
+    for diff_filename in diff_filenames:
+        for lint_filename in lint_filenames:
+            result = pair_min(result, min_strips(diff_filename, lint_filename))
+    return result
+
+
+def guess_strip_files(diff_file, lint_file):
+    return guess_strip_filenames(diff_filenames(diff_file), lint_filenames(lint_file))
+    
 
 ### Main routine
 
@@ -89,7 +157,7 @@ relative_diff_warned = False
 
 # TODO: Use argparse instead?  I don't see how to indicate that
 # the lint-output.txt argument is optional.
-while len(sys.argv) > 1 and sys.argv[1].startswith("--strip-"):
+while len(sys.argv) > 1 and sys.argv[1].startswith("--"):
     m = re.match('^--strip-diff=([0-9]+)$', sys.argv[1])
     if m:
         strip_diff = int(m.group(1))
@@ -100,14 +168,35 @@ while len(sys.argv) > 1 and sys.argv[1].startswith("--strip-"):
         strip_lint = int(m.group(1))
         del sys.argv[1]
         continue
+    m = re.match('^--guess-strip$', sys.argv[1])
+    if m:
+        guess_strip = True
+        del sys.argv[1]
+        continue
     eprint("Bad argument:", sys.argv[1])
+    sys.exit(2)
+
+if guess_strip and (strip_diff != 0 or strip_lint != 0):
+    eprint(sys.argv[0], ": don's supply both --guess-strip and --strip-diff or --strip-lint")
     sys.exit(2)
 
 if len(sys.argv) != 2 and len(sys.argv) != 3:
     eprint(sys.argv[0], "needs 1 or 2 arguments, got", len(sys.argv)-1)
     sys.exit(2)
 
-# A dictionary from file names to a set of ints (line numbers)
+if guess_strip and len(sys.argv) == 2:
+    eprint(sys.argv[0], "needs 2, not 1, file arguments when --guess-strip is provided")
+    sys.exit(2)
+    
+if guess_strip:
+    guessed_strip = guess_strip_files(sys.argv[1], sys.argv[2])
+    if guessed_strip != max_pair:
+        strip_diff = guessed_strip[0]
+        strip_lint = guessed_strip[1]
+        print("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(strip_diff, strip_lint))
+
+
+# A dictionary from file names to a set of ints (line numbers for changed lines)
 changed = {}
 
 # This many line around each changed one are also considered changed
@@ -115,7 +204,6 @@ context_lines = 2
 
 diff_filename = sys.argv[1]
 with open(diff_filename) as diff:
-    plusplusplus_re = re.compile('\+\+\+ (\S*).*')
     atat_re = re.compile('@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*')
     content_re = re.compile('[ +-].*')
 
@@ -155,7 +243,7 @@ with open(diff_filename) as diff:
             continue
 
 if relative_diff and strip_diff == 0:
-    eprint("warning:", sys.argv[1], "may use relative paths but --strip-diff=0")    
+    eprint("warning:", sys.argv[1], "may use relative paths but --strip-diff=0")
 
 if len(sys.argv) == 3:
     lint_filename = sys.argv[2]
@@ -163,8 +251,6 @@ if len(sys.argv) == 3:
 else:
     lint_filename = "stdin"
     lint = sys.stdin
-
-filename_lineno_re = re.compile('([^:]*):([0-9]+):.*')
 
 # 1 if this produced any output, 0 if not
 status = 0
