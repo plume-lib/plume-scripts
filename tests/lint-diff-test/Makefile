@@ -22,7 +22,7 @@ words2-lint.txt: words2.txt
 	grep -Hn 'a.*i' $< > $@ || true
 
 words2-lint-pruned.txt: words12-diff.txt words2-lint.txt
-	../../lint-diff.py $^ > $@ || true
+	../../lint-diff.py --context=0 $^ > $@ || true
 
 # perl command removes lines that match both a.*e.*t and a.*a.*e .
 words2-lint-pruned.txt-goal: words-lint.txt
@@ -37,8 +37,8 @@ words2-lint-pruned.txt-goal: words-lint.txt
 test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 	diff $^
 
-reldir-lint-pruned.txt: reldir-words12-diff.txt reldir-lint.txt
-	../../lint-diff.py --strip-diff=1 --strip-lint=2 $^ > $@ || true
+reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
+	../../lint-diff.py --strip-diff=1 --strip-lint=2 --context=0 $^ > $@ || true
 
 
 # Miscellaneous targets
