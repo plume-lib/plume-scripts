@@ -42,7 +42,7 @@ test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 	diff $^
 
 reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
-	../../lint-diff.py --strip-diff=1 --strip-lint=2 $^ > $@ || true
+	../../lint-diff.py --strip-diff=1 --strip-lint=2 --context=0 $^ > $@ || true
 
 
 # Miscellaneous targets
