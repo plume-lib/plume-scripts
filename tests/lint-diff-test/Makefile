@@ -1,4 +1,4 @@
-test: test-words test-reldir
+test: test-words test-reldir test-guessstrip
 
 
 # "words" test
@@ -43,6 +43,15 @@ test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 
 reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
 	../../lint-diff.py --strip-diff=1 --strip-lint=2 --context=0 $^ > $@ || true
+
+
+# "guessstrip" test
+
+test-guessstrip: guessstrip-lint-pruned.txt-goal guessstrip-lint-pruned.txt
+	diff $^
+
+guessstrip-lint-pruned.txt: guessstrip-diff.txt guessstrip-lint.txt
+	../../lint-diff.py  --guess-strip $^ > $@ || true
 
 
 # Miscellaneous targets
