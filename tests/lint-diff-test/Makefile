@@ -1,20 +1,10 @@
 test: test-words test-reldir test-guessstrip
 
+
+# "words" test
+
 test-words: words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename
 	diff $^
-
-test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
-	diff $^
-
-test-guessstrip: guessstrip-lint-pruned.txt-goal guessstrip-lint-pruned.txt
-	diff $^
-
-reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
-	../../lint-diff.py --strip-diff=1 --strip-lint=2 $^ > $@ || true
-
-# It would be nicer to put all generated files in a subdirectory.
-clean:
-	rm -f words1.txt words2.txt diff.txt words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt
 
 words1.txt: words.txt
 	grep -v 'a.*e.*t' $< > $@
@@ -38,9 +28,30 @@ words2-lint-pruned.txt: diff.txt words2-lint.txt
 words2-lint-pruned.txt-goal: words-lint.txt
 	grep ':.*a.*e.*t' $< | perl -ni -e 'print unless /a.*e.*t/ && /a.*a.*e/' > $@ || true
 
-guessstrip-lint-pruned.txt: guessstrip-diff.txt guessstrip-lint.txt
-	../../lint-diff.py  --guess-strip $^ > $@ || true
-
 %-nofilename: %
 	sed 's/^[-A-Za-z0-9.]\{1,\}:[0-9]\{1,\}://' $< > $@
 
+
+# "reldir" test
+
+test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
+	diff $^
+
+reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
+	../../lint-diff.py --strip-diff=1 --strip-lint=2 $^ > $@ || true
+
+
+# "guessstrip" test
+
+test-guessstrip: guessstrip-lint-pruned.txt-goal guessstrip-lint-pruned.txt
+	diff $^
+
+guessstrip-lint-pruned.txt: guessstrip-diff.txt guessstrip-lint.txt
+	../../lint-diff.py  --guess-strip $^ > $@ || true
+
+
+# Miscellaneous targets
+
+# It would be nicer to put all generated files in a subdirectory.
+clean:
+	rm -f words1.txt words2.txt diff.txt words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt

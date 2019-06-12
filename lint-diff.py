@@ -15,6 +15,8 @@
 #          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
 #              Affects matching, but not output, of lines.
 #          --guess-strip means guess values for --strip-diff and --strip-lint.
+#          --context=N is how many lines adjacent to the changed ones
+#              are also considered changed; the default is 2.
 
 # Here is how you could use this in Travis to require that pull requests
 # satisfy the command `command-that-issues-warnings`:
@@ -155,6 +157,9 @@ relative_diff = False
 # True if a warning has been issued about relative directories.
 relative_diff_warned = False
 
+# This many lines around each changed one are also considered changed
+context_lines = 2
+
 # TODO: Use argparse instead?  I don't see how to indicate that
 # the lint-output.txt argument is optional.
 while len(sys.argv) > 1 and sys.argv[1].startswith("--"):
@@ -171,6 +176,11 @@ while len(sys.argv) > 1 and sys.argv[1].startswith("--"):
     m = re.match('^--guess-strip$', sys.argv[1])
     if m:
         guess_strip = True
+        del sys.argv[1]
+        continue
+    m = re.match('^--context=([0-9]+)$', sys.argv[1])
+    if m:
+        context_lines = int(m.group(1))
         del sys.argv[1]
         continue
     eprint("Bad argument:", sys.argv[1])
@@ -199,8 +209,6 @@ if guess_strip:
 # A dictionary from file names to a set of ints (line numbers for changed lines)
 changed = {}
 
-# This many line around each changed one are also considered changed
-context_lines = 2
 
 diff_filename = sys.argv[1]
 with open(diff_filename) as diff:
