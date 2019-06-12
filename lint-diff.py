@@ -89,7 +89,7 @@ relative_diff = False
 # True if a warning has been issued about relative directories.
 relative_diff_warned = False
 
-# This many line around each changed one are also considered changed
+# This many lines around each changed one are also considered changed
 context_lines = 2
 
 # TODO: Use argparse instead?  I don't see how to indicate that
