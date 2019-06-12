@@ -12,7 +12,7 @@ words1.txt: words.txt
 words2.txt: words.txt
 	grep -v 'a.*a.*e' $< > $@
 
-diff.txt: words1.txt words2.txt
+words12-diff.txt: words1.txt words2.txt
 	diff -u $^ > $@ || true
 
 words-lint.txt: words.txt
@@ -21,7 +21,7 @@ words-lint.txt: words.txt
 words2-lint.txt: words2.txt
 	grep -Hn 'a.*i' $< > $@ || true
 
-words2-lint-pruned.txt: diff.txt words2-lint.txt
+words2-lint-pruned.txt: words12-diff.txt words2-lint.txt
 	../../lint-diff.py $^ > $@ || true
 
 # perl command removes lines that match both a.*e.*t and a.*a.*e .
@@ -37,7 +37,7 @@ words2-lint-pruned.txt-goal: words-lint.txt
 test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 	diff $^
 
-reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
+reldir-lint-pruned.txt: reldir-words12-diff.txt reldir-lint.txt
 	../../lint-diff.py --strip-diff=1 --strip-lint=2 $^ > $@ || true
 
 
@@ -45,5 +45,5 @@ reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
 
 # It would be nicer to put all generated files in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt diff.txt words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt
+	rm -f words1.txt words2.txt words12-diff.txt words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt
 
