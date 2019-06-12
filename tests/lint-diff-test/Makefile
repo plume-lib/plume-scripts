@@ -7,7 +7,7 @@ test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 	diff $^
 
 reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
-	../../lint-diff.py --strip-diff=1 --strip-lint=2 $^ > $@ || true
+	../../lint-diff.py --context=0 --strip-diff=1 --strip-lint=2 $^ > $@ || true
 
 # It would be nicer to put all generated files in a subdirectory.
 clean:
