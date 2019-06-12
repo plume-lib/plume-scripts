@@ -56,7 +56,7 @@ strip_diff = 0
 strip_lint = 0
 
 debug = False
-debug = True
+# debug = True
 
 def eprint(*args, **kwargs):
     """Print to stderr."""
