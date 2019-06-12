@@ -53,6 +53,8 @@ import sys
 strip_diff = 0
 strip_lint = 0
 
+debug = False
+debug = True
 
 def eprint(*args, **kwargs):
     """Print to stderr."""
@@ -153,6 +155,10 @@ with open(diff_filename) as diff:
             for changed_lineno in range(lineno-context_lines, lineno+context_lines):
                 changed[filename].add(changed_lineno)
             continue
+
+if debug:
+    for filename in sorted(changed):
+        print(filename, sorted(changed[filename]))
 
 if relative_diff and strip_diff == 0:
     eprint("warning:", sys.argv[1], "may use relative paths but --strip-diff=0")    
