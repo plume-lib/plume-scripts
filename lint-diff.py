@@ -140,7 +140,8 @@ def lint_filenames(lint_filename):
 
 
 def guess_strip_filenames(diff_filenames, lint_filenames):
-    """Arguments are two lists of file names."""
+    """Arguments are two lists of file names.
+    Result is a pair of integers."""
     result = max_pair
     for diff_filename in diff_filenames:
         for lint_filename in lint_filenames:
@@ -149,8 +150,17 @@ def guess_strip_filenames(diff_filenames, lint_filenames):
 
 
 def guess_strip_files(diff_file, lint_file):
-    return guess_strip_filenames(diff_filenames(diff_file), lint_filenames(lint_file))
-    
+    """Arguments are files produced by diff and a lint tool, respectively.
+    Result is a pair of integers."""
+    diff_files = diff_filenames(diff_file)
+    lint_files = lint_filenames(lint_file)
+    result = guess_strip_filenames(diff_files, lint_files)
+    diff_prefix = os.path.commonprefix(diff_files)
+    lint_prefix = os.path.commonprefix(lint_files)
+    if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
+        return max_pair
+    return result
+
 
 ### Main routine
 
