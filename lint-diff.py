@@ -23,7 +23,7 @@
 #
 # (git diff $TRAVIS_COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
-# [ -s /tmp/diff.txt ] || ([[ "${TRAVIS_BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty; try pulling base branch into compare branch" && false))
+# [ -s /tmp/diff.txt ] || ([[ "${TRAVIS_BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty; try pulling base branch (often master) into compare branch (often your feature branch)" && false))
 # wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
 # python lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
 #
