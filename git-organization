@@ -12,8 +12,7 @@ if [ "$TRAVIS" = "true" ]; then
     SLUGOWNER=${TRAVIS_REPO_SLUG%/*}
   fi
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
-  SLUG=`wget -q -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER} | jq .head.label`
-  echo "SLUG=$SLUG"
+  SLUG=`wget -q -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER} | jq .head.label | sed 's/"//g'`
   SLUGOWNER=${SLUG%:*}
   SLUGREPO=${SLUG#*:}
 fi
