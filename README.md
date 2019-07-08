@@ -4,6 +4,14 @@ I find these scripts automate tedious tasks and speed up my work.
 Some were written by me, others were found on the Internet.
 Maybe they will help you too.
 
+To use the scripts, put the following at the top of your script.
+Then, the scripts are available at `/tmp/plume-scripts`.
+
+```
+git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
+  || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+```
+
 
 ## cronic
 

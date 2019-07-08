@@ -6,6 +6,8 @@
 # You must run this via `source git-set-commit-range` (run in same shell),
 # not via `git-set-commit-range` (run it its own subshell).
 
+# For typical use, see comments in file `lint-diff.py` in this directory.
+
 # If it's a pull request, set COMMIT_RANGE and BRANCH
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines
