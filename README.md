@@ -13,18 +13,18 @@ git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
 ```
 
 
-## cronic
-
-A small shim shell script for wrapping cron jobs so that cron only sends
-email when an error has occurred.
-Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
-
-
 ## classfile_check_version
 
 Check that a class file's version is &leq; the specified version.
 This ensures that the class will run on a particular version of Java.
 Documentation [at top of file](classfile_check_version).
+
+
+## cronic
+
+A wrapper for cron jobs so that cron only sends
+email when an error has occurred.
+Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
 
 
 ## Cygwin wrappers
@@ -56,13 +56,12 @@ arguments that are Unix-style paths into Windows-style paths.
 [Documentation](javadoc-cygwin) at top of file.
 
 
-## ediff-merge-script
+## Git utilities
+
+### ediff-merge-script
 
 A script for use as a git mergetool; runs Emacs ediff as the mergetool.
 [Documentation](ediff-merge-script) at top of file.
-
-
-## Git utilities
 
 ### git-authors
 
@@ -152,7 +151,9 @@ Works for either space- or colon- delimiated paths.
 [Documentation](path-remove) at top of file.
 
 
-## preplace
+## Search and replace
+
+### preplace
 
 Replace all matching regular expressions in the given files (or all files
 under the current directory).  The timestamp on each file is updated only
@@ -160,14 +161,15 @@ if the replacement is performed.
 [Documentation](preplace) at top of file.
 
 
-## search
+### search
 
 Jeffrey Friedl's search program combines `find` and `grep`
 -- more or less do a 'grep' on a whole directory tree, but is more
 efficient, uses Perl regular expressions, and is much more powerful.
 This version fixes a tiny bug or two.  For full documentation, see its
 [manpage](search.manpage).
-This program has been largely superseded by [`ag`](http://geoff.greer.fm/ag/), [`pt`](https://github.com/monochromegane/the_platinum_searcher), etc.  However,
+This program has been largely superseded by [`rg'](https://github.com/BurntSushi/ripgrep), and before that by  [`pt`](https://github.com/monochromegane/the_platinum_searcher) and
+[`ag`](http://geoff.greer.fm/ag/).  However,
 it is still useful because it searches more thoroughly:  in git-ignored
 files, and in compressed archives.
 
