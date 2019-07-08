@@ -91,6 +91,17 @@ Here is how to accomplish that:
   (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
 ```
 
+### git-organization
+
+Returns the organization of the current git clone, like "plume-lib" for a
+clone of this repository.  Contains special code to handle pull requests in
+Travis and Azure Pipelines.
+
+### git-set-commit-range
+
+Sets environment variables COMMIT_RANGE, BRANCH, and STRIP_LINT, when run
+in a pull request under Azure Pipelines, CircleCI, or Travis CI.
+
 
 ## latex-process-inputs
 

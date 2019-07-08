@@ -18,16 +18,24 @@
 #          --context=N is how many lines adjacent to the changed ones
 #              are also considered changed; the default is 2.
 
-# Here is how you could use this in Travis to require that pull requests
+# Here is how you could use this in continuous integration (Azure
+# Pipelines, CircleCI, Travis CI) to require that pull requests
 # satisfy the command `command-that-issues-warnings`:
 #
-# (git diff $TRAVIS_COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
-# (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
-# [ -s /tmp/diff.txt ] || ([[ "${TRAVIS_BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty; try pulling base branch (often master) into compare branch (often your feature branch)" && false))
-# wget https://raw.githubusercontent.com/plume-lib/plume-scripts/master/lint-diff.py
-# python lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
+# git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
+#   || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+# source /tmp/plume-scripts/git-set-commit-range
+# echo COMMIT_RANGE=$COMMIT_RANGE
+# echo BRANCH=$BRANCH
+# if [ -n "$COMMIT_RANGE" ] ; then
+#   (git diff $COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
+#   (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
+#   [ -s /tmp/diff.txt ] || ([[ "${BRANCH}" != "master" && "${TRAVIS_EVENT_TYPE}" == "push" ]] || (echo "/tmp/diff.txt is empty for COMMIT_RANGE=$COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && false))
+#   python /tmp/plume-scripts/lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
+# fi
 #
 # If /tmp/diff is empty, that is usually a configuration error on your part.
+# Sometimes it is because Travis CI gets confused.
 # It's acceptable when pulling unrelated changes from master into a branch, or
 # when pulling master into a branch that already contains all of master's changes.
 
