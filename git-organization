@@ -21,7 +21,7 @@ fi
 ## Git clone
 if [ "$SLUGOWNER" = "" ]; then
   URL=`git config --get remote.origin.url`
-  SLUG=${URL#*:}}
+  SLUG=${URL#*:}
   SLUGOWNER=${SLUG%/*}
 fi
 
