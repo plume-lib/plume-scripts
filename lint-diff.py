@@ -32,10 +32,8 @@
 #   python /tmp/plume-scripts/lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
 # fi
 #
-# If /tmp/diff is empty, that is usually a configuration error on your part.
-# Sometimes it is because Travis CI gets confused.
-# It's acceptable when pulling unrelated changes from master into a branch, or
-# when pulling master into a branch that already contains all of master's changes.
+# If /tmp/diff is empty, that might be because your clone is shallow and
+# does not contain all the commits.  You can fix that by pulling upstream.
 
 
 # Implementation notes:
