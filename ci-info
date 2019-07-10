@@ -60,6 +60,9 @@ elif [ -n "$TRAVIS_COMMIT_RANGE" ] ; then
     CI_IS_PR=1
   fi
   CI_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
+  echo echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH
+  echo echo TRAVIS_BRANCH=$TRAVIS_BRANCH
+  echo echo CI_BRANCH=$CI_BRANCH
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
@@ -73,8 +76,9 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   CI_BRANCH=$CIRCLE_BRANCH
 else
   # It's not a pull request.
-	# In git 2.22 and later, CI_BRANCH=`git branch --show-current`
+  # In git 2.22 and later, CI_BRANCH=`git branch --show-current`
   CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
+  echo echo CI_BRANCH (via git grep cut)=$CI_BRANCH
   if [ $CI_BRANCH = master ]; then
     CI_COMMIT_RANGE=HEAD^1..HEAD
   else      
