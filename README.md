@@ -58,8 +58,9 @@ arguments that are Unix-style paths into Windows-style paths.
 
 ### ci-info
 
-Obtains information about a CI (continuous integration) job, such
-as whether it is a pull request, the branch, and the range of commits.
+Obtains information about a CI (continuous integration) job, such as
+whether it is a pull request, the organization, the branch, and the range
+of commits.
 
 ### ediff-merge-script
 
@@ -100,17 +101,6 @@ Here is how to accomplish that:
   BRANCH=`/tmp/plume-scripts/git-find-branch ${REPO} ${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}`
   (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
 ```
-
-### git-organization
-
-Returns the organization of the current git clone, like "plume-lib" for a
-clone of this repository.  Contains special code to handle pull requests in
-Travis and Azure Pipelines.
-
-### git-set-commit-range
-
-Sets environment variables COMMIT_RANGE, BRANCH, and STRIP_LINT, when run
-in a pull request under Azure Pipelines, CircleCI, or Travis CI.
 
 
 ## latex-process-inputs
