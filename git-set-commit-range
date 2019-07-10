@@ -2,9 +2,10 @@
 
 # Sets environment variables COMMIT_RANGE, BRANCH, and STRIP_LINT, when run
 # in a pull request under Azure Pipelines, CircleCI, or Travis CI.
-
-# You must run this via `source git-set-commit-range` (run in same shell),
-# not via `git-set-commit-range` (run it its own subshell).
+# Use it like this:
+#   source /path/to/git-set-commit-range
+# (Don't just run `/path/to/git-set-commit-range`, which would run it
+# its own subshell rather than in the same shell.)
 
 # For typical use, see comments in file `lint-diff.py` in this directory.
 
@@ -16,11 +17,8 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   STRIP_LINT=4
 elif [ -n "$TRAVIS_COMMIT_RANGE" ] ; then
   ## Travis CI
-  # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
-  # Until https://github.com/travis-ci/travis-ci/issues/4596 is fixed, $TRAVIS_COMMIT_RANGE is a
-  # good argument to `git diff` but a bad argument to `git log` (they interpret "..." differently!).
   COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
-  BRANCH=$TRAVIS_BRANCH
+  BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
   STRIP_LINT=2
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
