@@ -13,7 +13,7 @@
 # Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
 
 # Here are the variables that it sets:
-# CI_IS_PR: Set if it's a pull request, unset otherwise.
+# CI_IS_PULL_REQUEST: Either "true" or "false" (without the quotes).
 # CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source.
 # CI_BRANCH: In a PR, the source branch; otherwise, the branch being tested.
 # CI_COMMIT_RANGE: An argument to `git diff` with the range of commits.
@@ -50,11 +50,13 @@ fi
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines
   BASE_COMMIT=`git rev-parse HEAD^1`
+  CI_IS_PULL_REQUEST=true
   CI_IS_PR=1
   CI_BRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH
   CI_COMMIT_RANGE=$BASE_COMMIT...$BUILD_SOURCEVERSION
 elif [ -n "$TRAVIS_COMMIT_RANGE" ] ; then
   ## Travis CI
+  CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   if [ $TRAVIS_PULL_REQUEST != false ] ; then
     CI_IS_PR=1
@@ -67,7 +69,9 @@ elif [ -n "$TRAVIS_COMMIT_RANGE" ] ; then
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
   if [ -n "$CIRCLE_PULL_REQUEST" ]; then
-    CI_IS_PR=1
+    CI_IS_PULL_REQUEST=true
+  else
+    CI_IS_PULL_REQUEST=false
   fi
   CI_COMMIT_RANGE=$(echo "${CIRCLE_COMPARE_URL}" | cut -d/ -f7)
   if [ $CI_COMMIT_RANGE != *"..."* ]; then
@@ -76,6 +80,7 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   CI_BRANCH=$CIRCLE_BRANCH
 else
   # It's not a pull request.
+  CI_IS_PULL_REQUEST=false
   # In git 2.22 and later, CI_BRANCH=`git branch --show-current`
   CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
   echo echo "CI_BRANCH via git grep cut is '$CI_BRANCH';"
@@ -90,8 +95,9 @@ fi
 
 echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
 echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
+echo "echo CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
+echo "CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST; export CI_IS_PULL_REQUEST;"
 if [ -n "$CI_IS_PR" ]; then
-  echo "echo CI_IS_PR=$CI_IS_PR;"
   echo "CI_IS_PR=$CI_IS_PR; export CI_IS_PR;"
 fi
 echo "echo CI_BRANCH=$CI_BRANCH;"
