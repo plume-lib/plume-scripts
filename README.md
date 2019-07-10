@@ -1,10 +1,8 @@
 # Plume-Scripts:  Scripts for programming and system administration #
 
-I find these scripts automate tedious tasks and speed up my work.
-Some were written by me, others were found on the Internet.
-Maybe they will help you too.
+These scripts automate various programming as sysadmin tasks.
 
-To use the scripts, put the following at the top of your script.
+To install, run the following (or put it at the top of a script).
 Then, the scripts are available at `/tmp/plume-scripts`.
 
 ```
@@ -173,10 +171,13 @@ Jeffrey Friedl's search program combines `find` and `grep`
 efficient, uses Perl regular expressions, and is much more powerful.
 This version fixes a tiny bug or two.  For full documentation, see its
 [manpage](search.manpage).
-This program has been largely superseded by [`rg'](https://github.com/BurntSushi/ripgrep), and before that by  [`pt`](https://github.com/monochromegane/the_platinum_searcher) and
-[`ag`](http://geoff.greer.fm/ag/).  However,
-it is still useful because it searches more thoroughly:  in git-ignored
-files, and in compressed archives.
+
+This program has been largely superseded by
+[`rg`](https://github.com/BurntSushi/ripgrep), and before that by
+[`pt`](https://github.com/monochromegane/the_platinum_searcher) and
+[`ag`](http://geoff.greer.fm/ag/).  However, it is still useful because it
+searches more thoroughly:  in git-ignored files, and in compressed
+archives.
 
 
 ## sort-directory-order
