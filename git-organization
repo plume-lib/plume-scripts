@@ -1,5 +1,7 @@
 #!/bin/sh
 
+## This script is obsolete.  Use ci-info instead.
+
 # Returns the organization of the current git clone, like "plume-lib" for a
 # clone of this repository.  Contains special code to handle pull requests in
 # Travis and Azure Pipelines.
