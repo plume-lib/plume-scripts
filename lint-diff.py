@@ -24,7 +24,7 @@
 #
 # git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
 #   || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
-# source /tmp/plume-scripts/git-set-commit-range
+# eval `/tmp/plume-scripts/ci-info`
 # if [ -n "$COMMIT_RANGE" ] ; then
 #   (git diff $COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
 #   (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true

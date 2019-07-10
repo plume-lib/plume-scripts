@@ -58,6 +58,11 @@ arguments that are Unix-style paths into Windows-style paths.
 
 ## Git utilities
 
+### ci-info
+
+Obtains information about a CI (continuous integration) job, such
+as whether it is a pull request, the branch, and the range of commits.
+
 ### ediff-merge-script
 
 A script for use as a git mergetool; runs Emacs ediff as the mergetool.
