@@ -1,5 +1,7 @@
 #!/bin/sh
 
+## This script is obsolete.  Use ci-info instead.
+
 # Sets environment variables COMMIT_RANGE, BRANCH, and STRIP_LINT, when run
 # in a pull request under Azure Pipelines, CircleCI, or Travis CI.
 # Use it like this:
