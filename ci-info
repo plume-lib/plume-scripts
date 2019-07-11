@@ -57,7 +57,6 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
-  # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   if [ $TRAVIS_PULL_REQUEST != false ] ; then
     CI_IS_PR=1
   fi
@@ -65,6 +64,7 @@ elif [ "$TRAVIS" = "true" ] ; then
   echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
   echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
   echo "echo CI_BRANCH=$CI_BRANCH;"
+  # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
