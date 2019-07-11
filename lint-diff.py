@@ -125,6 +125,7 @@ assert pair_min((40,30), (6,5)) == (6,5)
 """
 
 def diff_filenames(diff_filename):
+    """All the filenames in the given diff file."""
     result = []
     with open(diff_filename) as diff:
         for diff_line in diff:
@@ -134,6 +135,7 @@ def diff_filenames(diff_filename):
     return result
 
 def lint_filenames(lint_filename):
+    """All the filenames in the given lint file."""
     result = []
     with open(lint_filename) as lint:
         for lint_line in lint:
@@ -162,6 +164,9 @@ def guess_strip_files(diff_file, lint_file):
     diff_prefix = os.path.commonprefix(diff_files)
     lint_prefix = os.path.commonprefix(lint_files)
     if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
+        print("lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}".format(result, diffstrip_diff, strip_lint))
+        print diff_files
+        print lint_files
         return max_pair
     return result
 
@@ -203,7 +208,7 @@ while len(sys.argv) > 1 and sys.argv[1].startswith("--"):
     sys.exit(2)
 
 if guess_strip and (strip_diff != 0 or strip_lint != 0):
-    eprint(sys.argv[0], ": don's supply both --guess-strip and --strip-diff or --strip-lint")
+    eprint(sys.argv[0], ": don't supply both --guess-strip and --strip-diff or --strip-lint")
     sys.exit(2)
 
 if len(sys.argv) != 2 and len(sys.argv) != 3:
@@ -216,7 +221,9 @@ if guess_strip and len(sys.argv) == 2:
     
 if guess_strip:
     guessed_strip = guess_strip_files(sys.argv[1], sys.argv[2])
-    if guessed_strip != max_pair:
+    if guessed_strip == max_pair:
+        print("lint-diff.py: --guess-strip failed to guess values")
+    else:
         strip_diff = guessed_strip[0]
         strip_lint = guessed_strip[1]
         print("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(strip_diff, strip_lint))
