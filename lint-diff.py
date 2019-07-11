@@ -164,9 +164,9 @@ def guess_strip_files(diff_file, lint_file):
     diff_prefix = os.path.commonprefix(diff_files)
     lint_prefix = os.path.commonprefix(lint_files)
     if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
-        print("lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}".format(result, diff_prefix, lint_prefix))
-        print("diff_files={}".format(diff_files))
-        print("lint_files={}".format(lint_files))
+        eprint("lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}".format(result, diff_prefix, lint_prefix))
+        eprint("diff_files={}".format(diff_files))
+        eprint("lint_files={}".format(lint_files))
         return max_pair
     return result
 
