@@ -164,9 +164,10 @@ def guess_strip_files(diff_file, lint_file):
     diff_prefix = os.path.commonprefix(diff_files)
     lint_prefix = os.path.commonprefix(lint_files)
     if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
-        eprint("lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}".format(result, diff_prefix, lint_prefix))
-        eprint("diff_files={}".format(diff_files))
-        eprint("lint_files={}".format(lint_files))
+        if debug:
+            eprint("lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}".format(result, diff_prefix, lint_prefix))
+            eprint("diff_files={}".format(diff_files))
+            eprint("lint_files={}".format(lint_files))
         return max_pair
     return result
 
@@ -222,11 +223,13 @@ if guess_strip and len(sys.argv) == 2:
 if guess_strip:
     guessed_strip = guess_strip_files(sys.argv[1], sys.argv[2])
     if guessed_strip == max_pair:
-        print("lint-diff.py: --guess-strip failed to guess values")
+        if debug:
+            eprint("lint-diff.py: --guess-strip failed to guess values")
     else:
         strip_diff = guessed_strip[0]
         strip_lint = guessed_strip[1]
-        print("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(strip_diff, strip_lint))
+        if debug:
+            eprint("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(strip_diff, strip_lint))
 
 
 # A dictionary from file names to a set of ints (line numbers for changed lines)
