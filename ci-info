@@ -54,7 +54,7 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_IS_PR=1
   CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
   CI_COMMIT_RANGE=$BASE_COMMIT...$BUILD_SOURCEVERSION
-elif [ -n "$TRAVIS_COMMIT_RANGE" ] ; then
+elif [ -n "$TRAVIS" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
@@ -84,12 +84,17 @@ else
   # In git 2.22 and later, CI_BRANCH=`git branch --show-current`
   CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
   echo echo "CI_BRANCH via git grep cut is '$CI_BRANCH';"
+fi
+
+# Separate from "It's not a pull request" because sometimes this is not set for Travis.
+if [ ! -n "$CI_COMMIT_RANGE" ]; then
   if [ $CI_BRANCH = master ]; then
     CI_COMMIT_RANGE=HEAD^1..HEAD
   else      
     CI_COMMIT_RANGE=master...$BRANCH
   fi
 fi
+
 
 ### Print it out
 
