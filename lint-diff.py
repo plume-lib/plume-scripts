@@ -126,22 +126,22 @@ assert pair_min((40,30), (6,5)) == (6,5)
 
 def diff_filenames(diff_filename):
     """All the filenames in the given diff file."""
-    result = []
+    result = set()
     with open(diff_filename) as diff:
         for diff_line in diff:
             m = plusplusplus_re.match(diff_line)
             if m:
-                result.append(m.group(1))
+                result.add(m.group(1))
     return result
 
 def lint_filenames(lint_filename):
     """All the filenames in the given lint file."""
-    result = []
+    result = set()
     with open(lint_filename) as lint:
         for lint_line in lint:
             m = filename_lineno_re.match(lint_line)
             if m:
-                result.append(m.group(1))
+                result.add(m.group(1))
     return result
 
 
