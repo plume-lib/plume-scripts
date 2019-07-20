@@ -30,8 +30,10 @@
 # [ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && false)
 # python /tmp/plume-scripts/lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
 #
-# If /tmp/diff is empty, that might be because your clone is shallow and
-# does not contain all the commits.  You can fix that by pulling upstream.
+# If you get a warning that /tmp/diff is empty, that might be because your
+# clone is shallow and does not contain all the commits.  You can fix that
+# by pulling upstream.  Or it might be because your branch is identical to
+# the base/upstream branch.
 
 
 # Implementation notes:
