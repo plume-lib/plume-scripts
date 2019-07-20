@@ -1,4 +1,4 @@
-# Plume-Scripts:  Scripts for programming and system administration #
+i# Plume-Scripts:  Scripts for programming and system administration #
 
 These scripts automate various programming as sysadmin tasks.
 
@@ -25,7 +25,21 @@ email when an error has occurred.
 Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
 
 
-## Cygwin wrappers
+## Continuous integration utilities
+
+### ci-info
+
+Obtains information about a CI (continuous integration) job, such as
+whether it is a pull request, the organization, the branch, and the range
+of commits.  Works for Azure Pipelines, CircleCI, and Travis CI.
+[Documentation](ci-info) at top of file.
+
+### ci-lint-diff
+
+Given a file of warnings, reports only those that are in the diff for the
+current pull request.  Works for Azure Pipelines, CircleCI, and Travis CI.
+[Documentation](ci-lint-diff) at top of file.
+
 
 ### cygwin-runner
 
@@ -55,12 +69,6 @@ arguments that are Unix-style paths into Windows-style paths.
 
 
 ## Git utilities
-
-### ci-info
-
-Obtains information about a CI (continuous integration) job, such as
-whether it is a pull request, the organization, the branch, and the range
-of commits.
 
 ### ediff-merge-script
 
