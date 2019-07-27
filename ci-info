@@ -86,9 +86,9 @@ else
   # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
   # If you re-run a pull request via "Queue" rather than "Rebuild",
   # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
-  case $1 in
-    *"HEAD detached at"*) CI_BRANCH=master
-  esac
+  if [ "$CI_BRANCH" = "${1#(HEAD detached at}" ] ; then
+    CI_BRANCH=master
+  fi
 fi
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
