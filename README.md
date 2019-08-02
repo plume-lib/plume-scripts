@@ -1,4 +1,4 @@
-i# Plume-Scripts:  Scripts for programming and system administration #
+# Plume-Scripts:  Scripts for programming and system administration #
 
 These scripts automate various programming as sysadmin tasks.
 
