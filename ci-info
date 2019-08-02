@@ -9,15 +9,16 @@
 #     || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
 #   eval `/tmp/plume-scripts/ci-info DEFAULT-ORGANIZATION`
 #
-# For example use, see comments in file `lint-diff.py` in this directory.
-# Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
-
 # Here are the variables that it sets:
 # CI_IS_PULL_REQUEST: Either "true" or "false" (without the quotes).
 # CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source.
+#   Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
 # CI_BRANCH: In a PR, the source branch; otherwise, the branch being tested.
 # CI_COMMIT_RANGE: An argument to `git diff` with the range of commits.
 #    (Don't use it with `git log`, which interprets its argument differently.)
+#
+# For example use, see comments in file `lint-diff.py` in this directory.
+
 
 
 ### Organization
