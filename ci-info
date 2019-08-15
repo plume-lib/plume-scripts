@@ -30,8 +30,12 @@ if [ "$TRAVIS" = "true" ]; then
     CI_ORGANIZATION=${TRAVIS_REPO_SLUG%/*}
   fi
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
-  SLUG=`wget -q -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER} | jq .head.label | sed 's/"//g'`
-  CI_ORGANIZATION=${SLUG%:*}
+  if [ "$BUILD_REASON" = "PullRequest" ]; then
+    SLUG=`wget -q -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER} | jq .head.label | sed 's/"//g'`
+    CI_ORGANIZATION=${SLUG%:*}
+  else
+    CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
+  fi
 fi
 
 ## Git clone
@@ -39,6 +43,7 @@ if [ "$CI_ORGANIZATION" = "" ]; then
   URL=`git config --get remote.origin.url`
   SLUG=${URL#*:}
   CI_ORGANIZATION=${SLUG%/*}
+  # TODO: Maybe add a sanity check here.
 fi
 
 ## Default
