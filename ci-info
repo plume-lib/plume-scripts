@@ -88,12 +88,16 @@ else
   # It's not a pull request.
   CI_IS_PULL_REQUEST=false
   # In git 2.22 and later, can use: CI_BRANCH=`git branch --show-current`  (and update test below).
-  CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
-  # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
-  # If you re-run a pull request via "Queue" rather than "Rebuild",
-  # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
-  if [ "$CI_BRANCH" = '(HEAD' ] ; then
-    CI_BRANCH=master
+  if [ -n "$BUILD_SOURCEBRANCHNAME" ] ; then
+    CI_BRANCH=BUILD_SOURCEBRANCHNAME
+  else
+    CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
+    # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
+    # If you re-run a pull request via "Queue" rather than "Rebuild",
+    # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
+    if [ "$CI_BRANCH" = '(HEAD' ] ; then
+      CI_BRANCH=master
+    fi
   fi
 fi
 
