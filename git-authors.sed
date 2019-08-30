@@ -108,4 +108,7 @@ s/^yuriy.brun$/Yuriy Brun/
 /^daikonuser$/d
 
 /^doc\/index.html$/d
+
+/^dependabot-preview\[bot\]$/d
+
 /^unknown$/d
