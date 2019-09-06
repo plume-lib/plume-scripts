@@ -16,6 +16,8 @@
 # CI_BRANCH: In a PR, the source branch; otherwise, the branch being tested.
 # CI_COMMIT_RANGE: An argument to `git diff` with the range of commits.
 #    (Don't use it with `git log`, which interprets its argument differently.)
+# CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE.
+# CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE.
 #
 # For example use, see comments in file `lint-diff.py` in this directory.
 
@@ -55,11 +57,12 @@ fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines
-  BASE_COMMIT=`git rev-parse HEAD^1`
   CI_IS_PULL_REQUEST=true
   CI_IS_PR=1
   CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
-  CI_COMMIT_RANGE=$BASE_COMMIT...$BUILD_SOURCEVERSION
+  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+  CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
+  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
@@ -81,7 +84,9 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   fi
   CI_COMMIT_RANGE=$(echo "${CIRCLE_COMPARE_URL}" | cut -d/ -f7)
   if [ $CI_COMMIT_RANGE != *"..."* ]; then
-    CI_COMMIT_RANGE="${COMMIT_RANGE}...${COMMIT_RANGE}"
+    CI_COMMIT_RANGE_START=${COMMIT_RANGE}
+    CI_COMMIT_RANGE_END=${COMMIT_RANGE}
+    CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
   fi
   CI_BRANCH=$CIRCLE_BRANCH
 else
@@ -104,12 +109,19 @@ fi
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ ! -n "$CI_COMMIT_RANGE" ]; then
   if [ $CI_BRANCH = master ]; then
-    CI_COMMIT_RANGE=HEAD^1..HEAD
+    CI_COMMIT_RANGE_START=HEAD^1
+    CI_COMMIT_RANGE_END=HEAD
   else      
-    CI_COMMIT_RANGE=master...$CI_BRANCH
+    CI_COMMIT_RANGE_START=master
+    CI_COMMIT_RANGE_END=$CI_BRANCH
   fi
+  CI_COMMIT_RANGE="${COMMIT_RANGE}...${COMMIT_RANGE}"
 fi
 
+if [ ! -n "$CI_COMMIT_RANGE_START" ]; then
+  CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%.*}
+  CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
+fi
 
 ### Print it out
 
@@ -124,3 +136,7 @@ echo "echo CI_BRANCH=$CI_BRANCH;"
 echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
 echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
 echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
+echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
+echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
+echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
+echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
