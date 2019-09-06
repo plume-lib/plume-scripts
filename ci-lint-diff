@@ -38,6 +38,8 @@ git_status=$?
 if [ $git_status -gt 1 ] ; then
   echo "git diff exited with status $git_status"
   cat /tmp/diff.txt
+  # "| cat" is necessary to disable the bizarre paging behavior of "git branch -a".
+  git branch -a | cat
   exit 2
 fi
 set -e
