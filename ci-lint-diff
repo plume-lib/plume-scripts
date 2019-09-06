@@ -30,7 +30,7 @@ eval `${SCRIPTDIR}/ci-info`
 
 set +e
 git diff --exit-code $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
-git_status = $?
+git_status=$?
 if [ $git_status -gt 1 ] ; then
   echo "git diff exited with status $git_status"
   cat /tmp/diff.txt
