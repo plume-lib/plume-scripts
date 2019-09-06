@@ -16,6 +16,12 @@
 # by pulling upstream.  Or it might be because your branch is identical to
 # the base/upstream branch.
 
+if [ "$#" -ne 1 ] || ! [ -f "$1" ]; then
+  echo "Usage: $0 FILENAME" >&2
+  exit 1
+fi
+WARNINGSFILE=$1
+
 set -e
 
 SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
@@ -24,7 +30,7 @@ eval `${SCRIPTDIR}/ci-info`
 
 set +e
 git diff $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
-if [ $? == 2 ]; then
+if [ $? == 2 ] ; then
   echo "git diff exited with status 2"
   cat /tmp/diff.txt
   exit 2
@@ -32,4 +38,4 @@ fi
 set -e
 [ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && exit 1)
 
-python ${SCRIPTDIR}/lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
+python ${SCRIPTDIR}/lint-diff.py --guess-strip /tmp/diff.txt $WARNINGSFILE
