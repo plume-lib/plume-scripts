@@ -43,6 +43,11 @@ if [ $git_status -gt 1 ] ; then
   exit 2
 fi
 set -e
-[ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && exit 1)
+if [ ! -s /tmp/diff.txt ] ; then
+  echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE ."
+  echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
+  git branch -a | cat
+  exit 1
+fi
 
 python ${SCRIPTDIR}/lint-diff.py --guess-strip /tmp/diff.txt $WARNINGSFILE
