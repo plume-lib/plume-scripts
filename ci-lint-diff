@@ -6,9 +6,9 @@
 
 # Example use:
 #
-# (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
 #   || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+# (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # /tmp/plume-scripts/ci-lint-diff /tmp/warnings.txt
 #
 # If you get a warning that /tmp/diff is empty, that might be because your
@@ -16,9 +16,20 @@
 # by pulling upstream.  Or it might be because your branch is identical to
 # the base/upstream branch.
 
+set -e
+
 SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
 eval `${SCRIPTDIR}/ci-info`
-(git diff $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
-[ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && false)
+
+set +e
+git diff $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
+if [ $? == 2 ]; then
+  echo "git diff exited with status 2"
+  cat /tmp/diff.txt
+  exit 2
+fi
+set -e
+[ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && exit 1)
+
 python ${SCRIPTDIR}/lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
