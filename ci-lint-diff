@@ -17,7 +17,7 @@
 # the base/upstream branch.
 
 if [ "$#" -ne 1 ] || ! [ -f "$1" ]; then
-  echo "Usage: $0 FILENAME" >&2
+  echo "Usage: $0 WARNINGS-FILE" >&2
   exit 1
 fi
 WARNINGSFILE=$1
@@ -29,9 +29,10 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 eval `${SCRIPTDIR}/ci-info`
 
 set +e
-git diff $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
-if [ $? == 2 ] ; then
-  echo "git diff exited with status 2"
+git diff --exit-code $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
+git_status = $?
+if [ $git_status -gt 1 ] ; then
+  echo "git diff exited with status $git_status"
   cat /tmp/diff.txt
   exit 2
 fi
