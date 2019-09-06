@@ -28,6 +28,10 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
 eval `${SCRIPTDIR}/ci-info`
 
+# Make the branches mentioned in $CI_COMMIT_RANGE available.
+git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START || true
+git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END || true
+
 set +e
 git diff --exit-code $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
 git_status=$?
