@@ -60,6 +60,7 @@ if [ ! -s /tmp/diff.txt ] ; then
   cat /tmp/diff.txt
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
   git branch -a | cat
+  echo "End of `git branch -a` output."
   git diff $CI_COMMIT_RANGE
   git show $CI_COMMIT_RANGE_START
   git show $CI_COMMIT_RANGE_END
