@@ -11,8 +11,9 @@
 # Usage:  git-clone-related UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_ARGS...]
 #   UPSTREAM_ORG is, if this is a fork, the parent organization.
 #   REPO_NAME is the repository name without the organization.
-#   DESTINATION is the new clone (not its parent), by default ../REPO .  If it
-#     exists, it is updated via "git pull", without changing its fork or branch.
+#   DESTINATION is the new clone (not its parent), by default ../REPO .
+#     If it exists, it is updated via "git pull", without changing its fork
+#     or branch.  No error is issued if the pull fails.
 #   GIT_ARGS is extra arguments to git clone.  It defaults to
 #     "-q --single-branch --depth 1" (without the quotes).
 #
@@ -46,8 +47,9 @@ fi
 if [ -d ${DESTINATION} ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
   # Older versions of git don't support the -C command-line option.
-  # Fails if not currently on a branch.  Maybe add "|| true"?
-  (cd ${DESTINATION} && git pull -q)
+  # In a Travis pull request, a repository can be in state "(HEAD detached at b475d58d)"
+  # and "git pull" fails.
+  (cd ${DESTINATION} && (git pull -q || true))
 else
   SCRIPT=$(readlink -f "$0")
   SCRIPTPATH=$(dirname "$SCRIPT")
