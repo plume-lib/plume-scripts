@@ -41,6 +41,7 @@ if [ "$#" -ne 0 ]; then
   GIT_ARGS="$@"
 else
   GIT_ARGS="-q --single-branch --depth 1"
+fi
 
 if [ -d ${DESTINATION} ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
