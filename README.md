@@ -41,6 +41,8 @@ current pull request.  Works for Azure Pipelines, CircleCI, and Travis CI.
 [Documentation](ci-lint-diff) at top of file.
 
 
+## Cygwin utilities
+
 ### cygwin-runner
 
 Takes a command with arguments and translates those arguments from
@@ -80,6 +82,12 @@ A script for use as a git mergetool; runs Emacs ediff as the mergetool.
 Lists all the authors of commits in a get repository.
 [Documentation](git-authors) at top of file.
 
+### git-clone-related
+
+Clones a repository related to the one where this script is called, trying
+to match the fork and branch.
+[Documentation](git-clone-related) at top of file.
+
 ### git-find-fork
 
 Finds a fork of a GitHub repository, or returns the upstream repository
@@ -106,10 +114,7 @@ Here is how to accomplish that:
 ```
   git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
     || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
-  eval `/tmp/plume-scripts/ci-info codespecs`
-  REPO=`/tmp/plume-scripts/git-find-fork ${CI_ORGANIZATION} codespecs fjalar`
-  BRANCH=`/tmp/plume-scripts/git-find-branch ${REPO} ${CI_BRANCH}`
-  (cd .. && git clone -b ${BRANCH} --single-branch --depth 1 ${REPO})
+  /tmp/plume-scripts/git-clone-related codespecs fjalar
 ```
 
 
