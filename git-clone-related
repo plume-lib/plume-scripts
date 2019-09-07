@@ -47,7 +47,7 @@ if [ -d ${DESTINATION} ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
   # Older versions of git don't support the -C command-line option.
   # Fails if not currently on a branch.  Maybe add "|| true"?
-  (cd ${DESTINATION} && git pull -q)
+  (cd ${DESTINATION} && git pull -q || (git branch -a && false))
 else
   SCRIPT=$(readlink -f "$0")
   SCRIPTPATH=$(dirname "$SCRIPT")
