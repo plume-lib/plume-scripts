@@ -49,7 +49,7 @@ if [ -d ${DESTINATION} ]; then
   # Older versions of git don't support the -C command-line option.
   # In a Travis pull request, a repository can be in state "(HEAD detached at b475d58d)"
   # and "git pull" fails.
-  (cd ${DESTINATION} && (git pull -q || true))
+  (cd ${DESTINATION} && (git pull -q || (git branch && true)))
 else
   SCRIPT=$(readlink -f "$0")
   SCRIPTPATH=$(dirname "$SCRIPT")
