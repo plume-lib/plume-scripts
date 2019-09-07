@@ -29,13 +29,15 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 eval `${SCRIPTDIR}/ci-info`
 
 # Make the branches mentioned in $CI_COMMIT_RANGE available.
-if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START > /dev/null 2>&1
-then
-  git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START
+if ! git cat-file -e $CI_COMMIT_RANGE_START^{commit}; then
+  if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START > /dev/null 2>&1; then
+    git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START
+  fi
 fi
-if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END > /dev/null 2>&1
-then
-  git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END
+if ! git cat-file -e $CI_COMMIT_RANGE_END^{commit}; then
+  if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END > /dev/null 2>&1; then
+    git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END
+  fi
 fi
 
 set +e
