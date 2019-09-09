@@ -47,9 +47,8 @@ if [ $git_status -gt 1 ] ; then
   echo "git diff exited with status $git_status"
   cat /tmp/diff.txt
   git diff --exit-code $CI_COMMIT_RANGE
-  # "git branch -a". uses paging by default
-  git branch -a > /tmp/git-branch-a.txt && cat /tmp/git-branch-a.txt
-  git diff $CI_COMMIT_RANGE
+  git --no-pager branch -a
+  git --no-pager diff $CI_COMMIT_RANGE
   exit 2
 fi
 set -e
@@ -61,10 +60,8 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE ."
   cat /tmp/diff.txt
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
-  # "git branch -a". uses paging by default
-  git branch -a > /tmp/git-branch-a.txt && cat /tmp/git-branch-a.txt
-  echo "End of `git branch -a` output."
-  git diff $CI_COMMIT_RANGE
+  git --no-pager branch -a
+  git --no-pager diff $CI_COMMIT_RANGE
   git show $CI_COMMIT_RANGE_START
   git show $CI_COMMIT_RANGE_END
   exit 2
