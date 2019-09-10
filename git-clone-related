@@ -44,6 +44,7 @@ else
   GIT_ARGS="-q --single-branch --depth 1"
 fi
 
+echo "In directory $(pwd) :"
 if [ -d ${DESTINATION} ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
   # Older versions of git don't support the -C command-line option.
@@ -56,6 +57,7 @@ else
   eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
   REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
   BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH}`
+  echo "In directory $(pwd) :"
   echo "git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION} $@"
   # Try twice in case of network lossage.
   git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION} "$@" \
