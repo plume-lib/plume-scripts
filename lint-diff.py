@@ -19,21 +19,13 @@
 #              are also considered changed; the default is 2.
 
 # Here is how you could use this in continuous integration (Azure
-# Pipelines, CircleCI, Travis CI) to require that pull requests
-# satisfy the command `command-that-issues-warnings`:
+# Pipelines, CircleCI, and Travis CI are currently supported) to require
+# that pull requests satisfy the command `command-that-issues-warnings`:
 #
 # git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
 #   || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
-# eval `/tmp/plume-scripts/ci-info`
-# (git diff $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1) || true
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
-# [ -s /tmp/diff.txt ] || (echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE; try pulling base branch (often master) into compare branch (often your feature branch)" && false)
-# python /tmp/plume-scripts/lint-diff.py --guess-strip /tmp/diff.txt /tmp/warnings.txt
-#
-# If you get a warning that /tmp/diff is empty, that might be because your
-# clone is shallow and does not contain all the commits.  You can fix that
-# by pulling upstream.  Or it might be because your branch is identical to
-# the base/upstream branch.
+# /tmp/plume-scripts/ci-lint-diff /tmp/warnings.txt
 
 
 # Implementation notes:
@@ -53,14 +45,14 @@ strip_diff = 0
 strip_lint = 0
 guess_strip = False
 
-debug = False
-# debug = True
+DEBUG = False
+# DEBUG = True
 
-plusplusplus_re = re.compile('\+\+\+ (\S*).*')
+PLUSPLUSPLUS_RE = re.compile(r'\+\+\+ (\S*).*')
 
-filename_lineno_re = re.compile('([^:]*):([0-9]+):.*')
+FILENAME_LINENO_RE = re.compile('([^:]*):([0-9]+):.*')
 
-max_pair = (1000,1000)
+MAX_PAIR = (1000, 1000)
 
 def eprint(*args, **kwargs):
     """Print to stderr."""
@@ -88,13 +80,14 @@ assert strip_dirs("/a/b/c/", 4) == ''
 """
 
 def min_strips(filename1, filename2):
-    """Returns a 2-tuple of 2 integers, indicating the smallest strip values that make the two filenames equal, or max_pair if the files have different basenames."""
+    """Returns a 2-tuple of 2 integers, indicating the smallest strip values that
+make the two filenames equal, or MAX_PAIR if the files have different basenames."""
     components1 = filename1.split(os.path.sep)
     components2 = filename2.split(os.path.sep)
     if components1[-1] != components2[-1]:
         ## TODO: is this special case necessary?
-        return max_pair
-    while len(components1) > 0 and len(components2) > 0 and components1[-1] == components2[-1]:
+        return MAX_PAIR
+    while components1 and components2 and components1[-1] == components2[-1]:
         del components1[-1]
         del components2[-1]
     return (len(components1), len(components2))
@@ -110,6 +103,8 @@ assert min_strips("/a/b/c/d", "/e/f/g/h") == (0,0)
 """
 
 def pair_min(pair1, pair2):
+    """Given two pairs, returns the one that is pointwise lesser.
+Fails if neither is lesser."""
     if pair1[0] <= pair2[0] and pair1[1] <= pair2[1]:
         return pair1
     if pair1[0] >= pair2[0] and pair1[1] >= pair2[1]:
@@ -129,7 +124,7 @@ def diff_filenames(diff_filename):
     result = set()
     with open(diff_filename) as diff:
         for diff_line in diff:
-            m = plusplusplus_re.match(diff_line)
+            m = PLUSPLUSPLUS_RE.match(diff_line)
             if m:
                 result.add(m.group(1))
     return result
@@ -139,7 +134,7 @@ def lint_filenames(lint_filename):
     result = set()
     with open(lint_filename) as lint:
         for lint_line in lint:
-            m = filename_lineno_re.match(lint_line)
+            m = FILENAME_LINENO_RE.match(lint_line)
             if m:
                 result.add(m.group(1))
     return result
@@ -148,7 +143,7 @@ def lint_filenames(lint_filename):
 def guess_strip_filenames(diff_filenames, lint_filenames):
     """Arguments are two lists of file names.
     Result is a pair of integers."""
-    result = max_pair
+    result = MAX_PAIR
     for diff_filename in diff_filenames:
         for lint_filename in lint_filenames:
             result = pair_min(result, min_strips(diff_filename, lint_filename))
@@ -164,18 +159,19 @@ def guess_strip_files(diff_file, lint_file):
     diff_prefix = os.path.commonprefix(diff_files)
     lint_prefix = os.path.commonprefix(lint_files)
     if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
-        if debug:
+        if DEBUG:
             eprint("lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}".format(result, diff_prefix, lint_prefix))
             eprint("diff_files={}".format(diff_files))
             eprint("lint_files={}".format(lint_files))
-        return max_pair
+        return MAX_PAIR
     return result
 
 
 ### Main routine
+## TODO: put this into a routine.
 
-# True if the diff filenames start with "a/" and "b/".
-relative_diff = False
+# A filename if the diff filenames start with "a/" and "b/", otherwise None.
+relative_diff = None
 # True if a warning has been issued about relative directories.
 relative_diff_warned = False
 
@@ -219,16 +215,16 @@ if len(sys.argv) != 2 and len(sys.argv) != 3:
 if guess_strip and len(sys.argv) == 2:
     eprint(sys.argv[0], "needs 2, not 1, file arguments when --guess-strip is provided")
     sys.exit(2)
-    
+
 if guess_strip:
     guessed_strip = guess_strip_files(sys.argv[1], sys.argv[2])
-    if guessed_strip == max_pair:
-        if debug:
+    if guessed_strip == MAX_PAIR:
+        if DEBUG:
             eprint("lint-diff.py: --guess-strip failed to guess values")
     else:
         strip_diff = guessed_strip[0]
         strip_lint = guessed_strip[1]
-        if debug:
+        if DEBUG:
             eprint("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(strip_diff, strip_lint))
 
 
@@ -241,15 +237,15 @@ with open(diff_filename) as diff:
     atat_re = re.compile('@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*')
     content_re = re.compile('[ +-].*')
 
-    filename=''
-    lineno=-1000000
+    filename = ''
+    lineno = -1000000
     for diff_line in diff:
         if diff_line.startswith("---"):
             continue
-        m = plusplusplus_re.match(diff_line)
+        m = PLUSPLUSPLUS_RE.match(diff_line)
         if m:
             if m.group(1).startswith("b/"): # heuristic
-                relative_diff = True
+                relative_diff = diff_line
             try:
                 filename = strip_dirs(m.group(1), strip_diff)
             except TypeError:
@@ -276,12 +272,12 @@ with open(diff_filename) as diff:
                 changed[filename].add(changed_lineno)
             continue
 
-if debug:
+if DEBUG:
     for filename in sorted(changed):
         print(filename, sorted(changed[filename]))
 
-if relative_diff and strip_diff == 0:
-    eprint("warning:", sys.argv[1], "may use relative paths but --strip-diff=0")
+if relative_diff is not None and strip_diff == 0:
+    eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff, ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
 
 if len(sys.argv) == 3:
     lint_filename = sys.argv[2]
@@ -294,7 +290,7 @@ else:
 status = 0
 
 for lint_line in lint:
-    m = filename_lineno_re.match(lint_line)
+    m = FILENAME_LINENO_RE.match(lint_line)
     if m:
         try:
             filename = strip_dirs(m.group(1), strip_lint)
@@ -303,7 +299,7 @@ for lint_line in lint:
             ## It's not an error; it just means this file doesn't appear in lint output.
             # eprint('Bad --strip-lint={0} ; line has fewer "/": {1}'.format(strip_lint, m.group(1)))
             # sys.exit(2)
-        if filename.startswith("/") and relative_diff and strip_lint == 0:
+        if filename.startswith("/") and relative_diff is not None and strip_lint == 0:
             if not relative_diff_warned:
                 eprint("warning:", sys.argv[1], "uses relative paths but", lint_filename, "uses absolute paths")
                 relative_diff_warned = True
