@@ -10,6 +10,13 @@ git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
   || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
 ```
 
+For older versions of git that do not support the `-C` command-line argument, use:
+
+```
+(cd /tmp/plume-scripts && git pull) > /dev/null 2>&1 \
+  || (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
+```
+
 
 ## classfile_check_version
 
