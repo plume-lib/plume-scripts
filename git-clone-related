@@ -51,12 +51,11 @@ if [ -d ${DESTINATION} ]; then
   # and "git pull" fails.
   (cd ${DESTINATION} && (git pull -q || (git branch && true)))
 else
-  SCRIPT=$(readlink -f "$0")
-  SCRIPTPATH=$(dirname "$SCRIPT")
+  SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
-  eval `${SCRIPTPATH}/ci-info ${UPSTREAM_ORG}`
-  REPO_URL=`${SCRIPTPATH}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
-  BRANCH=`${SCRIPTPATH}/git-find-branch ${REPO_URL} ${CI_BRANCH}`
+  eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
+  REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
+  BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH}`
   echo "git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION} $@"
   # Try twice in case of network lossage.
   git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION} "$@" \
