@@ -46,7 +46,7 @@ git_status=$?
 if [ $git_status -gt 1 ] ; then
   echo "git diff exited with status $git_status"
   cat /tmp/diff.txt
-  git diff --exit-code $CI_COMMIT_RANGE
+  git --no-pager diff --exit-code $CI_COMMIT_RANGE
   git --no-pager branch -a
   git --no-pager diff $CI_COMMIT_RANGE
   exit 2
@@ -58,12 +58,13 @@ if [ ! -r /tmp/diff.txt ] ; then
 fi
 if [ ! -s /tmp/diff.txt ] ; then
   echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE ."
+  ls -l /tmp/
   cat /tmp/diff.txt
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
   git --no-pager branch -a
   git --no-pager diff $CI_COMMIT_RANGE
-  git show $CI_COMMIT_RANGE_START
-  git show $CI_COMMIT_RANGE_END
+  git --no-pager show $CI_COMMIT_RANGE_START
+  git --no-pager show $CI_COMMIT_RANGE_END
   exit 2
 fi
 
