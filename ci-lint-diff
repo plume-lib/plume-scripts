@@ -41,6 +41,7 @@ if ! git cat-file -e $CI_COMMIT_RANGE_END^{commit}; then
 fi
 
 set +e
+rm -rf /tmp/diff.txt
 git diff --exit-code $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
 git_status=$?
 if [ $git_status -gt 1 ] ; then
@@ -58,13 +59,18 @@ if [ ! -r /tmp/diff.txt ] ; then
 fi
 if [ ! -s /tmp/diff.txt ] ; then
   echo "/tmp/diff.txt is empty for $CI_COMMIT_RANGE ."
-  ls -l /tmp/
-  cat /tmp/diff.txt
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
-  git --no-pager branch -a
+  echo "Re-execution of diff command:"
   git --no-pager diff $CI_COMMIT_RANGE
+  echo "Endpoints of commit range ($CI_COMMIT_RANGE_START and $CI_COMMIT_RANGE_END):"
   git --no-pager show $CI_COMMIT_RANGE_START
   git --no-pager show $CI_COMMIT_RANGE_END
+  echo "Current directory:"
+  pwd
+  echo "Contents of /tmp:"
+  ls -l /tmp/
+  echo "Branches:"
+  git --no-pager branch -a
   exit 2
 fi
 
