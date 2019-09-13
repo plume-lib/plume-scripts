@@ -16,7 +16,7 @@
 # by pulling upstream.  Or it might be because your branch is identical to
 # the base/upstream branch.
 
-if [ "$#" -ne "1" ] || ! [ -f "$1" ]; then
+if [ "$#" -ne 1 ] || ! [ -f "$1" ]; then
   echo "Usage: $0 WARNINGS-FILE" >&2
   exit 1
 fi
