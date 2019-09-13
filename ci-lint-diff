@@ -16,9 +16,13 @@
 # by pulling upstream.  Or it might be because your branch is identical to
 # the base/upstream branch.
 
-if [ "$#" -ne 1 ] || ! [ -f "$1" ]; then
+if [ "$#" -ne 1 ] ; then
   echo "Usage: $0 WARNINGS-FILE" >&2
-  exit 1
+  exit 2
+fi
+if ! [ -f "$1" ] ; then
+  echo "File $1 does not exist" >&2
+  exit 2
 fi
 WARNINGSFILE=$1
 
