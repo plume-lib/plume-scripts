@@ -11,6 +11,7 @@ s/^J Luo$/Jeff Luo/
 s/^Jianchu$/Jianchu Li/
 s/^JonathanGBurke$/Jonathan Burke/
 s/^Michèle$/Stefan Heule/
+s/^Maxi17$/Maximilian Gama/
 s/^Rashmi$/Rashmi Mudduluru/
 s/^Sadaf$/Sadaf Tajik/
 s/^SnowOnion$/Sonion Lee/
@@ -90,6 +91,7 @@ s/^mhao$/Melissa Hao/
 s/^mharder$/Michael Harder/
 s/^michael.ernst$/Michael Ernst/
 s/^minilek$/Jelani Nelson/
+s/^olegshtch$/Oleg Shchelykalnov/
 s/^pgbovine$/Philip Guo/
 s/^salcianu$/Alexandru Salcianu/
 s/^scruffy$/Benjamin Morse/
