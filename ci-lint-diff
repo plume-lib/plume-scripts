@@ -70,6 +70,14 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
   echo "This command will print diagnostic information, then exit."
   echo
+  echo git rev-parse $CI_COMMIT_RANGE_START
+  git rev-parse $CI_COMMIT_RANGE_START
+  echo git rev-parse $CI_COMMIT_RANGE_END
+  git rev-parse $CI_COMMIT_RANGE_END
+  echo
+  echo "Branches:"
+  git --no-pager branch -a
+  echo
   echo "git remote show origin"
   git remote show origin
   echo
@@ -90,9 +98,6 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo
   echo "Contents of /tmp:"
   ls -l /tmp/
-  echo
-  echo "Branches:"
-  git --no-pager branch -a
   exit 2
 fi
 
