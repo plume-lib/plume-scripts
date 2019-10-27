@@ -48,7 +48,7 @@ fi
 
 set +e
 rm -rf /tmp/diff.txt
-git diff --exit-code $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
+git --no-pager diff --exit-code $CI_COMMIT_RANGE > /tmp/diff.txt 2>&1
 git_status=$?
 if [ $git_status -gt 1 ] ; then
   echo "git diff exited with status $git_status"
@@ -70,9 +70,12 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
   echo "This command will print diagnostic information, then exit."
   echo
-  echo "Re-execution of diff command (twice):"
+  echo "Re-execution of diff command:"
+  echo git --no-pager diff --exit-code $CI_COMMIT_RANGE
   git --no-pager diff --exit-code $CI_COMMIT_RANGE
-  git diff --exit-code $CI_COMMIT_RANGE > /tmp/tmp.tmp && cat /tmp/tmp.tmp
+  echo
+  echo "Second re-execution of diff command:"
+  git --no-pager diff --exit-code $CI_COMMIT_RANGE > /tmp/tmp.tmp && cat /tmp/tmp.tmp
   echo
   echo "Endpoints of commit range ($CI_COMMIT_RANGE_START and $CI_COMMIT_RANGE_END):"
   git --no-pager show $CI_COMMIT_RANGE_START
