@@ -74,6 +74,10 @@ if [ ! -s /tmp/diff.txt ] ; then
   git rev-parse $CI_COMMIT_RANGE_START
   echo git rev-parse $CI_COMMIT_RANGE_END
   git rev-parse $CI_COMMIT_RANGE_END
+  echo git rev-parse remotes/origin/$CI_COMMIT_RANGE_START
+  git rev-parse remotes/origin/$CI_COMMIT_RANGE_START
+  echo git rev-parse remotes/origin/$CI_COMMIT_RANGE_END
+  git rev-parse remotes/origin/$CI_COMMIT_RANGE_END
   echo
   echo "Branches:"
   git --no-pager branch -a
