@@ -50,6 +50,7 @@ fi
 if [ "$CIRCLECI" = "true" ] ; then
   if [ "$CI_COMMIT_RANGE_START" = "master" ] ; then
     CI_COMMIT_RANGE_START=remotes/origin/$CI_COMMIT_RANGE_START
+    CI_COMMIT_RANGE=$CI_COMMIT_RANGE_START...$CI_COMMIT_RANGE_END
   fi
 fi
 
@@ -82,9 +83,9 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo git rev-parse $CI_COMMIT_RANGE_END
   git rev-parse $CI_COMMIT_RANGE_END
   echo git rev-parse remotes/origin/$CI_COMMIT_RANGE_START
-  git rev-parse remotes/origin/$CI_COMMIT_RANGE_START
+  git rev-parse remotes/origin/$CI_COMMIT_RANGE_START || true
   echo git rev-parse remotes/origin/$CI_COMMIT_RANGE_END
-  git rev-parse remotes/origin/$CI_COMMIT_RANGE_END
+  git rev-parse remotes/origin/$CI_COMMIT_RANGE_END || true
   echo
   echo git fetch
   git fetch
@@ -94,9 +95,9 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo git rev-parse $CI_COMMIT_RANGE_END
   git rev-parse $CI_COMMIT_RANGE_END
   echo git rev-parse remotes/origin/$CI_COMMIT_RANGE_START
-  git rev-parse remotes/origin/$CI_COMMIT_RANGE_START
+  git rev-parse remotes/origin/$CI_COMMIT_RANGE_START || true
   echo git rev-parse remotes/origin/$CI_COMMIT_RANGE_END
-  git rev-parse remotes/origin/$CI_COMMIT_RANGE_END
+  git rev-parse remotes/origin/$CI_COMMIT_RANGE_END || true
   echo
   echo "Branches:"
   git --no-pager branch -a
