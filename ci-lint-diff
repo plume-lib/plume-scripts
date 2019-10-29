@@ -33,7 +33,7 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 eval `${SCRIPTDIR}/ci-info`
 
 # Make the branches mentioned in $CI_COMMIT_RANGE available.
-if [ "$(git cat-file -t $CI_COMMIT_RANGE_START)" -ne "commit" ]; then
+if [ "$(git cat-file -t $CI_COMMIT_RANGE_START)" != "commit" ]; then
   if ! git cat-file -e $CI_COMMIT_RANGE_START^{commit} > /dev/null 2>&1; then
     echo git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START
     git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START || true
@@ -43,7 +43,7 @@ if [ "$(git cat-file -t $CI_COMMIT_RANGE_START)" -ne "commit" ]; then
     fi
   fi
 fi
-if [ "$(git cat-file -t $CI_COMMIT_RANGE_END)" -ne "commit" ]; then
+if [ "$(git cat-file -t $CI_COMMIT_RANGE_END)" != "commit" ]; then
   if ! git cat-file -e $CI_COMMIT_RANGE_END^{commit} > /dev/null 2>&1; then
     echo git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START
     git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START || true
