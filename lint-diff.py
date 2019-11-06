@@ -287,7 +287,7 @@ if relative_diff is not None and strip_diff == 0:
         eprint("lint-diff.py: diff file {0}:", sys.argv[1])
         with open(sys.argv[1], 'r') as fin:
             eprint("{0}", fin.read())
-        eprint("lint-diff.py: lint file {0}:", sys.argv[2]))
+        eprint("lint-diff.py: lint file {0}:", sys.argv[2])
         with open(sys.argv[1], 'r') as fin:
             eprint("{0}", fin.read())
         eprint("lint-diff.py: end of input files.")
