@@ -16,8 +16,18 @@
 # by pulling upstream.  Or it might be because your branch is identical to
 # the base/upstream branch.
 
+DEBUG=""
+
+if [ "$#" -eq 0 ] ; then
+  echo "Usage: $0 [--debug] WARNINGS-FILE" >&2
+  exit 2
+fi
+if [ $1 = "--debug" ] ; then
+    DEBUG="--debug"
+    shift
+fi
 if [ "$#" -ne 1 ] ; then
-  echo "Usage: $0 WARNINGS-FILE" >&2
+  echo "Usage: $0 [--debug] WARNINGS-FILE" >&2
   exit 2
 fi
 if ! [ -f "$1" ] ; then
@@ -133,4 +143,4 @@ if [ ! -s /tmp/diff.txt ] ; then
   exit 2
 fi
 
-python ${SCRIPTDIR}/lint-diff.py --guess-strip /tmp/diff.txt $WARNINGSFILE
+python ${SCRIPTDIR}/lint-diff.py $DEBUG --guess-strip /tmp/diff.txt $WARNINGSFILE
