@@ -105,6 +105,9 @@ for my $line (@toplevel_lines) {
       $replace =~ s/([^\\]%).*?$/$1/gm;
     }
     $line =~ s/___TOKEN___/$replace/;
+    # $line may now consist of multiple lines.
+    # kill comments.
+    $line =~ s/((^|[^\\])%).*?$/$1/gm;
   }
   $text .= $line;
 }
