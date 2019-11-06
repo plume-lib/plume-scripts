@@ -282,7 +282,6 @@ if DEBUG:
         print(filename, sorted(changed[filename]))
 
 if relative_diff is not None and strip_diff == 0:
-    $relative_diff =~ s/\s+$//;
     eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff, ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
     if DEBUG:
         eprint("lint-diff.py TODO: add debugging output here")
