@@ -284,7 +284,13 @@ if DEBUG:
 if relative_diff is not None and strip_diff == 0:
     eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff, ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
     if DEBUG:
-        eprint("lint-diff.py TODO: add debugging output here")
+        eprint("lint-diff.py: diff file {0}:", sys.argv[1])
+        with open(sys.argv[1], 'r') as fin:
+            eprint("{0}", fin.read())
+        eprint("lint-diff.py: lint file {0}:", sys.argv[2]))
+        with open(sys.argv[1], 'r') as fin:
+            eprint("{0}", fin.read())
+        eprint("lint-diff.py: end of input files.")
 
 if len(sys.argv) == 3:
     lint_filename = sys.argv[2]
