@@ -17,6 +17,7 @@
 #          --guess-strip means guess values for --strip-diff and --strip-lint.
 #          --context=N is how many lines adjacent to the changed ones
 #              are also considered changed; the default is 2.
+#          --debug means to print diagnostic output
 
 # Here is how you could use this in continuous integration (Azure
 # Pipelines, CircleCI, and Travis CI are currently supported) to require
@@ -41,12 +42,11 @@ import os
 import re
 import sys
 
+DEBUG = False
+
 strip_diff = 0
 strip_lint = 0
 guess_strip = False
-
-DEBUG = False
-# DEBUG = True
 
 PLUSPLUSPLUS_RE = re.compile(r'\+\+\+ (\S*).*')
 
@@ -201,6 +201,11 @@ while len(sys.argv) > 1 and sys.argv[1].startswith("--"):
         context_lines = int(m.group(1))
         del sys.argv[1]
         continue
+    m = re.match('^--debug$', sys.argv[1])
+    if m:
+        DEBUG = True
+        del sys.argv[1]
+        continue
     eprint("Bad argument:", sys.argv[1])
     sys.exit(2)
 
@@ -277,7 +282,10 @@ if DEBUG:
         print(filename, sorted(changed[filename]))
 
 if relative_diff is not None and strip_diff == 0:
+    $relative_diff =~ s/\s+$//;
     eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff, ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
+    if DEBUG:
+        eprint("lint-diff.py TODO: add debugging output here")
 
 if len(sys.argv) == 3:
     lint_filename = sys.argv[2]
