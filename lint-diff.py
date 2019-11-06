@@ -225,7 +225,7 @@ if guess_strip:
     guessed_strip = guess_strip_files(sys.argv[1], sys.argv[2])
     if guessed_strip == MAX_PAIR:
         if DEBUG:
-            eprint("lint-diff.py: --guess-strip failed to guess values")
+            eprint("lint-diff.py: --guess-strip failed to guess values (maybe no files in common?)")
     else:
         strip_diff = guessed_strip[0]
         strip_lint = guessed_strip[1]
@@ -282,12 +282,14 @@ if DEBUG:
         print(filename, sorted(changed[filename]))
 
 if relative_diff is not None and strip_diff == 0:
-    eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff, ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
+    eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff.strip(), ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
+    eprint("warning: (Maybe there were no files in common.)")
+    relative_diff_warned = True
     if DEBUG:
-        eprint("lint-diff.py: diff file {0}:", sys.argv[1])
+        eprint("lint-diff.py: diff file {}:".format(sys.argv[1]))
         with open(sys.argv[1], 'r') as fin:
             eprint("{0}", fin.read())
-        eprint("lint-diff.py: lint file {0}:", sys.argv[2])
+        eprint("lint-diff.py: lint file {}:".format(sys.argv[2]))
         with open(sys.argv[1], 'r') as fin:
             eprint("{0}", fin.read())
         eprint("lint-diff.py: end of input files.")
