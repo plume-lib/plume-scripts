@@ -288,10 +288,10 @@ if relative_diff is not None and strip_diff == 0:
     if DEBUG:
         eprint("lint-diff.py: diff file {}:".format(sys.argv[1]))
         with open(sys.argv[1], 'r') as fin:
-            eprint("{0}", fin.read())
+            eprint("{}", fin.read())
         eprint("lint-diff.py: lint file {}:".format(sys.argv[2]))
-        with open(sys.argv[1], 'r') as fin:
-            eprint("{0}", fin.read())
+        with open(sys.argv[2], 'r') as fin:
+            eprint("{}", fin.read())
         eprint("lint-diff.py: end of input files.")
 
 if len(sys.argv) == 3:
