@@ -11,10 +11,11 @@
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # /tmp/plume-scripts/ci-lint-diff /tmp/warnings.txt
 #
-# If you get a warning that /tmp/diff is empty, that might be because your
-# clone is shallow and does not contain all the commits.  You can fix that
-# by pulling upstream.  Or it might be because your branch is identical to
-# the base/upstream branch.
+# If you get a warning that /tmp/diff is empty, here are two possible reasons:
+#  * Your branch is identical to the base/upstream branch.  In this case, the pull
+#    request is pointless.
+#  * Your clone is shallow and does not contain all the commits.  You can fix that
+#    by pulling upstream.
 
 DEBUG=""
 
@@ -141,6 +142,12 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo "Contents of /tmp:"
   ls -l /tmp/
   exit 2
+fi
+
+if [ "$DEBUG" = "--debug" ] ; then
+    echo "/tmp/diff.txt file:"
+    cat /tmp/diff.txt
+    echo "end of /tmp/diff.txt file."
 fi
 
 python ${SCRIPTDIR}/lint-diff.py $DEBUG --guess-strip /tmp/diff.txt $WARNINGSFILE
