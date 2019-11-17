@@ -145,6 +145,9 @@ if [ ! -s /tmp/diff.txt ] ; then
 fi
 
 if [ "$DEBUG" = "--debug" ] ; then
+    echo "warnings file $WARNINGSFILE:"
+    cat $WARNINGSFILE
+    echo "end of warnings file $WARNINGSFILE."
     echo "/tmp/diff.txt file:"
     cat /tmp/diff.txt
     echo "end of /tmp/diff.txt file."
