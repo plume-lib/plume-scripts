@@ -108,7 +108,7 @@ fi
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ ! -n "$CI_COMMIT_RANGE" ]; then
-  if [ $CI_BRANCH = master ]; then
+  if [ "$CI_BRANCH" = "master" ]; then
     CI_COMMIT_RANGE_START=HEAD^1
     CI_COMMIT_RANGE_END=HEAD
   else      
