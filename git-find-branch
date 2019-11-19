@@ -4,8 +4,7 @@
 # Prints either the first BRANCH that exists in REPO_URL,
 # or else prints "master" if none of the branches exists.
 
-# For example usage within a Travis build, see
-# https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
+# Often, you can use the `git-clone-related` script instead of this one.
 
 if [ "$#" -eq 1 ]; then
     script=$(basename -- "$0")

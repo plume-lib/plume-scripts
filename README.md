@@ -95,20 +95,6 @@ Clones a repository related to the one where this script is called, trying
 to match the fork and branch.
 [Documentation](git-clone-related) at top of file.
 
-### git-find-fork
-
-Finds a fork of a GitHub repository, or returns the upstream repository
-if the fork does not exist.
-[Documentation](git-find-fork) at top of file.
-
-### git-find-branch
-
-Tests whether a branch exists in a Git repository;
-prints the branch, or prints "master" if the branch does not exist.
-[Documentation](git-find-branch) at top of file.
-
-### Usage of git-find-{fork,branch}
-
 Suppose you have two related Git repositories:\
   *MY-ORG*`/`*MY-REPO*\
   *MY-ORG*`/`*MY-OTHER-REPO*
@@ -123,6 +109,18 @@ Here is how to accomplish that:
     || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
   /tmp/plume-scripts/git-clone-related codespecs fjalar
 ```
+
+### git-find-fork
+
+Finds a fork of a GitHub repository, or returns the upstream repository
+if the fork does not exist.
+[Documentation](git-find-fork) at top of file.
+
+### git-find-branch
+
+Tests whether a branch exists in a Git repository;
+prints the branch, or prints "master" if the branch does not exist.
+[Documentation](git-find-branch) at top of file.
 
 
 ## latex-process-inputs

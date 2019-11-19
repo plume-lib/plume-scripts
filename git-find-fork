@@ -7,8 +7,7 @@
 #   https://github.com/${ORG}/${REPO}.git
 #   https://github.com/${UPSTREAM_ORG}/${REPO}.git
 
-# For example usage within a Travis build, see
-# https://github.com/plume-lib/plume-scripts#usage-of-git-find-forkbranch
+# Often, you can use the `git-clone-related` script instead of this one.
 
 if [ "$#" -ne 3 ]; then
     script=$(basename -- "$0")
