@@ -17,7 +17,7 @@
 #   GIT_ARGS is extra arguments to git clone.  It defaults to
 #     "-q --single-branch --depth 1" (without the quotes).
 #
-# When invoked from within a clone of MYORG/MYREPO , at branch MYBRANCH,
+# When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
 # this script first chooses a fork, which is the first of these that exists:
 #   https://github.com/${ORG}/${REPO_NAME}.git
 #   https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
