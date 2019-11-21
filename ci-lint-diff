@@ -44,7 +44,7 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 eval `${SCRIPTDIR}/ci-info`
 
 # Make the branches mentioned in $CI_COMMIT_RANGE available.
-CI_COMMIT_RANGE_START_TYPE=$(git cat-file -t $CI_COMMIT_RANGE_START 2>&1)
+CI_COMMIT_RANGE_START_TYPE=$(git cat-file -t $CI_COMMIT_RANGE_START 2>&1) || true
 if [ "$CI_COMMIT_RANGE_START_TYPE" != "commit" ]; then
   if [ "$DEBUG" = "--debug" ] ; then
     echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
@@ -59,7 +59,7 @@ if [ "$CI_COMMIT_RANGE_START_TYPE" != "commit" ]; then
     fi
   fi
 fi
-CI_COMMIT_RANGE_END_TYPE=$(git cat-file -t $CI_COMMIT_RANGE_END 2>&1)
+CI_COMMIT_RANGE_END_TYPE=$(git cat-file -t $CI_COMMIT_RANGE_END 2>&1) || true
 if [ "$CI_COMMIT_RANGE_END_TYPE" != "commit" ]; then
   if [ "$DEBUG" = "--debug" ] ; then
     echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
