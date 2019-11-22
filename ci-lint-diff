@@ -39,6 +39,10 @@ WARNINGSFILE=$1
 
 set -e
 
+if [ "$DEBUG" = "--debug" ] ; then
+  git log --graph | head --lines=10000
+fi
+
 SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
 eval `${SCRIPTDIR}/ci-info`
