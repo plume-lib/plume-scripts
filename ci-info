@@ -22,7 +22,7 @@
 # For example use, see comments in file `lint-diff.py` in this directory.
 
 
-if [ $1 = "--debug" ] ; then
+if [ "$1" = "--debug" ] ; then
     DEBUG="--debug"
     shift
 fi
