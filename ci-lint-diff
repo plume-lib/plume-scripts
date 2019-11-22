@@ -59,7 +59,8 @@ if [ "$CI_COMMIT_RANGE_START_TYPE" != "commit" ]; then
     git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START || true
     if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START > /dev/null 2>&1; then
       echo git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START
-      git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START
+      git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START \
+	  || (git log --graph | head --lines=10000 && false)
     fi
   fi
 fi
@@ -74,7 +75,8 @@ if [ "$CI_COMMIT_RANGE_END_TYPE" != "commit" ]; then
     git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END || true
     if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END > /dev/null 2>&1; then
       echo git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END
-      git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END
+      git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END \
+	  || (git log --graph | head --lines=10000 && false)
     fi
   fi
 fi
