@@ -75,6 +75,10 @@ if [ "$CI_COMMIT_RANGE_END_TYPE" != "commit" ]; then
     git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END || true
 
     ## Temporary debugging
+    echo env
+    env
+    echo ci-info --debug
+    ci-info --debug
     echo git branch -r
     git branch -r
     echo git ls-remote --heads origin
