@@ -282,8 +282,10 @@ if DEBUG:
         print(filename, sorted(changed[filename]))
 
 if relative_diff is not None and strip_diff == 0:
-    eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff.strip(), ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
-    eprint("warning: (Maybe there were no files in common.)")
+    # This is usually not an error, so don't warn.
+    if DEBUG:
+        eprint("warning:", sys.argv[1], "may use relative paths (e.g.,", relative_diff.strip(), ") but --strip-diff=0", ("(guessed)" if guess_strip else ""))
+        eprint("warning: (Maybe there were no files in common.)")
     relative_diff_warned = True
     if DEBUG:
         eprint("lint-diff.py: diff file {}:".format(sys.argv[1]))
