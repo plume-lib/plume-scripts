@@ -76,7 +76,7 @@ if [ "$CI_COMMIT_RANGE_END_TYPE" != "commit" ]; then
 
     ## Temporary debugging
     echo env
-    env
+    env | sort
     echo /tmp/plume-scripts/ci-info --debug
     /tmp/plume-scripts/ci-info --debug
     echo git branch -r
