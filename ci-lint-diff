@@ -40,6 +40,7 @@ WARNINGSFILE=$1
 set -e
 
 if [ "$DEBUG" = "--debug" ] ; then
+  env | sort
   git log --graph | head --lines=10000
 fi
 
@@ -73,19 +74,6 @@ if [ "$CI_COMMIT_RANGE_END_TYPE" != "commit" ]; then
   if ! git cat-file -e $CI_COMMIT_RANGE_END^{commit} > /dev/null 2>&1; then
     echo git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END
     git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END || true
-
-    ## Temporary debugging
-    echo env
-    env | sort
-    echo /tmp/plume-scripts/ci-info --debug
-    /tmp/plume-scripts/ci-info --debug
-    echo git branch -r
-    git branch -r
-    echo git ls-remote --heads origin
-    git ls-remote --heads origin
-    echo git remote show origin
-    git remote show origin
-
     if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END > /dev/null 2>&1; then
       echo git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END
       git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END \
