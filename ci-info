@@ -111,8 +111,10 @@ else
   CI_IS_PULL_REQUEST=false
   # In git 2.22 and later, can use: CI_BRANCH=`git branch --show-current`  (and update test below).
   if [ -n "$BUILD_SOURCEBRANCH" ] ; then
-    # In Azure Pipelines:  BUILD_SOURCEBRANCH is a name.  $BUILD_SOURCEVERSION is commit ID.
-    CI_BRANCH=$BUILD_SOURCEBRANCH
+    # In Azure Pipelines:  BUILD_SOURCEBRANCH is a name.  $BUILD_SOURCEVERSION is a commit ID.
+    # `ci-lint-diff` deals better with commit IDs (it does not currently handle
+    # "refs/heads/dependabot/gradle/de.undercouch.download-4.0.2").
+    CI_BRANCH=$BUILD_SOURCEVERSION
   else
     CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
     # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
