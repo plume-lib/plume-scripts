@@ -35,7 +35,9 @@ if [ "$#" -gt 1 ] ; then
 fi
 
 if [ "$DEBUG" = "--debug" ] ; then
+  echo
   env | sort | sed -e 's/^/echo /'
+  echo
   git log --graph | head --lines=10000 | sed -e 's/^/echo /'
 fi
 
@@ -73,13 +75,24 @@ fi
 ### Other information
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
-  ## Azure Pipelines
+  ## Azure Pipelines pull request
   CI_IS_PULL_REQUEST=true
   CI_IS_PR=1
   CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
   CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
+elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
+  # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full name like "refs/heads/master";
+  # BUILD_SOURCEBRANCHNAME is a short name like "master"; $BUILD_SOURCEVERSION is a commit ID.
+  # `ci-lint-diff` deals better with commit IDs (it does not currently handle branch names
+  # with "/", like "refs/heads/dependabot/gradle/de.undercouch.download-4.0.2").  In the future,
+  # use branch names more often.
+  if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
+    CI_BRANCH=$BUILD_SOURCEBRANCHNAME
+  else
+    CI_BRANCH=$BUILD_SOURCEVERSION
+  fi
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
@@ -107,27 +120,15 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   fi
   CI_BRANCH=$CIRCLE_BRANCH
 else
-  # It's not a pull request.
+  # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
   CI_IS_PULL_REQUEST=false
   # In git 2.22 and later, can use: CI_BRANCH=`git branch --show-current`  (and update test below).
-  if [ -n "$BUILD_SOURCEBRANCH" ] ; then
-    # In Azure Pipelines:  BUILD_SOURCEBRANCH is a name.  $BUILD_SOURCEVERSION is a commit ID.
-    # `ci-lint-diff` deals better with commit IDs (it does not currently handle branch names
-    # with "/", like "refs/heads/dependabot/gradle/de.undercouch.download-4.0.2").  In the future,
-    # use branch names more often.
-    if [ "$BUILD_SOURCEBRANCH" = "master" ] ; then
-      CI_BRANCH=$BUILD_SOURCEBRANCH
-    else
-      CI_BRANCH=$BUILD_SOURCEVERSION
-    fi
-  else
-    CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
-    # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
-    # If you re-run a pull request via "Queue" rather than "Rebuild",
-    # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
-    if [ "$CI_BRANCH" = '(HEAD' ] ; then
-      CI_BRANCH=master
-    fi
+  CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
+  # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
+  # If you re-run a pull request via "Queue" rather than "Rebuild",
+  # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
+  if [ "$CI_BRANCH" = '(HEAD' ] ; then
+    CI_BRANCH=master
   fi
 fi
 
