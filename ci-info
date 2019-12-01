@@ -133,6 +133,7 @@ fi
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ ! -n "$CI_COMMIT_RANGE" ]; then
+  echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH"
   if [ "$CI_BRANCH" = "master" ]; then
     CI_COMMIT_RANGE_START=HEAD^1
     CI_COMMIT_RANGE_END=HEAD
@@ -144,6 +145,7 @@ if [ ! -n "$CI_COMMIT_RANGE" ]; then
 fi
 
 if [ ! -n "$CI_COMMIT_RANGE_START" ]; then
+  echo "echo Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
   CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
   CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
 fi
