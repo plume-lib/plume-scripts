@@ -115,6 +115,9 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
   echo "This command will print diagnostic information, then exit."
   echo
+  echo ${SCRIPTDIR}/ci-info --debug
+  ${SCRIPTDIR}/ci-info --debug
+  echo
   echo git rev-parse \$CI_COMMIT_RANGE_START
   echo git rev-parse $CI_COMMIT_RANGE_START
   git rev-parse $CI_COMMIT_RANGE_START
