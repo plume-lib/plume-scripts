@@ -35,7 +35,7 @@ if [ "$#" -gt 1 ] ; then
 fi
 
 if [ "$DEBUG" = "--debug" ] ; then
-  env | sed -e 's/^/echo /'
+  env | sort | sed -e 's/^/echo /'
   git log --graph | head --lines=10000 | sed -e 's/^/echo /'
 fi
 
