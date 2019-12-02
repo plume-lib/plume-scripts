@@ -10,12 +10,15 @@ s/^Haaris710$/Haaris Ahmed/
 s/^J Luo$/Jeff Luo/
 s/^Jianchu$/Jianchu Li/
 s/^JonathanGBurke$/Jonathan Burke/
+s/^LS@WATER$/Lian Sun/
 s/^Michèle$/Stefan Heule/
 s/^Maxi17$/Maximilian Gama/
+s/^Oleg$/Oleg Shchelykalnov/
 s/^Rashmi$/Rashmi Mudduluru/
 s/^Sadaf$/Sadaf Tajik/
 s/^SnowOnion$/Sonion Lee/
 s/^W. Dietl$/Werner Dietl/
+s/^abslamp$/Lian Sun/
 s/^atul dada$/Atul Dada/
 s/^awturner$/Andy Turner/
 s/^ayman abdelghany$/Ayman Abdelghany/
