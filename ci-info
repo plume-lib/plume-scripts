@@ -85,14 +85,14 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full name like "refs/heads/master";
   # BUILD_SOURCEBRANCHNAME is a short name like "master"; $BUILD_SOURCEVERSION is a commit ID.
-  # `ci-lint-diff` deals better with commit IDs (it does not currently handle branch names
-  # with "/", like "refs/heads/dependabot/gradle/de.undercouch.download-4.0.2").  In the future,
-  # use branch names more often.
-  if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    CI_BRANCH=$BUILD_SOURCEBRANCHNAME
-  else
-    CI_BRANCH=$BUILD_SOURCEVERSION
-  fi
+  # Problem: `ci-lint-diff` does not currently handle branch names with "/", like
+  # "refs/heads/dependabot/gradle/de.undercouch.download-4.0.2", but it does handle commit IDs. I
+  # need to fix that and remove the below hack.  The branch name is more readable in general, and
+  # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
+  CI_BRANCH=$BUILD_SOURCEBRANCHNAME
+  case $CI_BRANCH in
+    */*) CI_BRANCH=$BUILD_SOURCEVERSION
+  esac
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
