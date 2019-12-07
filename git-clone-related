@@ -65,6 +65,9 @@ if [ -d ${DESTINATION} ]; then
 else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
+  # # For debugging
+  # ${SCRIPTDIR}/ci-info ${UPSTREAM_ORG} --debug
+
   eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
   REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
   BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH}`
