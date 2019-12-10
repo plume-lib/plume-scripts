@@ -70,7 +70,7 @@ else
 
   eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
   REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
-  BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH}`
+  BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH_NAME}`
   echo "In directory $(pwd) :"
   echo "git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.

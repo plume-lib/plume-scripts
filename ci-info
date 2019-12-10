@@ -13,11 +13,11 @@
 # CI_IS_PULL_REQUEST: Either "true" or "false" (without the quotes).
 # CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source.
 #   Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
-# CI_BRANCH: In a PR, the source branch; otherwise, the branch being tested.
-# CI_COMMIT_RANGE: An argument to `git diff` with the range of commits.
+# CI_BRANCH_NAME: The name of the source branch (in a PR) or of the branch being tested.
+# CI_COMMIT_RANGE: An argument to `git diff` with the range of commits IDs.
 #    (Don't use it with `git log`, which interprets its argument differently.)
-# CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE.
-# CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE.
+# CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID.
+# CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID.
 #
 # For example use, see comments in file `lint-diff.py` in this directory.
 
@@ -72,45 +72,34 @@ if [ "$CI_ORGANIZATION" = "" ]; then
   CI_ORGANIZATION=$1
 fi
 
-### Other information
+### Other information (besides organization)
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines pull request
   CI_IS_PULL_REQUEST=true
-  CI_IS_PR=1
-  CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
-  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
-  CI_COMMIT_RANGE_END=$CI_BRANCH
-  # # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge"
-  # if [ "$BUILD_SOURCEBRANCHNAME" = "merge" ] ; then
-  #   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
-  # else
-  #   CI_COMMIT_RANGE_END=$BUILD_SOURCEBRANCH
-  # fi
-  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
+  # WARNING!  This is just a name, not a full ref path.
+  # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge"
+  CI_BRANCH_NAME=$SYSTEM_PULLREQUEST_SOURCEBRANCH
+  # CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+  CI_COMMIT_RANGE_START=$SYSTEM_PULLREQUEST_SOURCECOMMITID
+  # CI_COMMIT_RANGE_END=`git rev-parse $SYSTEM_PULLREQUEST_TARGETBRANCH`
+  CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
-  # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full name like "refs/heads/master";
+  # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/master";
   # BUILD_SOURCEBRANCHNAME is a short name like "master"; $BUILD_SOURCEVERSION is a commit ID.
-  # Problem: `ci-lint-diff` does not currently handle branch names with "/", like
-  # "refs/heads/dependabot/gradle/de.undercouch.download-4.0.2", but it does handle commit IDs. I
-  # need to fix that and remove the below hack.  The branch name is more readable in general, and
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
-  CI_BRANCH=$BUILD_SOURCEBRANCHNAME
-  case $CI_BRANCH in
-    */*) CI_BRANCH=$BUILD_SOURCEVERSION
-  esac
+  CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
+
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
-  if [ $TRAVIS_PULL_REQUEST != false ] ; then
-    CI_IS_PR=1
-  fi
-  CI_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
+  CI_BRANCH_NAME=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
   echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
   echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
-  echo "echo CI_BRANCH=$CI_BRANCH;"
+  echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
+
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
   if [ -n "$CIRCLE_PULL_REQUEST" ]; then
@@ -124,31 +113,34 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
     CI_COMMIT_RANGE_END=${COMMIT_RANGE}
     CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
   fi
-  CI_BRANCH=$CIRCLE_BRANCH
+  CI_BRANCH_NAME=$CIRCLE_BRANCH
+
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
   CI_IS_PULL_REQUEST=false
-  # In git 2.22 and later, can use: CI_BRANCH=`git branch --show-current`  (and update test below).
-  CI_BRANCH=`git branch | grep \* | cut -d ' ' -f2`
+  # In git 2.22 and later, can use: CI_BRANCH_NAME=`git branch --show-current`  (and update test below).
+  CI_BRANCH_NAME=`git branch | grep \* | cut -d ' ' -f2`
   # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
   # If you re-run a pull request via "Queue" rather than "Rebuild",
   # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
-  if [ "$CI_BRANCH" = '(HEAD' ] ; then
-    CI_BRANCH=master
+  if [ "$CI_BRANCH_NAME" = '(HEAD' ] ; then
+    CI_BRANCH_NAME=master
   fi
 fi
+
+## The above may have not set all variables.  Set ones that can be inferred from them.
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ ! -n "$CI_COMMIT_RANGE" ]; then
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH;"
+    echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH_NAME=$CI_BRANCH_NAME;"
   fi
-  if [ "$CI_BRANCH" = "master" ]; then
-    CI_COMMIT_RANGE_START=HEAD^1
-    CI_COMMIT_RANGE_END=HEAD
+  if [ "$CI_BRANCH_NAME" = "master" ]; then
+    CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+    CI_COMMIT_RANGE_END=`git rev-parse HEAD`
   else      
-    CI_COMMIT_RANGE_START=master
-    CI_COMMIT_RANGE_END=$CI_BRANCH
+    CI_COMMIT_RANGE_START=`git rev-parse master`
+    CI_COMMIT_RANGE_END=`git rev-parse $CI_BRANCH_NAME`
   fi
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 fi
@@ -167,14 +159,21 @@ echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
 echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
 echo "echo CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
 echo "CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST; export CI_IS_PULL_REQUEST;"
-if [ -n "$CI_IS_PR" ]; then
-  echo "CI_IS_PR=$CI_IS_PR; export CI_IS_PR;"
-fi
-echo "echo CI_BRANCH=$CI_BRANCH;"
-echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
+echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
+echo "CI_BRANCH_NAME=$CI_BRANCH_NAME; export CI_BRANCH_NAME;"
 echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
 echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
 echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
 echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
 echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
 echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
+
+# Temporary, for backward compatibility
+# Deprecated 2019-07-10; remove on 2020-07-10
+if [ "$CI_IS_PULL_REQUEST" = "true" ]; then
+  echo "CI_IS_PR=1; export CI_IS_PR;"
+fi
+# Deprecated 2019-12-10; remove on 2020-07-10
+echo "echo CI_BRANCH=$CI_BRANCH_NAME;"
+echo "CI_BRANCH=$CI_BRANCH_NAME; export CI_BRANCH;"
+echo "echo CI_BRANCH=$CI_BRANCH_NAME;"

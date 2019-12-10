@@ -48,47 +48,11 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
 eval `${SCRIPTDIR}/ci-info`
 
-# Make the branches mentioned in $CI_COMMIT_RANGE available.
-CI_COMMIT_RANGE_START_TYPE=$(git cat-file -t $CI_COMMIT_RANGE_START 2>&1) || true
-if [ "$CI_COMMIT_RANGE_START_TYPE" != "commit" ]; then
-  if [ "$DEBUG" = "--debug" ] ; then
-    echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
-    echo "CI_COMMIT_RANGE_START_TYPE=$CI_COMMIT_RANGE_START_TYPE"
-  fi
-  if ! git cat-file -e $CI_COMMIT_RANGE_START^{commit} > /dev/null 2>&1; then
-    echo git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START
-    git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START || true
-    if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_START > /dev/null 2>&1; then
-      echo git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START
-      git branch --track $CI_COMMIT_RANGE_START origin/$CI_COMMIT_RANGE_START \
-	  || (echo "Commit $CI_COMMIT_RANGE_START not found; clone more deeply." && false)
-    fi
-  fi
-fi
-CI_COMMIT_RANGE_END_TYPE=$(git cat-file -t $CI_COMMIT_RANGE_END 2>&1) || true
-if [ "$CI_COMMIT_RANGE_END_TYPE" != "commit" ]; then
-  if [ "$DEBUG" = "--debug" ] ; then
-    echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
-    echo "CI_COMMIT_RANGE_END_TYPE=$CI_COMMIT_RANGE_END_TYPE"
-  fi
-  if ! git cat-file -e $CI_COMMIT_RANGE_END^{commit} > /dev/null 2>&1; then
-    echo git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END
-    git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END || true
-    if ! git show-ref --verify --quiet refs/heads/$CI_COMMIT_RANGE_END > /dev/null 2>&1; then
-      echo git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END
-      git branch --track $CI_COMMIT_RANGE_END origin/$CI_COMMIT_RANGE_END \
-	  || (echo "Commit $CI_COMMIT_RANGE_END not found; clone more deeply." && false)
-    fi
-  fi
-fi
-
-# On CircleCI, sometimes the master branch is set to the same commit as the feature branch!
-if [ "$CIRCLECI" = "true" ] ; then
-  if [ "$CI_COMMIT_RANGE_START" = "master" ] ; then
-    CI_COMMIT_RANGE_START=remotes/origin/$CI_COMMIT_RANGE_START
-    CI_COMMIT_RANGE=$CI_COMMIT_RANGE_START...$CI_COMMIT_RANGE_END
-  fi
-fi
+# Ensure the commits mentioned in $CI_COMMIT_RANGE are available.
+git fetch origin $CI_COMMIT_RANGE_START \
+    || (echo "Commit $CI_COMMIT_RANGE_START not found; clone more deeply." && false)
+git fetch origin $CI_COMMIT_RANGE_END \
+    || (echo "Commit $CI_COMMIT_RANGE_END not found; clone more deeply." && false)
 
 set +e
 rm -rf /tmp/diff.txt
