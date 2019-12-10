@@ -84,14 +84,15 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_COMMIT_RANGE_START=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   # CI_COMMIT_RANGE_END=`git rev-parse $SYSTEM_PULLREQUEST_TARGETBRANCH`
   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
+  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
+  fi
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/master";
   # BUILD_SOURCEBRANCHNAME is a short name like "master"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
-  if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
-  fi
 
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
@@ -131,7 +132,7 @@ else
   fi
 fi
 
-## The above may have not set all variables.  Set ones that can be inferred from them.
+## The above may have not set CI_COMMIT_RANGE.  Set it.
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ ! -n "$CI_COMMIT_RANGE" ]; then
