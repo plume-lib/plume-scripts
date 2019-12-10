@@ -49,10 +49,14 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 eval `${SCRIPTDIR}/ci-info`
 
 # Ensure the commits mentioned in $CI_COMMIT_RANGE are available.
-git fetch origin $CI_COMMIT_RANGE_START \
-    || (echo "Commit $CI_COMMIT_RANGE_START not found; clone more deeply." && false)
-git fetch origin $CI_COMMIT_RANGE_END \
-    || (echo "Commit $CI_COMMIT_RANGE_END not found; clone more deeply." && false)
+if [ "$(git cat-file -t $CI_COMMIT_RANGE_START)" != "commit" ] ; then
+  echo "Commit CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START not found; clone more deeply."
+  false
+fi
+if [ "$(git cat-file -t $CI_COMMIT_RANGE_END)" != "commit" ] ; then
+  echo "Commit CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END not found; clone more deeply."
+  false
+fi
 
 set +e
 rm -rf /tmp/diff.txt
