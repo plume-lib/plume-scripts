@@ -80,9 +80,10 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   # WARNING!  This is just a name, not a full ref path.
   # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge"
   CI_BRANCH_NAME=$SYSTEM_PULLREQUEST_SOURCEBRANCH
-  # CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
-  CI_COMMIT_RANGE_START=$BUILD_SOURCEVERSION
-  # CI_COMMIT_RANGE_END=`git rev-parse $SYSTEM_PULLREQUEST_TARGETBRANCH`
+  # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
+  # in the repo.  Its first child HEAD^1 is the target branch (e.g., master), but we can obtain
+  # that more directly via $SYSTEM_PULLREQUEST_TARGETBRANCH.
+  CI_COMMIT_RANGE_START=`git rev-parse $SYSTEM_PULLREQUEST_TARGETBRANCH`
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
