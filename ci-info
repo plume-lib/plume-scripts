@@ -89,6 +89,9 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # BUILD_SOURCEBRANCHNAME is a short name like "master"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
+  fi
 
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
