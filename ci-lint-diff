@@ -48,14 +48,15 @@ SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
 eval `${SCRIPTDIR}/ci-info`
 
+
 # Ensure the commits mentioned in $CI_COMMIT_RANGE are available.
 if [ "$(git cat-file -t $CI_COMMIT_RANGE_START)" != "commit" ] ; then
   echo "Commit CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START not found; clone more deeply."
-  false
+  CI_LINT_DIFF_ERROR=1
 fi
 if [ "$(git cat-file -t $CI_COMMIT_RANGE_END)" != "commit" ] ; then
   echo "Commit CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END not found; clone more deeply."
-  false
+  CI_LINT_DIFF_ERROR=1
 fi
 
 set +e
@@ -81,6 +82,10 @@ if [ ! -s /tmp/diff.txt ] ; then
   echo "*****"
   echo "ERROR: /tmp/diff.txt is empty for $CI_COMMIT_RANGE ."
   echo "Try pulling base branch (often master) into compare branch (often your feature branch)."
+  CI_LINT_DIFF_ERROR=1
+fi
+
+if [ -n $CI_LINT_DIFF_ERROR ] ; then
   echo "This command will print diagnostic information, then exit."
   echo
   echo ${SCRIPTDIR}/ci-info --debug
