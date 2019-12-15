@@ -75,7 +75,7 @@ if [ ! -s /tmp/diff.txt ] ; then
   CI_LINT_DIFF_ERROR="ERROR: Empty diff for $CI_COMMIT_RANGE. Try pulling base branch (often master) into compare branch (often your feature branch)."
 fi
 
-if [ -n $CI_LINT_DIFF_ERROR ] ; then
+if [ -n "$CI_LINT_DIFF_ERROR" ] ; then
   echo
   echo "*****"
   echo "$CI_LINT_DIFF_ERROR"
