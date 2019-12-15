@@ -87,14 +87,18 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
+  # It's not a pull request, but is a build for a branch.
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
   fi
-  # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/master";
-  # BUILD_SOURCEBRANCHNAME is a short name like "master"; $BUILD_SOURCEVERSION is a commit ID.
+  # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
+  # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
-
+  git fetch origin master
+  CI_COMMIT_RANGE_START=`git rev-parse origin/master`
+  CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
+  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
