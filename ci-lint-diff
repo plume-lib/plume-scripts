@@ -85,6 +85,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ] ; then
   echo
   echo ${SCRIPTDIR}/ci-info --debug
   ${SCRIPTDIR}/ci-info --debug
+  echo end of ${SCRIPTDIR}/ci-info --debug
   echo
   echo git rev-parse \$CI_COMMIT_RANGE_START
   echo git rev-parse $CI_COMMIT_RANGE_START

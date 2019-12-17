@@ -90,7 +90,7 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
-  # It's not a pull request, but is a build for a branch.
+  # It's not a pull request, but is a build for a branch (possibly master).
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
   fi
@@ -98,8 +98,14 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
-  git fetch origin master
-  CI_COMMIT_RANGE_START=`git rev-parse origin/master`
+  if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
+    # This isn't right, because there could have been multiple pushes since the
+    # last finished/successful CI job.
+    CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+  else
+    git fetch origin master
+    CI_COMMIT_RANGE_START=`git rev-parse origin/master`
+  fi
   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ "$TRAVIS" = "true" ] ; then
