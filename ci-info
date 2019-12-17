@@ -34,6 +34,8 @@ if [ "$#" -gt 1 ] ; then
   exit 2
 fi
 
+SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
+
 if [ "$DEBUG" = "--debug" ] ; then
   echo
   env | sort | sed -e 's/^/echo /'
@@ -99,9 +101,9 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    # This isn't right, because there could have been multiple pushes since the
-    # last finished/successful CI job.
-    CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+    # `git rev-parse HEAD^1` isn't right, because there could have
+    # been multiple pushes since the last successful CI job.
+    CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py`
   else
     git fetch origin master
     CI_COMMIT_RANGE_START=`git rev-parse origin/master`
