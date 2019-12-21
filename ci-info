@@ -61,6 +61,7 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
     CI_ORGANIZATION=${SLUG%:*}
   else
     CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
+    CI_REPO=${BUILD_REPOSITORY_NAME##*/}
   fi
 fi
 
@@ -101,10 +102,20 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    # `git rev-parse HEAD^1` isn't right, because there could have been multiple
-    # pushes since the last successful CI job.  But use it if the script fails
-    # (which is a bit of a hack).
-    CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py` || CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+    # `git rev-parse HEAD^1` isn't right, because there could have been
+    # multiple pushes since the last successful CI job.  But use it if we
+    # cannot run the `ci-last-success.py` script.
+    if pip3 list | tail -n +1 | grep -q '^requests ' ; then
+      echo "Python requests package is already installed"
+    else
+      sudo pip3 install requests || pip3 install --user requests || true
+    fi
+    if pip3 list | tail -n +1 | grep -q '^requests ' ; then
+      CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
+    else
+      echo "WARNING: Could not run ci-last-success.py script"
+      CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+    fi
   else
     git fetch origin master
     CI_COMMIT_RANGE_START=`git rev-parse origin/master`
