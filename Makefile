@@ -6,6 +6,6 @@ test:
 PYTHON_FILES=lint-diff.py
 
 python-style:
-	yapf -i ${PYTHON_FILES}
-	pylint -f parseable --disable=W ${PYTHON_FILES}
+	yapf -i --style='{column_limit: 100}' ${PYTHON_FILES}
+	pylint -f parseable --disable=W,invalid-name ${PYTHON_FILES}
 

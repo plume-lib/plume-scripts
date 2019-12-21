@@ -167,8 +167,7 @@ def guess_strip_files(diff_file, lint_file):
     result = guess_strip_filenames(diff_files, lint_files)
     diff_prefix = os.path.commonprefix(list(diff_files))
     lint_prefix = os.path.commonprefix(list(lint_files))
-    if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count(
-            "/"):
+    if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
         if DEBUG:
             eprint(
                 "lint-diff.py: guess_strip_files giving up: result={} diff_prefix={} lint_prefix={}"
@@ -184,9 +183,10 @@ def guess_strip_files(diff_file, lint_file):
 
 def parse_args():
     """Parse and return the command-line arguments."""
+    global DEBUG
+
     parser = argparse.ArgumentParser(
-        description=
-        "Filter the output of lint, to only show output for changed lines")
+        description="Filter the output of lint, to only show output for changed lines")
     parser.add_argument('--guess-strip',
                         dest='guess_strip',
                         action='store_true',
@@ -199,34 +199,26 @@ def parse_args():
                         type=int,
                         default=0,
                         help="ignore N leading \"/\" in filenames in diff.txt")
-    parser.add_argument(
-        '--strip-lint',
-        metavar="NUM_SLASHES",
-        dest='strip_lint',
-        action='store',
-        type=int,
-        default=0,
-        help="ignore N leading \"/\" in filenames in lint-output.txt")
-    parser.add_argument(
-        '--context',
-        metavar="NUM_LINES",
-        dest='context_lines',
-        action='store',
-        type=int,
-        default=2,
-        help=
-        "how many lines around each changed one are also considered changed")
+    parser.add_argument('--strip-lint',
+                        metavar="NUM_SLASHES",
+                        dest='strip_lint',
+                        action='store',
+                        type=int,
+                        default=0,
+                        help="ignore N leading \"/\" in filenames in lint-output.txt")
+    parser.add_argument('--context',
+                        metavar="NUM_LINES",
+                        dest='context_lines',
+                        action='store',
+                        type=int,
+                        default=2,
+                        help="how many lines around each changed one are also considered changed")
     parser.add_argument('--debug',
                         dest='DEBUG',
                         action='store_true',
                         help="print diagnostic output")
-    parser.add_argument('diff_filename',
-                        metavar='diff.txt',
-                        default=os.getcwd())
-    parser.add_argument(
-        'lint_filename',
-        metavar='lint-output.txt',
-        default=None)
+    parser.add_argument('diff_filename', metavar='diff.txt', default=os.getcwd())
+    parser.add_argument('lint_filename', metavar='lint-output.txt', default=None)
 
     args = parser.parse_args()
     DEBUG = args.DEBUG
@@ -240,10 +232,7 @@ def parse_args():
         sys.exit(2)
 
     if args.guess_strip and args.lint_filename is None:
-        eprint(
-            PROGRAM,
-            "needs \"lint-output.txt\" file argument when --guess-strip is provided"
-        )
+        eprint(PROGRAM, "needs \"lint-output.txt\" file argument when --guess-strip is provided")
         sys.exit(2)
 
     if args.guess_strip:
@@ -257,8 +246,8 @@ def parse_args():
             args.strip_diff = guessed_strip[0]
             args.strip_lint = guessed_strip[1]
             if DEBUG:
-                eprint("lint-diff.py inferred --strip-diff={} --strip-lint={}".
-                       format(args.strip_diff, args.strip_lint))
+                eprint("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(
+                    args.strip_diff, args.strip_lint))
 
     # A filename if the diff filenames start with "a/" and "b/", otherwise None.
     # Is set by changed_lines().
@@ -273,8 +262,7 @@ def changed_lines(args):
     changed = {}
 
     with open(args.diff_filename) as diff:
-        atat_re = re.compile(
-            '@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*')
+        atat_re = re.compile('@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*')
         content_re = re.compile('[ +-].*')
 
         filename = ''
@@ -325,8 +313,7 @@ def warn_relative_diff(args):
     if args.relative_diff is not None and args.strip_diff == 0:
         # This is usually not an error, so don't warn.
         if DEBUG:
-            eprint("warning:",
-                   args.diff_filename, "may use relative paths (e.g.,",
+            eprint("warning:", args.diff_filename, "may use relative paths (e.g.,",
                    args.relative_diff.strip(), ") but --strip-diff=0",
                    ("(guessed)" if args.guess_strip else ""))
             eprint("warning: (Maybe there were no files in common.)")
@@ -380,13 +367,10 @@ def main():
                 # eprint('Bad --strip-lint={0} ; line has fewer "/": {1}'.format(
                 #   strip_lint, match.group(1)))
                 # sys.exit(2)
-            if filename.startswith(
-                    "/"
-            ) and args.relative_diff is not None and args.strip_lint == 0:
+            if filename.startswith("/") and args.relative_diff is not None and args.strip_lint == 0:
                 if not relative_diff_warned:
-                    eprint("warning:", args.diff_filename,
-                           "uses relative paths but", args.lint_filename,
-                           "uses absolute paths")
+                    eprint("warning:", args.diff_filename, "uses relative paths but",
+                           args.lint_filename, "uses absolute paths")
                     relative_diff_warned = True
             lineno = int(match.group(2))
             if (filename in changed and lineno in changed[filename]):
