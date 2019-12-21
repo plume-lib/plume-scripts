@@ -1,4 +1,4 @@
-test: test-words test-reldir test-guessstrip
+test: clean test-words test-reldir test-guessstrip
 
 
 # "words" test
