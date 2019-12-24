@@ -8,7 +8,7 @@
 # Requires the Python requests module to be installed
 
 # This does no GitHub authentication, so it is limited to 60 requests
-# per hour.  It fails if it goes over the limit.
+# per hour.  It fails (and prints nothing to standard out) if it goes over the limit.
 
 import json
 import pprint
@@ -25,7 +25,7 @@ repo=sys.argv[2]
 url_commits = 'https://api.github.com/repos/{}/{}/commits'.format(org, repo)
 resp_commits = requests.get(url_commits)
 if resp_commits.status_code != 200:
-    # This means something went wrong.
+    # This means something went wrong, possibly rate-limiting.
     raise Exception('GET {} {} {}'.format(url_commits, resp_commits.status_code, resp_commits.headers))
 for commit in resp_commits.json():
     sha=commit['sha']
@@ -33,7 +33,7 @@ for commit in resp_commits.json():
     url_status = 'https://api.github.com/repos/{}/{}/commits/{}/status'.format(org, repo, sha)
     resp_status = requests.get(url_status)
     if resp_status.status_code != 200:
-        # This means something went wrong.
+        # This means something went wrong, possibly rate-limiting.
         raise Exception('GET {} {} {}'.format(url_status, resp_status.status_code, resp_status.headers))
     state=resp_status.json()['state']
     if (state == "success"):

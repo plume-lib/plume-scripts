@@ -108,15 +108,19 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     # `git rev-parse HEAD^1` isn't right, because there could have been
     # multiple pushes since the last successful CI job.  But use it if we
     # cannot run the `ci-last-success.py` script.
-    if pip3 list | tail -n +1 | grep -q '^requests ' ; then
+    if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
       echo "Python requests package is already installed"
     else
       sudo pip3 install requests || pip3 install --user requests || true
     fi
-    if pip3 list | tail -n +1 | grep -q '^requests ' ; then
+    if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
       CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
+      if [ "$BUILD_SOURCEBRANCHNAME" = "" ] ; then
+	  echo "echo WARNING: ci-last-success.py script failed; just considering last commit."
+	  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+      fi
     else
-      echo "WARNING: Could not run ci-last-success.py script; just considering last commit."
+      echo "echo WARNING: Could not run ci-last-success.py script; just considering last commit."
       CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
     fi
   else
