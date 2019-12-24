@@ -6,15 +6,21 @@ To install, run the following (or put it at the top of a script).
 Then, the scripts are available at `/tmp/plume-scripts`.
 
 ```
-git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
-  || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+if [ -d "/tmp/plume-scripts" ] ; then
+  git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+else
+  git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+fi
 ```
 
 For older versions of git that do not support the `-C` command-line argument, use:
 
 ```
-(cd /tmp/plume-scripts && git pull) > /dev/null 2>&1 \
-  || (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
+if [ -d "/tmp/plume-scripts" ] ; then
+  (cd /tmp/plume-scripts && git pull -q) > /dev/null 2>&1
+else
+  (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
+fi
 ```
 
 
@@ -110,8 +116,11 @@ and you would like to use branch BR if it exists.
 Here is how to accomplish that:
 
 ```
-  git -C /tmp/plume-scripts pull > /dev/null 2>&1 \
-    || git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+  if [ -d "/tmp/plume-scripts" ] ; then
+    git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+  else
+    git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+  fi
   /tmp/plume-scripts/git-clone-related codespecs fjalar
 ```
 
