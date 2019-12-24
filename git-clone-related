@@ -68,7 +68,7 @@ else
   # # For debugging
   # ${SCRIPTDIR}/ci-info ${UPSTREAM_ORG} --debug
 
-  eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
+  eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}` || (${SCRIPTDIR}/ci-info --debug ${UPSTREAM_ORG} && false)
   REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
   BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH_NAME}`
   echo "In directory $(pwd) :"
