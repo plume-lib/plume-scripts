@@ -109,9 +109,9 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     # multiple pushes since the last successful CI job.  But use it if we
     # cannot run the `ci-last-success.py` script.
     if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-      echo "Python requests package is already installed"
+      echo echo "Python requests package is already installed"
     else
-      sudo pip3 install requests || pip3 install --user requests || true
+      (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
     fi
     if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
       CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
