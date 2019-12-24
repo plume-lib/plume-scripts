@@ -53,6 +53,11 @@ Given a file of warnings, reports only those that are in the diff for the
 current pull request.  Works for Azure Pipelines, CircleCI, and Travis CI.
 [Documentation](ci-lint-diff) at top of file.
 
+### ci-last-success.py
+
+Prints the SHA commit id corresponding to the most recent successful CI job.
+[Documentation](ci-last-success.py) at top of file.
+
 
 ## Cygwin utilities
 
