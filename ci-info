@@ -115,7 +115,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     fi
     if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
       CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
-      if [ "$BUILD_SOURCEBRANCHNAME" = "" ] ; then
+      if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
 	  echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\""
 	  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
       fi
