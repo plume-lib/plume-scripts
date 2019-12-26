@@ -119,7 +119,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
 	  echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\""
 	  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
       else
-	  echo "echo \"ci-last-success.py script suceeded with $CI_COMMIT_RANGE_START.\""
+	  echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} suceeded with $CI_COMMIT_RANGE_START.\""
       fi
     else
       echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\""
@@ -192,6 +192,14 @@ if [ ! -n "$CI_COMMIT_RANGE_START" ]; then
   fi
   CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
   CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
+fi
+
+# Avoid errors regarding empty range
+
+if [ "$CI_COMMIT_RANGE_START" = "CI_COMMIT_RANGE_END" ]; then
+  echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+  CI_COMMIT_RANGE_START=`git rev-parse $CI_COMMIT_RANGE_END^1`
+  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 fi
 
 ### Print it out

@@ -5,10 +5,11 @@
 # Outputs the SHA commit id corresponding to the most recent successful CI job.
 # Currently works only for Azure Pipelines, and only for the master branch.
 #
-# Requires the Python requests module to be installed
+# Requires the Python requests module to be installed.
 
-# This does no GitHub authentication, so it is limited to 60 requests
-# per hour.  It fails (and prints nothing to standard out) if it goes over the limit.
+# This does no GitHub authentication, so it is limited to 60 requests per
+# hour.  It fails (and prints nothing to standard out, only to standard
+# error) if it goes over the limit.
 
 import json
 import pprint
