@@ -43,9 +43,9 @@ if [ "$DEBUG" = "--debug" ] ; then
   echo
   env | sort | sed -e 's/^/echo /'
   echo
-  git log --graph | head --lines=10000 | sed -e 's/^/echo /'
-  echo
   git branch -a
+  echo
+  git log --graph | head --lines=1000 | sed -e 's/^/echo /'
   echo
 fi
 
