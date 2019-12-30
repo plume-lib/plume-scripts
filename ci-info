@@ -85,6 +85,9 @@ fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines pull request
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH"
+  fi
   CI_IS_PULL_REQUEST=true
   # WARNING!  $BUILD_SOURCEBRANCHNAME is just a name, not a full ref path.  For example,
   # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge".
@@ -97,6 +100,9 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # It's not a pull request, but is a build for a branch (possibly master).
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH"
+  fi
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
   fi
@@ -133,6 +139,9 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo Travis CI $TRAVIS"
+  fi
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   CI_BRANCH_NAME=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
   echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
@@ -143,6 +152,9 @@ elif [ "$TRAVIS" = "true" ] ; then
 
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo CircleCI $CIRCLE_COMPARE_URL $CIRCLE_PULL_REQUEST"
+  fi
   if [ -n "$CIRCLE_PULL_REQUEST" ]; then
     CI_IS_PULL_REQUEST=true
   else
@@ -158,6 +170,9 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
 
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo Else clause: nothing matched"
+  fi
   CI_IS_PULL_REQUEST=false
   # In git 2.22 and later, can use: CI_BRANCH_NAME=`git branch --show-current`  (and update test below).
   CI_BRANCH_NAME=`git --no-pager branch | grep \* | cut -d ' ' -f2`
