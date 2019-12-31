@@ -211,7 +211,7 @@ fi
 
 # Avoid errors regarding empty range
 
-if [ "$CI_COMMIT_RANGE_START" = "CI_COMMIT_RANGE_END" ]; then
+if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
   CI_COMMIT_RANGE_START=`git rev-parse $CI_COMMIT_RANGE_END^1`
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
