@@ -133,7 +133,7 @@ assert pair_min((40,30), (6,5)) == (6,5)
 def diff_filenames(diff_filename):
     """All the filenames in the given diff file."""
     result = set()
-    with open(diff_filename) as diff:
+    with open(diff_filename, encoding='utf-8') as diff:
         for diff_line in diff:
             match = PLUSPLUSPLUS_RE.match(diff_line)
             if match:
@@ -144,7 +144,7 @@ def diff_filenames(diff_filename):
 def lint_filenames(lint_filename):
     """All the filenames in the given lint file."""
     result = set()
-    with open(lint_filename) as lint:
+    with open(lint_filename, encoding='utf-8') as lint:
         for lint_line in lint:
             match = FILENAME_LINENO_RE.match(lint_line)
             if match:
@@ -264,7 +264,7 @@ def changed_lines(args):
 
     changed = {}
 
-    with open(args.diff_filename) as diff:
+    with open(args.diff_filename, encoding='utf-8') as diff:
         atat_re = re.compile('@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*')
         content_re = re.compile('[ +-].*')
 
@@ -323,10 +323,10 @@ def warn_relative_diff(args):
         result = True
         if DEBUG:
             eprint("lint-diff.py: diff file {}:".format(args.diff_filename))
-            with open(args.diff_filename, 'r') as fin:
+            with open(args.diff_filename, 'r', encoding='utf-8') as fin:
                 eprint("{}", fin.read())
             eprint("lint-diff.py: lint file {}:".format(args.lint_filename))
-            with open(args.lint_filename, 'r') as fin:
+            with open(args.lint_filename, 'r', encoding='utf-8') as fin:
                 eprint("{}", fin.read())
             eprint("lint-diff.py: end of input files.")
 
@@ -354,7 +354,7 @@ def main():
         args.lint_filename = "stdin"
         lint = sys.stdin
     else:
-        lint = open(args.lint_filename)
+        lint = open(args.lint_filename, encoding='utf-8')
 
     # 1 if this produced any output, 0 if not
     status = 0
