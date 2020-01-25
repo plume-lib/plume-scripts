@@ -66,7 +66,7 @@ else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
   # For debugging
-  ${SCRIPTDIR}/ci-info --debug ${UPSTREAM_ORG}
+  # ${SCRIPTDIR}/ci-info --debug ${UPSTREAM_ORG}
 
   eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
   REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
