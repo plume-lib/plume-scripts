@@ -58,6 +58,7 @@ s/^utsavoza$/Utsav Oza/
 s/^wdietl$/Werner Dietl/
 s/^wmdietl$/Werner Dietl/
 s/^wmdietlGC$/Google Inc.\\ (via @wmdietlGC)/
+s/^zhangjiangqige$/Jiangqi Zhang/
 
 s/^adonovan$/Alan Donovan/
 s/^akcabac$/Cemal Akcaba/
