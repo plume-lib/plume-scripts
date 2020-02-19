@@ -120,12 +120,15 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
       (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
     fi
     if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
+      # Problem:  typically the repository only contains a few recent
+      # commits, and this commit may be older than those.  Especially when
+      # api.github.com returns "state: pending" for succeeding jobs
       CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
       if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
-	  echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\""
-	  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+        echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\""
+        CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
       else
-	  echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} suceeded with $CI_COMMIT_RANGE_START.\""
+          echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START.\""
       fi
     else
       echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\""
