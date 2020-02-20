@@ -53,10 +53,10 @@ eval `${SCRIPTDIR}/ci-info`
 
 
 # Ensure the commits mentioned in $CI_COMMIT_RANGE are available.
-if [ "$(git cat-file -t $CI_COMMIT_RANGE_START)" != "commit" ] ; then
+if ! git cat-file -e ${$CI_COMMIT_RANGE_START}^{commit} ; then
   CI_LINT_DIFF_ERROR="Commit CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START not found; clone more deeply."
 fi
-if [ "$(git cat-file -t $CI_COMMIT_RANGE_END)" != "commit" ] ; then
+if ! git cat-file -e ${$CI_COMMIT_RANGE_END}^{commit} ; then
   CI_LINT_DIFF_ERROR="Commit CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END not found; clone more deeply."
 fi
 
