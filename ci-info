@@ -31,7 +31,7 @@ if [ "$1" = "--debug" ] ; then
     shift
 fi
 if [ "$#" -gt 1 ] ; then
-  echo "echo Usage: $0 [--debug] [DEFAULT-ORGANIZATION]"
+  echo "echo Usage: $0 [--debug] [DEFAULT-ORGANIZATION];"
   echo "Usage: $0 [--debug] [DEFAULT-ORGANIZATION]" >&2
   echo "exit 2"
   exit 2
@@ -86,7 +86,7 @@ fi
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines pull request
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH"
+    echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH;"
   fi
   CI_IS_PULL_REQUEST=true
   # WARNING!  $BUILD_SOURCEBRANCHNAME is just a name, not a full ref path.  For example,
@@ -101,10 +101,10 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # It's not a pull request, but is a build for a branch (possibly master).
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH"
+    echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
   fi
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
+    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
   fi
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
@@ -115,27 +115,27 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     # multiple pushes since the last successful CI job.  But use it if we
     # cannot run the `ci-last-success.py` script.
     if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-      echo "echo \"Python requests package is already installed\""
+      echo "echo \"Python requests package is already installed\";"
     else
       (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
     fi
     if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
       CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
       if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
-        echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\""
+        echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
         CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
       elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
         # The commit is not in the repository.  Maybe it is older than the
         # commits pulled into this repository.  This can happen when when
         # api.github.com incorrectly returns "state: pending" for successful
         # jobs.
-        echo "echo \"WARNING: ci-last-success.py script returned commit not in repository; using last commit.\""
+        echo "echo \"WARNING: ci-last-success.py script returned commit not in repository; using last commit.\";"
         CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
       else
-        echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START.\""
+        echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START.\";"
       fi
     else
-      echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\""
+      echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\";"
       CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
     fi
   else
@@ -147,7 +147,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
 elif [ "$TRAVIS" = "true" ] ; then
   ## Travis CI
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo Travis CI $TRAVIS"
+    echo "echo Travis CI $TRAVIS;"
   fi
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   CI_BRANCH_NAME=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
@@ -160,7 +160,7 @@ elif [ "$TRAVIS" = "true" ] ; then
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   ## CircleCI
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo CircleCI $CIRCLE_COMPARE_URL $CIRCLE_PULL_REQUEST"
+    echo "echo CircleCI $CIRCLE_COMPARE_URL $CIRCLE_PULL_REQUEST;"
   fi
   if [ -n "$CIRCLE_PULL_REQUEST" ]; then
     CI_IS_PULL_REQUEST=true
@@ -178,7 +178,7 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo Else clause: nothing matched"
+    echo "echo Else clause: nothing matched;"
   fi
   CI_IS_PULL_REQUEST=false
   # In git 2.22 and later, can use: CI_BRANCH_NAME=`git branch --show-current`  (and update test below).
