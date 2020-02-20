@@ -3,7 +3,7 @@ all: test python-style
 test:
 	${MAKE} -C tests test
 
-PYTHON_FILES=lint-diff.py
+PYTHON_FILES=lint-diff.py ci-last-success.py
 
 python-style:
 	yapf -i --style='{column_limit: 100}' ${PYTHON_FILES}
