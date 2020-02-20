@@ -217,12 +217,13 @@ if [ ! -n "$CI_COMMIT_RANGE_START" ]; then
 fi
 
 # Avoid errors regarding empty range
-
 if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
   CI_COMMIT_RANGE_START=`git rev-parse $CI_COMMIT_RANGE_END^1`
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 fi
+
+# The diff might be empty if the last commit is the revert of the one before it.
 
 ### Print it out
 

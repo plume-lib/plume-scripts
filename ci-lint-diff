@@ -74,6 +74,8 @@ if [ $git_status -gt 1 ] ; then
 elif [ ! -r /tmp/diff.txt ] ; then
   CI_LINT_DIFF_ERROR="/tmp/diff.txt does not exist"
 fi
+# This can happen if the commit range is a commit and its revert.
+# So maybe don't fail here?
 if [ ! -s /tmp/diff.txt ] ; then
   CI_LINT_DIFF_ERROR="ERROR: Empty diff for $CI_COMMIT_RANGE. Try pulling base branch (often master) into compare branch (often your feature branch)."
 fi
