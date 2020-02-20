@@ -111,33 +111,47 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    # `git rev-parse HEAD^1` isn't right, because there could have been
-    # multiple pushes since the last successful CI job.  But use it if we
-    # cannot run the `ci-last-success.py` script.
-    if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-      echo "echo \"Python requests package is already installed\";"
-    else
-      (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
-    fi
-    if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-      CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO}`
-      if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
-        echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
-        CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
-      elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
-        # The commit is not in the repository.  Maybe it is older than the
-        # commits pulled into this repository.  This can happen when when
-        # api.github.com incorrectly returns "state: pending" for successful
-        # jobs.
-        echo "echo \"WARNING: ci-last-success.py script returned commit not in repository; using last commit.\";"
-        CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
-      else
-        echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START.\";"
-      fi
-    else
-      echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\";"
-      CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
-    fi
+    DEFAULT_CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+    # If a build fails, we would like to continue failing subsequent
+    # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
+    # does not do that, because there could have been multiple pushes
+    # since the last successful CI job.
+    # Pass argument to ci-last-success.py, because in a pull request
+    # we are only interested in the last success on the master branch,
+    # not on the feature branch!  The feature branch might have many
+    # succeeding jobs and then ci-last-success.py will return just
+    # part of the pull request's diffs.
+
+    ## # ci-last-success.py currently doesn't work because api.github.com returns "state: pending".
+    # # TODO: wrap all this in a ci-last-commit.sh shell script.
+    # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
+    #   # echo "echo \"Python requests package is already installed\";"
+    #   :
+    # else
+    #   (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
+    # fi
+    # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
+    #   CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START}`
+    #   if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
+    #     echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
+    #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+    #   elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
+    #     # The commit is not in the repository.  Maybe it is older than the
+    #     # commits pulled into this repository.  This can happen when when
+    #     # api.github.com incorrectly returns "state: pending" for successful
+    #     # jobs.
+    #     echo "echo \"WARNING: ci-last-success.py script returned commit not in repository; using last commit.\";"
+    #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+    #   else
+    #     echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START.\";"
+    #   fi
+    # else
+    #   echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\";"
+    #   CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+    # fi
+
+    ## Use this because ci-last-success.py currently doesn't work.
+    CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
   else
     git fetch origin master
     CI_COMMIT_RANGE_START=`git rev-parse origin/master`
