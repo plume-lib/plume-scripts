@@ -42,9 +42,9 @@ Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
 
 ### ci-info
 
-Obtains information about a CI (continuous integration) job, such as
-whether it is a pull request, the organization, the branch, and the range
-of commits.  Works for Azure Pipelines, CircleCI, and Travis CI.
+Obtains information about a CI (continuous integration) job, such as the
+organization, the branch, the range of commits, and whether it is a pull
+request.  Works for Azure Pipelines, CircleCI, and Travis CI.
 [Documentation](ci-info) at top of file.
 
 ### ci-lint-diff
