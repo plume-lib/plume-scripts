@@ -19,6 +19,8 @@
 #    request is pointless.
 #  * Your clone is shallow and does not contain all the commits.  You can fix that
 #    by pulling upstream.
+#
+# Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
 DEBUG=""
 

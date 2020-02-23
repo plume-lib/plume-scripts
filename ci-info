@@ -23,6 +23,8 @@
 # CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID.
 #
 # For example use, see comments in file `lint-diff.py` in this directory.
+#
+# Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
 
 DEBUG=""
