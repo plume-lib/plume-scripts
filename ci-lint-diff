@@ -165,4 +165,4 @@ fi
 
 set -e
 
-"${SCRIPTDIR}"/lint-diff.py "$DEBUG" --guess-strip /tmp/diff.txt "$WARNINGSFILE"
+"${SCRIPTDIR}"/lint-diff.py $DEBUG --guess-strip /tmp/diff.txt "$WARNINGSFILE"
