@@ -51,10 +51,8 @@ else
   fi
   DESTINATION=../${REPO_NAME}
 fi
-if [ "$#" -ne 0 ]; then
-  GIT_ARGS="$*"
-else
-  GIT_ARGS="-q --single-branch --depth 1"
+if [ "$#" -eq 0 ]; then
+  set -- -q --single-branch --depth 1
 fi
 
 echo "In directory $(pwd) :"
@@ -76,6 +74,6 @@ else
   echo "In directory $(pwd) :"
   echo "git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
-  git clone -b "${BRANCH}" "${GIT_ARGS}" "${REPO_URL}" "${DESTINATION}" \
-    || git clone -b "${BRANCH}" "${GIT_ARGS}" "${REPO_URL}" "${DESTINATION}"
+  git clone -b "${BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
+    || git clone -b "${BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}"
 fi
