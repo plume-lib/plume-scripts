@@ -78,7 +78,7 @@ while ((scalar(@ARGV) > 0) && ($ARGV[0] =~ /^-/)) {
   } elsif ($arg eq "-debug") {
     $debug = 1;
   } else {
-    die "unrecognized argument '$arg'; $forhelp\n";
+    die "preplace: unrecognized argument '$arg'; $forhelp\n";
   }
 }
 

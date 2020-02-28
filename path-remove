@@ -25,7 +25,7 @@ while (scalar(@ARGV) > 0) {
     shift @ARGV;
     $extra_regexp = shift @ARGV;
   } else {
-    die "Unrecognized argument $ARGV[1]";
+    die "path-remove: Unrecognized argument $ARGV[1]";
   }
 }
 
