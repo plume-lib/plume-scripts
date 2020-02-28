@@ -52,30 +52,30 @@ else
   DESTINATION=../${REPO_NAME}
 fi
 if [ "$#" -ne 0 ]; then
-  GIT_ARGS="$@"
+  GIT_ARGS="$*"
 else
   GIT_ARGS="-q --single-branch --depth 1"
 fi
 
 echo "In directory $(pwd) :"
-if [ -d ${DESTINATION} ]; then
+if [ -d "${DESTINATION}" ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
   # Older versions of git don't support the -C command-line option.
   # In a Travis pull request, a repository can be in state "(HEAD detached at b475d58d)"
   # and "git pull" fails.
-  (cd ${DESTINATION} && (git pull -q || (git branch && true)))
+  (cd "${DESTINATION}" && (git pull -q || (git branch && true)))
 else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
   # For debugging
   # ${SCRIPTDIR}/ci-info --debug ${UPSTREAM_ORG}
 
-  eval `${SCRIPTDIR}/ci-info ${UPSTREAM_ORG}`
-  REPO_URL=`${SCRIPTDIR}/git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME}`
-  BRANCH=`${SCRIPTDIR}/git-find-branch ${REPO_URL} ${CI_BRANCH_NAME}`
+  eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
+  REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
+  BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}")
   echo "In directory $(pwd) :"
   echo "git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
-  git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION} \
-    || git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}
+  git clone -b "${BRANCH}" "${GIT_ARGS}" "${REPO_URL}" "${DESTINATION}" \
+    || git clone -b "${BRANCH}" "${GIT_ARGS}" "${REPO_URL}" "${DESTINATION}"
 fi

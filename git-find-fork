@@ -26,9 +26,9 @@ REPONAME=$3
 export GITEXISTS="wget -q --spider"
 
 
-if ( ${GITEXISTS} https://github.com/${ORG}/${REPONAME}.git > /dev/null ); then
-   OWNER=${ORG}
+if ( ${GITEXISTS} "https://github.com/${ORG}/${REPONAME}.git" > /dev/null ); then
+   OWNER="${ORG}"
 else
-   OWNER=${UPSTREAM_ORG}
+   OWNER="${UPSTREAM_ORG}"
 fi
-echo https://github.com/${OWNER}/${REPONAME}.git
+echo "https://github.com/${OWNER}/${REPONAME}.git"

@@ -32,16 +32,16 @@ if [ ! ${#} -ge 3 ]; then
 fi
 
 # tools
-_BASENAME=basename
-_CP=/bin/cp
-_EGREP=/bin/egrep
-_MKTEMP=/bin/mktemp
+_BASENAME="basename"
+_CP="/bin/cp"
+_EGREP="/bin/egrep"
+_MKTEMP="/bin/mktemp"
 
 # args
 _LOCAL=${1}
 _REMOTE=${2}
 _MERGED=${3}
-if [ -r ${4} ] ; then
+if [ -r "${4}" ] ; then
     _BASE=${4}
     _EDIFF=ediff-merge-files-with-ancestor
     _EVAL="(${_EDIFF} \"${_LOCAL}\" \"${_REMOTE}\" \"${_BASE}\" nil \"${_MERGED}\")"
@@ -65,7 +65,7 @@ if [[ $_EMACSCLIENT == *"emacsclient"* ]]; then
       unset DISPLAY
       _EMACSCLIENTOPTS='-t -a \"\"'
   else
-      _EMACSCLIENTOPTS='-c -a \"\"'
+      _EMACSCLIENTOPTS="-c -a \"\""
   fi
 else
   ## emacs only, not emacsclient
@@ -74,14 +74,14 @@ fi
 
 # run emacs or emacsclient
 # # For debugging
-# echo ${_EMACSCLIENT} ${_EMACSCLIENTOPTS} --eval "(progn ${_EVAL_PREFIX} ${_EVAL_PREFIX2} ${_EVAL})"
-${_EMACSCLIENT} ${_EMACSCLIENTOPTS} --eval "(progn ${_EVAL_PREFIX} ${_EVAL_PREFIX2} ${_EVAL})" 2>&1
+# echo "${_EMACSCLIENT}" "${_EMACSCLIENTOPTS}" --eval "(progn ${_EVAL_PREFIX} ${_EVAL_PREFIX2} ${_EVAL})"
+"${_EMACSCLIENT}" "${_EMACSCLIENTOPTS}" --eval "(progn ${_EVAL_PREFIX} ${_EVAL_PREFIX2} ${_EVAL})" 2>&1
 
 
 # check modified file
-if [ ! $(egrep -c '^(<<<<<<<|=======|>>>>>>>|####### Ancestor)$' ${_MERGED}) = 0 ]; then
-    _MERGEDSAVE=$(${_MKTEMP} --tmpdir `${_BASENAME} ${_MERGED}`.XXXXXXXXXX)
-    ${_CP} ${_MERGED} ${_MERGEDSAVE}
+if [ ! "$("${_EGREP}" -c '^(<<<<<<<|=======|>>>>>>>|####### Ancestor)$' "${_MERGED}")" = 0 ]; then
+    _MERGEDSAVE=$(${_MKTEMP} --tmpdir "$(${_BASENAME} "${_MERGED}").XXXXXXXXXX")
+    ${_CP} "${_MERGED}" "${_MERGEDSAVE}"
     echo 1>&2 "Oops! Conflict markers detected in $_MERGED."
     echo 1>&2 "Saved your changes to ${_MERGEDSAVE}"
     echo 1>&2 "Exiting with code 1."

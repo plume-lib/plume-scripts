@@ -6,8 +6,8 @@
 # Xbootclasspath or any arguments that begin with / .
 #
 
-ME="`basename $0`"
-JAVA_EXEC="$JAVA_HOME/bin/java"
+# ME="$(basename "$0")"
+JAVA_EXEC="${JAVA_HOME}/bin/java"
 ARGS=""
 
 while [ -n "$1" ]; do
@@ -15,14 +15,14 @@ while [ -n "$1" ]; do
    shift
    case "$arg" in
       -cp | -classpath)
-         arg="$arg' '`cygpath -p -w "$1"`"
+         arg="$arg' '$(cygpath -p -w "$1")"
          shift
          ;;
       -Xbootclasspath*:*)
-         arg="${arg%%:*}:`cygpath -p -w "${arg#*:}"`"
+         arg="${arg%%:*}:$(cygpath -p -w "${arg#*:}")"
          ;;
       /*)
-         arg="`cygpath -p -w "$arg"`"
+         arg="$(cygpath -p -w "$arg")"
          ;;
    esac
    ARGS="$ARGS '$arg'"

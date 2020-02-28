@@ -38,10 +38,11 @@ while :; do
     shift
 done
 
+# shellcheck disable=SC2015
 git log | grep "^Author:" | sed 's/Author: \(.*\) <.*>/\1/' | sort | uniq | \
-  sed -f $(dirname "$0")/git-authors.sed | sort | uniq | \
-  ( [ ! -z ${html+x} ] && sed -e "s/á/\\&aacute;/" -e "s/é/\\&eacute;/" || cat ) | \
-  ( [ ! -z ${latex+x} ] && sed -e "s/á/\\\\'a/" -e "s/é/\\\\'e/" || cat ) | \
-  ( [ ! -z ${texinfo+x} ] && sed -e "s/á/@'a/" -e "s/é/@'e/" || cat ) | \
-  ( [ ! -z ${punctuation+x} ] && sed -e 's/$/,/' -e '$ s/,$/./' || cat ) | \
+  sed -f "$(dirname "$0")"/git-authors.sed | sort | uniq | \
+  ( [ -n "${html+x}" ] && sed -e "s/á/\\&aacute;/" -e "s/é/\\&eacute;/" || cat ) | \
+  ( [ -n "${latex+x}" ] && sed -e "s/á/\\\\'a/" -e "s/é/\\\\'e/" || cat ) | \
+  ( [ -n "${texinfo+x}" ] && sed -e "s/á/@'a/" -e "s/é/@'e/" || cat ) | \
+  ( [ -n "${punctuation+x}" ] && sed -e 's/$/,/' -e '$ s/,$/./' || cat ) | \
   cat

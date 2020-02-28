@@ -39,7 +39,7 @@ if [ "$#" -gt 1 ] ; then
   exit 2
 fi
 
-SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
+# SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
 if [ "$DEBUG" = "--debug" ] ; then
   echo
@@ -62,17 +62,17 @@ if [ "$TRAVIS" = "true" ]; then
   fi
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
-    SLUG=`wget -q -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER} | jq .head.label | sed 's/"//g'`
+    SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
     CI_ORGANIZATION=${SLUG%:*}
   else
     CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
-    CI_REPO=${BUILD_REPOSITORY_NAME##*/}
+    # CI_REPO=${BUILD_REPOSITORY_NAME##*/}
   fi
 fi
 
 ## Git clone
 if [ "$CI_ORGANIZATION" = "" ]; then
-  URL=`git config --get remote.origin.url`
+  URL=$(git config --get remote.origin.url)
   SLUG=${URL#*:}
   CI_ORGANIZATION=${SLUG%/*}
   # TODO: Maybe add a sanity check here.
@@ -97,7 +97,7 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
   # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that instead of
   # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
-  CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+  CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
@@ -113,7 +113,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    DEFAULT_CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
+    DEFAULT_CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
     # If a build fails, we would like to continue failing subsequent
     # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
     # does not do that, because there could have been multiple pushes
@@ -133,7 +133,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     #   (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
     # fi
     # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-    #   CI_COMMIT_RANGE_START=`${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START}`
+    #   CI_COMMIT_RANGE_START=$(${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START})
     #   if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
     #     echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
     #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
@@ -156,7 +156,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
   else
     git fetch origin master
-    CI_COMMIT_RANGE_START=`git rev-parse origin/master`
+    CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
   fi
   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
@@ -184,11 +184,12 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
     CI_IS_PULL_REQUEST=false
   fi
   CI_COMMIT_RANGE=$(echo "${CIRCLE_COMPARE_URL}" | cut -d/ -f7)
-  if [ $CI_COMMIT_RANGE != *"..."* ]; then
-    CI_COMMIT_RANGE_START=`git rev-parse ${COMMIT_RANGE}`
-    CI_COMMIT_RANGE_END=`git rev-parse ${COMMIT_RANGE}`
-    CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
-  fi
+  case $CI_COMMIT_RANGE in
+    *"..."*)
+    CI_COMMIT_RANGE_START=$(git rev-parse "${COMMIT_RANGE}")
+    CI_COMMIT_RANGE_END=$(git rev-parse "${COMMIT_RANGE}")
+    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}" ;;
+  esac
   CI_BRANCH_NAME=$CIRCLE_BRANCH
 
 else
@@ -197,8 +198,9 @@ else
     echo "echo Else clause: nothing matched;"
   fi
   CI_IS_PULL_REQUEST=false
-  # In git 2.22 and later, can use: CI_BRANCH_NAME=`git branch --show-current`  (and update test below).
-  CI_BRANCH_NAME=`git --no-pager branch | grep \* | cut -d ' ' -f2`
+  # In git 2.22 and later, can use: CI_BRANCH_NAME=$(git branch --show-current)  (and update test below).
+  # shellcheck disable=SC2063
+  CI_BRANCH_NAME=$(git --no-pager branch | grep \* | cut -d ' ' -f2)
   # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
   # If you re-run a pull request via "Queue" rather than "Rebuild",
   # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
@@ -210,21 +212,21 @@ fi
 ## The above may have not set CI_COMMIT_RANGE.  Set it.
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
-if [ ! -n "$CI_COMMIT_RANGE" ]; then
+if [ -z "$CI_COMMIT_RANGE" ]; then
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH_NAME=$CI_BRANCH_NAME;"
   fi
   if [ "$CI_BRANCH_NAME" = "master" ]; then
-    CI_COMMIT_RANGE_START=`git rev-parse HEAD^1`
-    CI_COMMIT_RANGE_END=`git rev-parse HEAD`
+    CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+    CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   else      
-    CI_COMMIT_RANGE_START=`git rev-parse master`
-    CI_COMMIT_RANGE_END=`git rev-parse $CI_BRANCH_NAME`
+    CI_COMMIT_RANGE_START=$(git rev-parse master)
+    CI_COMMIT_RANGE_END=$(git rev-parse $CI_BRANCH_NAME)
   fi
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 fi
 
-if [ ! -n "$CI_COMMIT_RANGE_START" ]; then
+if [ -z "$CI_COMMIT_RANGE_START" ]; then
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
   fi
@@ -235,8 +237,8 @@ fi
 # Avoid errors regarding empty range
 if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
-  CI_COMMIT_RANGE_START=`git rev-parse $CI_COMMIT_RANGE_END^1`
-  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
+  CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
+  CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 fi
 
 # The diff might be empty if the last commit is the revert of the one before it.

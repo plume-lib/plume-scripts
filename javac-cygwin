@@ -6,7 +6,7 @@
 # sourcepath or any arguments that begin with / .
 #
 
-ME="`basename $0`"
+# ME="$(basename "$0")"
 JAVAC_EXEC="$JAVA_HOME/bin/javac"
 ARGS=""
 
@@ -15,15 +15,15 @@ while [ -n "$1" ]; do
    shift
    case "$arg" in
       -cp | -classpath)
-         arg="$arg' '`cygpath -p -w "$1"`"
+         arg="$arg' '$(cygpath -p -w "$1")"
          shift
          ;;
       -sourcepath)
-         arg="$arg' '`cygpath -p -w "$1"`"
+         arg="$arg' '$(cygpath -p -w "$1")"
          shift
          ;;
       /*)
-         arg="`cygpath -p -w "$arg"`"
+         arg="$(cygpath -p -w "$arg")"
          ;;
    esac
    ARGS="$ARGS '$arg'"

@@ -21,14 +21,14 @@ ERR=/tmp/cronic.err.$$
 TRACE=/tmp/cronic.trace.$$
 
 EXPECTED=0
-if [ $1 == "--expected-status" ]
+if [ "$1" == "--expected-status" ]
     then
     shift
     EXPECTED=$1
     shift
 fi
 PERMITSTDERR=0
-if [ $1 == "--permit-stderr" ]
+if [ "$1" == "--permit-stderr" ]
   then
   shift
   PERMITSTDERR=1
@@ -47,7 +47,7 @@ else
     ERR=$TRACE
 fi
 
-if [ $RESULT -ne $EXPECTED -o \( $PERMITSTDERR -eq 0 -a -s "$ERR" \) ]
+if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$ERR" ]; }
     then
     echo "Cronic detected failure or error output for the command:"
     echo "$@"
