@@ -19,10 +19,10 @@
 #     "-q --single-branch --depth 1" (without the quotes).
 #
 # When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
-# this script first chooses a fork, which is the first of these that exists:
-#   https://github.com/${ORG}/${REPO_NAME}.git
-#   https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
-# Then, it chooses a branch: MYBRANCH if it exists, or "master" otherwise.
+# this script first chooses the first of these that exists:
+#   branch ${MYBRANCH} of https://github.com/${ORG}/${REPO_NAME}.git
+#   branch ${MYBRANCH} of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
+#   branch master of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
@@ -69,11 +69,15 @@ else
   # ${SCRIPTDIR}/ci-info --debug ${UPSTREAM_ORG}
 
   eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
+  UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
   REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
-  BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}")
-  echo "In directory $(pwd) :"
-  echo "git clone -b ${BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
+  REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}")
+  if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ] ; then
+    ## Don't use branch master of the downstream repo
+    REPO_URL="$UPSTREAM_REPO_URL"
+  fi
+  echo "git clone -b ${REPO_BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
-  git clone -b "${BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
-    || git clone -b "${BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}"
+  git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
+    || git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}"
 fi
