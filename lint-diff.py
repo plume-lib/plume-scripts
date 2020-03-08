@@ -137,7 +137,9 @@ def diff_filenames(diff_filename):
         for diff_line in diff:
             match = PLUSPLUSPLUS_RE.match(diff_line)
             if match:
-                result.add(match.group(1))
+                filename = match.group(1)
+                if filename != "/dev/null":
+                    result.add(filename)
     return result
 
 
