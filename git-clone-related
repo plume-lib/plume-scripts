@@ -71,7 +71,9 @@ else
   eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
   UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
   REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
+  # echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
   REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}")
+  # echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
   if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ] ; then
     ## Don't use branch master of the downstream repo
     REPO_URL="$UPSTREAM_REPO_URL"
