@@ -220,7 +220,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
     CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   else      
-    CI_COMMIT_RANGE_START=$(git rev-parse master)
+    CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
     CI_COMMIT_RANGE_END=$(git rev-parse $CI_BRANCH_NAME)
   fi
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
