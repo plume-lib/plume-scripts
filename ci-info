@@ -10,7 +10,7 @@
 #   else
 #     git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
 #   fi
-#   eval `/tmp/plume-scripts/ci-info DEFAULT-ORGANIZATION`
+#   eval $(/tmp/plume-scripts/ci-info DEFAULT-ORGANIZATION)
 #
 # Here are the variables that it sets:
 # CI_IS_PULL_REQUEST: Either "true" or "false" (without the quotes).
