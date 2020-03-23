@@ -160,7 +160,10 @@ def guess_strip_filenames(diff_filenames, lint_filenames):
     result = MAX_PAIR
     for diff_filename in diff_filenames:
         for lint_filename in lint_filenames:
-            result = pair_min(result, min_strips(diff_filename, lint_filename))
+            try:
+                result = pair_min(result, min_strips(diff_filename, lint_filename))
+            except Exception as e:
+                raise Exception("problem in diff_filename={} lint_filename={} e={}".format(diff_filename, lint_filename, e))
     return result
 
 
