@@ -117,7 +117,7 @@ Fails if neither is lesser."""
         return pair1
     if pair1[0] >= pair2[0] and pair1[1] >= pair2[1]:
         return pair2
-    raise Exception("incomparable pairs: " + pair1 + " " + pair2)
+    raise Exception("incomparable pairs: {} {}".format(pair1, pair2))
 
 
 ## Tests:
