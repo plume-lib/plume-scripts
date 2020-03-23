@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Filter the output of lint, to only show output for changed lines."""
+"""Filter warnings output, to only show output for changed lines."""
 
-# Filter the output of lint, to only show output for changed lines.
+# Filter warnings output, to only show output for changed lines.
 #
 # This is useful when you want to enforce some style guideline, but
 # making the changes globally in your project would be too burdensome.
 # You can make the requirement only for new and changed lines, so your
 # codebase will conform to the new standard gradually, as you edit it.
 
-# Usage:  lint-diff.py [options] diff.txt [lint-output.txt]
-#         If lint-output is omitted, use standard input.
-# Output: all lines in lint-output that are on a changed line.
+# Usage:  lint-diff.py [options] diff.txt [warnings.txt]
+#         If warnings.txt is omitted, use standard input.
+# Output: all lines in warnings.txt that are on a changed line.
 #         Output status is 1 if it produced any output, 0 if not, 2 if error.
 # Options: --guess-strip means guess values for --strip-diff and --strip-lint.
 #          --strip-diff=N means to ignore N leading "/" in diff.txt.
-#          --strip-lint=N means to ignore N leading "/" in lint-output.txt.
+#          --strip-warnings=N means to ignore N leading "/" in warnings.txt.
 #              Affects matching, but not output, of lines.
 #          --context=N is how many lines adjacent to the changed ones
 #              are also considered changed; the default is 2.
@@ -143,47 +143,47 @@ def diff_filenames(diff_filename):
     return result
 
 
-def lint_filenames(lint_filename):
-    """All the filenames in the given lint file."""
+def warning_filenames(warning_filename):
+    """All the filenames in the given warning file."""
     result = set()
-    with open(lint_filename, encoding='utf-8') as lint:
-        for lint_line in lint:
-            match = FILENAME_LINENO_RE.match(lint_line)
+    with open(warning_filename, encoding='utf-8') as warnings:
+        for warning_line in warnings:
+            match = FILENAME_LINENO_RE.match(warning_line)
             if match:
                 result.add(match.group(1))
     return result
 
 
-def guess_strip_filenames(diff_filenames, lint_filenames):
+def guess_strip_filenames(diff_filenames, warning_filenames):
     """Arguments are two lists of file names.
     Result is a pair of integers."""
     result = MAX_PAIR
     for diff_filename in diff_filenames:
-        for lint_filename in lint_filenames:
+        for warning_filename in warning_filenames:
             try:
-                result = pair_min(result, min_strips(diff_filename, lint_filename))
+                result = pair_min(result, min_strips(diff_filename, warning_filename))
             except Exception as e:
-                raise Exception("problem in diff_filename={} lint_filename={} e={}".format(diff_filename, lint_filename, e))
+                raise Exception("problem in diff_filename={} warning_filename={} e={}".format(diff_filename, warning_filename, e))
     return result
 
 
-def guess_strip_files(diff_file, lint_file):
+def guess_strip_files(diff_file, warning_file):
     """Arguments are files produced by diff and a lint tool, respectively.
     Result is a pair of integers."""
     diff_files = diff_filenames(diff_file)
-    lint_files = lint_filenames(lint_file)
-    result = guess_strip_filenames(diff_files, lint_files)
+    warning_files = warning_filenames(warning_file)
+    result = guess_strip_filenames(diff_files, warning_files)
     diff_prefix = os.path.commonprefix(list(diff_files))
-    lint_prefix = os.path.commonprefix(list(lint_files))
-    if result[0] > diff_prefix.count("/") or result[1] > lint_prefix.count("/"):
+    warnings_prefix = os.path.commonprefix(list(warning_files))
+    if result[0] > diff_prefix.count("/") or result[1] > warnings_prefix.count("/"):
         # This is not necessarily a problem.  It is possible that all the
         # diffs, or all the lint output, happens to be in one subdirectory.
         if DEBUG:
             eprint(
-                "lint-diff.py: guess_strip_files all in one subdirectory: result={} diff_prefix={} lint_prefix={}"
-                .format(result, diff_prefix, lint_prefix))
+                "lint-diff.py: guess_strip_files all in one subdirectory: result={} diff_prefix={} warnings_prefix={}"
+                .format(result, diff_prefix, warnings_prefix))
             eprint("diff_files={}".format(diff_files))
-            eprint("lint_files={}".format(lint_files))
+            eprint("warning_files={}".format(warning_files))
     return result
 
 
@@ -195,12 +195,12 @@ def parse_args():
     global DEBUG
 
     parser = argparse.ArgumentParser(
-        description="Filter the output of lint, to only show output for changed lines")
+        description="Filter warnings output, to only show output for changed lines")
     parser.add_argument('--guess-strip',
                         dest='guess_strip',
                         action='store_true',
                         default=False,
-                        help="guess values for --strip-diff and --strip-lint")
+                        help="guess values for --strip-diff and --strip-warnings")
     parser.add_argument('--strip-diff',
                         metavar="NUM_SLASHES",
                         dest='strip_diff',
@@ -208,13 +208,21 @@ def parse_args():
                         type=int,
                         default=0,
                         help="ignore N leading \"/\" in filenames in diff.txt")
-    parser.add_argument('--strip-lint',
+    parser.add_argument('--strip-warnings',
                         metavar="NUM_SLASHES",
-                        dest='strip_lint',
+                        dest='strip_warnings',
                         action='store',
                         type=int,
                         default=0,
-                        help="ignore N leading \"/\" in filenames in lint-output.txt")
+                        help="ignore N leading \"/\" in filenames in warnings.txt")
+    # Deprecated; exists for backwards compatibility
+    parser.add_argument('--strip-lint',
+                        metavar="NUM_SLASHES",
+                        dest='strip_warnings',
+                        action='store',
+                        type=int,
+                        default=0,
+                        help="(DEPRECATED) ignore N leading \"/\" in filenames in warnings.txt")
     parser.add_argument('--context',
                         metavar="NUM_LINES",
                         dest='context_lines',
@@ -227,7 +235,7 @@ def parse_args():
                         action='store_true',
                         help="print diagnostic output")
     parser.add_argument('diff_filename', metavar='diff.txt', default=os.getcwd())
-    parser.add_argument('lint_filename', metavar='lint-output.txt', default=None)
+    parser.add_argument('warning_filename', metavar='warnings.txt', default=None)
 
     args = parser.parse_args()
     DEBUG = args.DEBUG
@@ -236,16 +244,16 @@ def parse_args():
         eprint(PROGRAM, ": don't supply both --guess-strip and --strip-diff")
         sys.exit(2)
 
-    if args.guess_strip and args.strip_lint != 0:
-        eprint(PROGRAM, ": don't supply both --guess-strip and --strip-lint")
+    if args.guess_strip and args.strip_warnings != 0:
+        eprint(PROGRAM, ": don't supply both --guess-strip and --strip-warnings")
         sys.exit(2)
 
-    if args.guess_strip and args.lint_filename is None:
-        eprint(PROGRAM, "needs \"lint-output.txt\" file argument when --guess-strip is provided")
+    if args.guess_strip and args.warning_filename is None:
+        eprint(PROGRAM, "needs \"warnings.txt\" file argument when --guess-strip is provided")
         sys.exit(2)
 
     if args.guess_strip:
-        guessed_strip = guess_strip_files(args.diff_filename, args.lint_filename)
+        guessed_strip = guess_strip_files(args.diff_filename, args.warning_filename)
         if guessed_strip == MAX_PAIR:
             if DEBUG:
                 eprint(
@@ -253,10 +261,10 @@ def parse_args():
                 )
         else:
             args.strip_diff = guessed_strip[0]
-            args.strip_lint = guessed_strip[1]
+            args.strip_warnings = guessed_strip[1]
             if DEBUG:
-                eprint("lint-diff.py inferred --strip-diff={} --strip-lint={}".format(
-                    args.strip_diff, args.strip_lint))
+                eprint("lint-diff.py inferred --strip-diff={} --strip-warnings={}".format(
+                    args.strip_diff, args.strip_warnings))
 
     # A filename if the diff filenames start with "a/" and "b/", otherwise None.
     # Is set by changed_lines().
@@ -287,7 +295,7 @@ def changed_lines(args):
                     filename = strip_dirs(match.group(1), args.strip_diff)
                 except TypeError:
                     filename = "diff filename above common directory"
-                    ## It's not an error; it just means this file doesn't appear in lint output.
+                    ## It's not an error; it just means this file doesn't appear in warnings output.
                     # eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(
                     #   strip_diff, match.group(1)))
                     # sys.exit(2)
@@ -331,8 +339,8 @@ def warn_relative_diff(args):
             eprint("lint-diff.py: diff file {}:".format(args.diff_filename))
             with open(args.diff_filename, 'r', encoding='utf-8') as fin:
                 eprint("{}", fin.read())
-            eprint("lint-diff.py: lint file {}:".format(args.lint_filename))
-            with open(args.lint_filename, 'r', encoding='utf-8') as fin:
+            eprint("lint-diff.py: lint file {}:".format(args.warning_filename))
+            with open(args.warning_filename, 'r', encoding='utf-8') as fin:
                 eprint("{}", fin.read())
             eprint("lint-diff.py: end of input files.")
 
@@ -356,38 +364,38 @@ def main():
     # True if a warning has been issued about relative directories.
     relative_diff_warned = warn_relative_diff(args)
 
-    if args.lint_filename is None:
-        args.lint_filename = "stdin"
-        lint = sys.stdin
+    if args.warning_filename is None:
+        args.warning_filename = "stdin"
+        warnings = sys.stdin
     else:
-        lint = open(args.lint_filename, encoding='utf-8')
+        warnings = open(args.warning_filename, encoding='utf-8')
 
     # 1 if this produced any output, 0 if not
     status = 0
 
-    for lint_line in lint:
-        match = FILENAME_LINENO_RE.match(lint_line)
+    for warning_line in warnings:
+        match = FILENAME_LINENO_RE.match(warning_line)
         if match:
             try:
-                filename = strip_dirs(match.group(1), args.strip_lint)
+                filename = strip_dirs(match.group(1), args.strip_warnings)
             except TypeError:
-                filename = "lint filename above common directory"
-                ## It's not an error; it just means this file doesn't appear in lint output.
-                # eprint('Bad --strip-lint={0} ; line has fewer "/": {1}'.format(
-                #   strip_lint, match.group(1)))
+                filename = "warnings filename above common directory"
+                ## It's not an error; it just means this file doesn't appear in warnings output.
+                # eprint('Bad --strip-warnings={0} ; line has fewer "/": {1}'.format(
+                #   strip_warnings, match.group(1)))
                 # sys.exit(2)
-            if filename.startswith("/") and args.relative_diff is not None and args.strip_lint == 0:
+            if filename.startswith("/") and args.relative_diff is not None and args.strip_warnings == 0:
                 if not relative_diff_warned:
                     eprint("warning:", args.diff_filename, "uses relative paths but",
-                           args.lint_filename, "uses absolute paths")
+                           args.warning_filename, "uses absolute paths")
                     relative_diff_warned = True
             lineno = int(match.group(2))
             if (filename in changed and lineno in changed[filename]):
-                print(lint_line, end='')
+                print(warning_line, end='')
                 status = 1
 
-    if lint is not sys.stdin:
-        lint.close
+    if warnings is not sys.stdin:
+        warnings.close
 
     sys.exit(status)
 

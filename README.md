@@ -49,9 +49,10 @@ request.  Works for Azure Pipelines, CircleCI, and Travis CI.
 
 ### ci-lint-diff
 
-Given a file of warnings, reports only those that are in the diff for the
-current pull request.  Works for Azure Pipelines, CircleCI, and Travis CI.
-[Documentation](ci-lint-diff) at top of file.
+Given a file of warnings (such as those output by `lint` or other tools),
+reports only those that are in the diff for the current pull request.  Works for
+Azure Pipelines, CircleCI, and Travis CI.  [Documentation](ci-lint-diff) at top
+of file.
 
 ### ci-last-success.py
 
@@ -154,7 +155,7 @@ The program has two modes:
 
 ## lint-diff.py
 
-Filter the ouput of tools such as lint, to only show output for changed
+Filter the ouput of tools such as `lint`, to only show output for changed
 lines in a diff or pull request.
 [Documentation](lint-diff.py) at top of file.
 
