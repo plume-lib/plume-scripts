@@ -27,7 +27,8 @@
 #  if [ -d /tmp/$USER/plume-scripts ] ; then
 #    git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 #  else
-#    mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+#    mkdir -p /tmp/$USER \
+#      && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
 #  fi
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt
@@ -52,8 +53,6 @@ DEBUG = False
 PLUSPLUSPLUS_RE = re.compile(r'\+\+\+ (\S*).*')
 
 FILENAME_LINENO_RE = re.compile('([^:]*):([0-9]+):.*')
-
-MAX_PAIR = (1000, 1000)
 
 
 def eprint(*args, **kwargs):
@@ -85,33 +84,35 @@ assert strip_dirs("/a/b/c/", 4) == ''
 
 
 def min_strips(filename1, filename2):
-    """Returns a 2-tuple of 2 integers, indicating the smallest strip values that
-make the two filenames equal, or MAX_PAIR if the files have different basenames."""
+    """Returns a 4-tuple of 2 integers and 2 strings.  The integers
+indicate the smallest strip values that make the two filenames equal,
+or a maximal pair if the files have different basenames.  The last two
+elements of the tuple are the argument strings."""
     components1 = filename1.split(os.path.sep)
     components2 = filename2.split(os.path.sep)
     if components1[-1] != components2[-1]:
         ## TODO: is this special case necessary?
-        return MAX_PAIR
+        return (1000, 1000, filename1, filename2)
     while components1 and components2 and components1[-1] == components2[-1]:
         del components1[-1]
         del components2[-1]
-    return (len(components1), len(components2))
+    return (len(components1), len(components2), filename1, filename2)
 
 
 ## Tests:
 """
 import os
-assert min_strips("/a/b/c/d", "/a/b/c/d") == (0,0)
-assert min_strips("e1/e2/a/b/c/d", "/a/b/c/d") == (2,1)
-assert min_strips("/e1/e2/a/b/c/d", "/a/b/c/d") == (3,1)
-assert min_strips("e1/e2/a/b/c/d", "a/b/c/d") == (2,0)
-assert min_strips("/e1/e2/a/b/c/d", "a/b/c/d") == (3,0)
-assert min_strips("/a/b/c/d", "/e/f/g/h") == (0,0)
+assert min_strips("/a/b/c/d", "/a/b/c/d") == (0, 0, "/a/b/c/d", "/a/b/c/d")
+assert min_strips("e1/e2/a/b/c/d", "/a/b/c/d") == (2, 1, "e1/e2/a/b/c/d", "/a/b/c/d")
+assert min_strips("/e1/e2/a/b/c/d", "/a/b/c/d") == (3, 1, "/e1/e2/a/b/c/d", "/a/b/c/d")
+assert min_strips("e1/e2/a/b/c/d", "a/b/c/d") == (2, 0, "e1/e2/a/b/c/d", "a/b/c/d")
+assert min_strips("/e1/e2/a/b/c/d", "a/b/c/d") == (3, 0, "/e1/e2/a/b/c/d", "a/b/c/d")
+assert min_strips("/a/b/c/d", "/e/f/g/h") == (1000, 1000, "/a/b/c/d", "/e/f/g/h")
 """
 
 
 def pair_min(pair1, pair2):
-    """Given two pairs, returns the one that is pointwise lesser.
+    """Given two pairs, returns the one that is pointwise lesser in its first two elements.
 Fails if neither is lesser."""
     if pair1[0] <= pair2[0] and pair1[1] <= pair2[1]:
         return pair1
@@ -123,10 +124,10 @@ Fails if neither is lesser."""
 ## Tests:
 """
 import os
-assert pair_min((3,4), (5,6)) == (3,4)
-assert pair_min((4,3), (6,5)) == (4,3)
-assert pair_min((30,40), (5,6)) == (5,6)
-assert pair_min((40,30), (6,5)) == (6,5)
+assert pair_min((3,4,"a","b"), (5,6,"c","d")) == (3,4,"a","b")
+assert pair_min((4,3,"a","b"), (6,5,"c","d")) == (4,3,"a","b")
+assert pair_min((30,40,"a","b"), (5,6,"c","d")) == (5,6,"c","d")
+assert pair_min((40,30,"a","b"), (6,5,"c","d")) == (6,5,"c","d")
 """
 
 
@@ -157,13 +158,10 @@ def warning_filenames(warning_filename):
 def guess_strip_filenames(diff_filenames, warning_filenames):
     """Arguments are two lists of file names.
     Result is a pair of integers."""
-    result = MAX_PAIR
+    result = (1000, 1000, "no files seen yet", "no files seen yet")
     for diff_filename in diff_filenames:
         for warning_filename in warning_filenames:
-            try:
-                result = pair_min(result, min_strips(diff_filename, warning_filename))
-            except Exception as e:
-                raise Exception("problem in diff_filename={} warning_filename={} e={}".format(diff_filename, warning_filename, e))
+            result = pair_min(result, min_strips(diff_filename, warning_filename))
     return result
 
 
@@ -179,9 +177,9 @@ def guess_strip_files(diff_file, warning_file):
         # This is not necessarily a problem.  It is possible that all the
         # diffs, or all the lint output, happens to be in one subdirectory.
         if DEBUG:
-            eprint(
-                "lint-diff.py: guess_strip_files all in one subdirectory: result={} diff_prefix={} warnings_prefix={}"
-                .format(result, diff_prefix, warnings_prefix))
+            eprint("lint-diff.py: guess_strip_files all in one subdirectory: " +
+                   "result={} diff_prefix={} warnings_prefix={}".format(
+                       result, diff_prefix, warnings_prefix))
             eprint("diff_files={}".format(diff_files))
             eprint("warning_files={}".format(warning_files))
     return result
@@ -254,7 +252,7 @@ def parse_args():
 
     if args.guess_strip:
         guessed_strip = guess_strip_files(args.diff_filename, args.warning_filename)
-        if guessed_strip == MAX_PAIR:
+        if guessed_strip[0] == 1000:
             if DEBUG:
                 eprint(
                     "lint-diff.py: --guess-strip failed to guess values (maybe no files in common?)"
@@ -384,7 +382,8 @@ def main():
                 # eprint('Bad --strip-warnings={0} ; line has fewer "/": {1}'.format(
                 #   strip_warnings, match.group(1)))
                 # sys.exit(2)
-            if filename.startswith("/") and args.relative_diff is not None and args.strip_warnings == 0:
+            if filename.startswith(
+                    "/") and args.relative_diff is not None and args.strip_warnings == 0:
                 if not relative_diff_warned:
                     eprint("warning:", args.diff_filename, "uses relative paths but",
                            args.warning_filename, "uses absolute paths")
