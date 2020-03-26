@@ -9,7 +9,7 @@
 # The new clone is in a sibling directory of the old.
 # This script also works in an Azure Pipelines, CircleCI, or Travis CI job.
 #
-# Usage:  git-clone-related UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_ARGS...]
+# Usage:  git-clone-related [--debug] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_ARGS...]
 #   UPSTREAM_ORG is, if this is a fork, the parent organization.
 #   REPO_NAME is the repository name without the organization.
 #   DESTINATION is the new clone (not its parent), by default ../REPO .
@@ -36,6 +36,9 @@ fi
 
 beginswith() { case $2 in "$1"*) true;; *) false;; esac; }
 
+if [ "$1" = "--debug" ] ; then
+  DEBUG=1
+fi
 UPSTREAM_ORG=$1; shift
 REPO_NAME=$1; shift
 if [ "$#" -ne 0 ] && ! beginswith "-" "$1"; then
@@ -65,8 +68,9 @@ if [ -d "${DESTINATION}" ]; then
 else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
-  # For debugging
-  # ${SCRIPTDIR}/ci-info --debug ${UPSTREAM_ORG}
+  if [ -n "$DEBUG" ] ; then
+    "${SCRIPTDIR}/ci-info" --debug "${UPSTREAM_ORG}"
+  fi
 
   eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
   UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
