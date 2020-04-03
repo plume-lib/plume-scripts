@@ -87,3 +87,4 @@ else
   git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
     || git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}"
 fi
+echo "Done in directory $(DESTINATION) : $(cd "${DESTINATION}" && git rev-parse HEAD)"
