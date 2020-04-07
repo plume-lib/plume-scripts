@@ -113,7 +113,11 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    DEFAULT_CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+    if git show --summary HEAD | grep -q ^Merge: ; then
+      DEFAULT_CI_COMMIT_RANGE_START=$(git merge-base HEAD)
+    else
+      DEFAULT_CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+    fi
     # If a build fails, we would like to continue failing subsequent
     # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
     # does not do that, because there could have been multiple pushes
@@ -217,13 +221,21 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH_NAME=$CI_BRANCH_NAME;"
   fi
   if [ "$CI_BRANCH_NAME" = "master" ]; then
-    CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+    if git show --summary HEAD | grep -q ^Merge: ; then
+      CI_COMMIT_RANGE_START=$(git merge-base HEAD)
+    else
+      CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+    fi
     CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   else      
     if git rev-parse --verify --quiet origin/master ; then
       CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
     else
-      CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+      if git show --summary HEAD | grep -q ^Merge: ; then
+        CI_COMMIT_RANGE_START=$(git merge-base HEAD)
+      else
+        CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+      fi
     fi
     CI_COMMIT_RANGE_END=$(git rev-parse $CI_BRANCH_NAME)
   fi
@@ -241,7 +253,11 @@ fi
 # Avoid errors regarding empty range
 if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
-  CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
+  if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge: ; then
+    CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END")
+  else
+    CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
+  fi
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 fi
 
