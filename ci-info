@@ -228,7 +228,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     fi
     CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   else      
-    if git rev-parse --verify --quiet origin/master ; then
+    if git rev-parse --verify --quiet origin/master > /dev/null 2>&1 ; then
       CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
     else
       if git show --summary HEAD | grep -q ^Merge: ; then
