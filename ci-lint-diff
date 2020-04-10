@@ -11,8 +11,8 @@
 #   else
 #     mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
 #   fi
-# (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
-# /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt
+#   (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
+#   /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt
 #
 # If you get a warning that /tmp/diff is empty, here are two possible reasons:
 #  * Your branch is identical to the base/upstream branch.  In this case, the pull
