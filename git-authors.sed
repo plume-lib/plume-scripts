@@ -107,6 +107,7 @@ s/^wmdietl$/Werner Dietl/
 s/^wmdietlGC$/Google Inc.\\ (via @wmdietlGC)/
 s/^yoav.zibin$/Yoav Zibin/
 s/^yuriy.brun$/Yuriy Brun/
+s/^zcai$/Zhiping Cai/
 s/^zhangjiangqige$/Jiangqi Zhang/
 
 /^daikonbuildtest$/d
