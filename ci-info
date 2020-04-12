@@ -108,10 +108,9 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # It's not a pull request, but is a build for a branch (possibly master).
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
-  fi
-  if [ "$DEBUG" = "--debug" ] ; then
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
   fi
+  CI_IS_PULL_REQUEST=false
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
