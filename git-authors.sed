@@ -1,6 +1,9 @@
 # This file converts authors found in a git history into full names.
 # It is necessary primarily when people have not configured git properly.
 
+# TODO: It might be better to match against full email address rather than
+# just the id before the "@".
+
 s/^Bohdan$/Bohdan Sharipov/
 s/^Carlos$/Carlos Pacheco/
 s/^CharlesZ-Chen$/Charles Chen/
@@ -31,6 +34,7 @@ s/^bitterfox$/Shinya Yoshida/
 s/^carlos$/Carlos Pacheco/
 s/^carlos.pche$/Carlos Pacheco/
 s/^charlest$/Charles Tam/
+s/^fmc$/Forrest Coward/
 s/^charlie garrett$/Charlie Garrett/
 s/^chenx05$/Chen Xiao/
 s/^cmackie$/Christopher Mackie/
@@ -98,6 +102,8 @@ s/^szhang$/Sai Zhang/
 s/^tamier$/Mier Ta/
 s/^ten3$/Tatyana Nikolova/
 s/^todd.schiller$/Todd Schiller/
+s/^tschiller$/Todd Schiller/
+s/^tws$/Todd Schiller/
 s/^tohn$/Toh Ne Win/
 s/^txiang61$/Jenny Xiang/
 s/^utsavoza$/Utsav Oza/
@@ -113,6 +119,8 @@ s/^zhangjiangqige$/Jiangqi Zhang/
 /^daikonbuildtest$/d
 /^daikongroupmember$/d
 /^daikonuser$/d
+/^convert-repo$/d
+/^student$/d
 
 /^doc\/index.html$/d
 
