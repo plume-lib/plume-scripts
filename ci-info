@@ -73,7 +73,11 @@ fi
 ## Git clone
 if [ "$CI_ORGANIZATION" = "" ]; then
   URL=$(git config --get remote.origin.url)
-  SLUG=${URL#*:}
+  # This handles two possible forms for a URL:
+  #   https://github.com/mernst/annotation-tools
+  #   git@github.com:mernst/annotation-tools.git
+  SLUG=${URL#https://github.com/}
+  SLUG=${SLUG#git@github.com:}
   CI_ORGANIZATION=${SLUG%/*}
   # TODO: Maybe add a sanity check here.
 fi
