@@ -89,6 +89,8 @@ fi
 
 ### Other information (besides organization)
 
+# TODO: The uses of HEAD^1 can fail if the clone was created with `git clone --depth=1`.
+
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines pull request
   if [ "$DEBUG" = "--debug" ] ; then
