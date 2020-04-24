@@ -19,7 +19,7 @@ For older versions of git that do not support the `-C` command-line argument, us
 if [ -d /tmp/$USER/plume-scripts ] ; then
   (cd /tmp/$USER/plume-scripts && git pull -q) > /dev/null 2>&1
 else
-  (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
+  mkdir -p /tmp/$USER && (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
 fi
 ```
 
@@ -120,7 +120,7 @@ Here is how to accomplish that:
   if [ -d "/tmp/$USER/plume-scripts" ] ; then
     git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
   else
-    git -C /tmp clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+    mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
   fi
   /tmp/$USER/plume-scripts/git-clone-related codespecs fjalar
 ```
