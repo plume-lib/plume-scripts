@@ -118,11 +118,8 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    if git show --summary HEAD | grep -q ^Merge: ; then
-      DEFAULT_CI_COMMIT_RANGE_START=$(git merge-base HEAD)
-    else
-      DEFAULT_CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
-    fi
+    DEFAULT_CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+
     # If a build fails, we would like to continue failing subsequent
     # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
     # does not do that, because there could have been multiple pushes
