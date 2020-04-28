@@ -79,6 +79,7 @@ s/^mharder$/Michael Harder/
 s/^michael.ernst$/Michael Ernst/
 s/^minilek$/Jelani Nelson/
 s/^mjollnir$/Matt Mullen/
+s/^nimakarimipour$/Nima Karimipour/
 s/^notnoop$/Mahmood Ali/
 s/^olegshtch$/Oleg Shchelykalnov/
 s/^patrickmeiring$/Patrick Meiring/
