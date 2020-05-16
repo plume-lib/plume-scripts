@@ -23,6 +23,10 @@ else
 fi
 ```
 
+If you want to use a specific version of `plume-scripts` rather than the
+bleeding-edge HEAD, you can do `git checkout _SHA_` after the `git clone`
+command.
+
 
 ## classfile_check_version
 
