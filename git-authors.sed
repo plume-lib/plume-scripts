@@ -14,6 +14,7 @@ s/^J Luo$/Jeff Luo/
 s/^Jianchu$/Jianchu Li/
 s/^JonathanGBurke$/Jonathan Burke/
 s/^LS@WATER$/Lian Sun/
+s/^L\. Sun$/Lian Sun/
 s/^Maxi17$/Maximilian Gama/
 s/^Michèle$/Stefan Heule/
 s/^MrigankArora$/Mrigank Arora/
@@ -34,12 +35,12 @@ s/^bitterfox$/Shinya Yoshida/
 s/^carlos$/Carlos Pacheco/
 s/^carlos.pche$/Carlos Pacheco/
 s/^charlest$/Charles Tam/
-s/^fmc$/Forrest Coward/
 s/^charlie garrett$/Charlie Garrett/
 s/^chenx05$/Chen Xiao/
 s/^cmackie$/Christopher Mackie/
 s/^cok$/David Cok/
 s/^cpacheco$/Carlos Pacheco/
+s/^d367wang$/Di Wang/
 s/^danbrotherston$/Dan Brotherston/
 s/^dannydig$/Danny Dig/
 s/^dbrosoft$/Dan Brown/
@@ -48,6 +49,7 @@ s/^drayside$/Derek Rayside/
 s/^emarcus$/Emily Marcus/
 s/^falaina$/Robert Rudd/
 s/^felly$/Eric Fellheimer/
+s/^fmc$/Forrest Coward/
 s/^garland$/Stephen Garland/
 s/^garrett$/Charlie Garrett/
 s/^gpickard$/Galen Pickard/
@@ -103,9 +105,9 @@ s/^szhang$/Sai Zhang/
 s/^tamier$/Mier Ta/
 s/^ten3$/Tatyana Nikolova/
 s/^todd.schiller$/Todd Schiller/
+s/^tohn$/Toh Ne Win/
 s/^tschiller$/Todd Schiller/
 s/^tws$/Todd Schiller/
-s/^tohn$/Toh Ne Win/
 s/^txiang61$/Jenny Xiang/
 s/^utsavoza$/Utsav Oza/
 s/^vkm$/Vikash Mansinghka/
