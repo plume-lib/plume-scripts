@@ -15,6 +15,7 @@ s/^Jianchu$/Jianchu Li/
 s/^JonathanGBurke$/Jonathan Burke/
 s/^LS@WATER$/Lian Sun/
 s/^L\. Sun$/Lian Sun/
+s/^Leo$/Leo Liu/
 s/^Maxi17$/Maximilian Gama/
 s/^Michèle$/Stefan Heule/
 s/^MrigankArora$/Mrigank Arora/
