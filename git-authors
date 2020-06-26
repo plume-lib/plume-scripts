@@ -39,7 +39,7 @@ while :; do
 done
 
 # shellcheck disable=SC2015
-git log | grep "^\(Author\|    Co-authored-by\):" | sed 's/\(Author\|    Co-authored-by\): \(.*\) <.*>/\2/' | LC_ALL=C sort | uniq | \
+git log | grep '^\(Author\|    Co-authored-by\):' | sed 's/\(Author\|    Co-authored-by\): \(.*\) <.*>/\2/' | LC_ALL=C sort | uniq | \
   sed -f "$(dirname "$0")"/git-authors.sed | LC_ALL=C sort | uniq | \
   ( [ -n "${html+x}" ] && sed -e "s/á/\\&aacute;/" -e "s/é/\\&eacute;/" || cat ) | \
   ( [ -n "${latex+x}" ] && sed -e "s/á/\\\\'a/" -e "s/é/\\\\'e/" || cat ) | \
