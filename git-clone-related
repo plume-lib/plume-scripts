@@ -16,6 +16,7 @@
 #     or branch.  No error is issued if the pull fails.
 #   GIT_ARGS is extra arguments to git clone.  It defaults to
 #     "-q --single-branch --depth 1" (without the quotes).
+#     It is not used if the destination already exists.
 #
 # When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
 # this script first chooses the first of these that exists:
