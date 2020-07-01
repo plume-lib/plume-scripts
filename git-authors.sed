@@ -6,6 +6,7 @@
 
 s/^Bohdan$/Bohdan Sharipov/
 s/^Carlos$/Carlos Pacheco/
+s/^Charles Chen Charleszhuochen@gmail.com$/Charles Chen/
 s/^CharlesZ-Chen$/Charles Chen/
 s/^Colin Gordon$/Colin S. Gordon/
 s/^Colin Stebbins Gordon$/Colin S. Gordon/
@@ -25,6 +26,7 @@ s/^Sadaf$/Sadaf Tajik/
 s/^SnowOnion$/Sonion Lee/
 s/^W. Dietl$/Werner Dietl/
 s/^abslamp$/Lian Sun/
+s/^aditya3434$/Aditya Singh/
 s/^adonovan$/Alan Donovan/
 s/^akcabac$/Cemal Akcaba/
 s/^amdunn$/Alan Dunn/
