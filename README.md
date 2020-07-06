@@ -13,7 +13,7 @@ else
 fi
 ```
 
-For older versions of git that do not support the `-C` command-line argument, use:
+For versions of git before 1.8.5 that do not support the `-C` command-line argument, use:
 
 ```
 if [ -d /tmp/$USER/plume-scripts ] ; then
