@@ -28,13 +28,18 @@
 
 
 DEBUG=""
+if [ "$1" = "--verbose" ] ; then
+    VERBOSE="--verbose"
+    shift
+fi
 if [ "$1" = "--debug" ] ; then
     DEBUG="--debug"
+    VERBOSE="--verbose"
     shift
 fi
 if [ "$#" -gt 1 ] ; then
-  echo "echo Usage: $0 [--debug] [DEFAULT-ORGANIZATION];"
-  echo "Usage: $0 [--debug] [DEFAULT-ORGANIZATION]" >&2
+  echo "echo Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION];"
+  echo "Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION]" >&2
   echo "exit 2"
   exit 2
 fi
@@ -173,9 +178,11 @@ elif [ "$TRAVIS" = "true" ] ; then
   fi
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   CI_BRANCH_NAME=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
-  echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
-  echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
-  echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
+  if [ "$VERBOSE" = "--verbose" ] ; then
+    echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
+    echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
+    echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
+  fi
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 
@@ -254,7 +261,9 @@ fi
 
 # Avoid errors regarding empty range
 if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
-  echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+  if [ "$VERBOSE" = "--verbose" ] ; then
+    echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+  fi
   if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge: ; then
     CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END")
   else
@@ -267,17 +276,29 @@ fi
 
 ### Print it out
 
-echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
+fi
 echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
-echo "echo CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
+fi
 echo "CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST; export CI_IS_PULL_REQUEST;"
-echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
+fi
 echo "CI_BRANCH_NAME=$CI_BRANCH_NAME; export CI_BRANCH_NAME;"
-echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+fi
 echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
-echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
+fi
 echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
-echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
+fi
 echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
 
 # Temporary, for backward compatibility
@@ -285,6 +306,8 @@ echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
 if [ "$CI_IS_PULL_REQUEST" = "true" ]; then
   echo "CI_IS_PR=1; export CI_IS_PR;"
 fi
-# Deprecated 2019-12-10; remove on 2020-07-10
-echo "echo CI_BRANCH=$CI_BRANCH_NAME;"
+# Deprecated 2019-12-10; remove on 2020-12-10
+if [ "$VERBOSE" = "--verbose" ] ; then
+  echo "echo CI_BRANCH=$CI_BRANCH_NAME;"
+fi
 echo "CI_BRANCH=$CI_BRANCH_NAME; export CI_BRANCH;"
