@@ -91,12 +91,14 @@ if [ -n "$CI_LINT_DIFF_ERROR" ] ; then
   echo 
   echo "This command will print diagnostic information, then exit."
   echo
+
   # This is not very effective because environment variables were set by
   # the previous invocation of ci-info.
   echo "${SCRIPTDIR}"/ci-info --debug
   "${SCRIPTDIR}"/ci-info --debug
   echo end of "${SCRIPTDIR}"/ci-info --debug
   echo
+
   echo git rev-parse \$CI_COMMIT_RANGE_START
   echo git rev-parse "$CI_COMMIT_RANGE_START"
   git rev-parse "$CI_COMMIT_RANGE_START"
