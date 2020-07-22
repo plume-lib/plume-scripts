@@ -74,6 +74,7 @@ s/^jwyuan$/Jeff Yuan/
 s/^kelloggm$/Martin Kellogg/
 s/^laurejt$/Laure Thompson/
 s/^leelin$/Lee Lin/
+s/^looser$/Nitin Kumar Das/
 s/^mali$/Mahmood Ali/
 s/^marinov$/Darko Marinov/
 s/^matthew.s.tschantz$/Matthew Tschantz/
@@ -86,6 +87,7 @@ s/^minilek$/Jelani Nelson/
 s/^mjollnir$/Matt Mullen/
 s/^nimakarimipour$/Nima Karimipour/
 s/^nitin23329$/Nitin Kumar Das/
+s/^NITIN DAS$/Nitin Kumar Das/
 s/^notnoop$/Mahmood Ali/
 s/^olegshtch$/Oleg Shchelykalnov/
 s/^patrickmeiring$/Patrick Meiring/
