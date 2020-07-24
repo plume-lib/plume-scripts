@@ -88,6 +88,7 @@ s/^mjollnir$/Matt Mullen/
 s/^nimakarimipour$/Nima Karimipour/
 s/^nitin23329$/Nitin Kumar Das/
 s/^NITIN DAS$/Nitin Kumar Das/
+s/^NITIN KUMAR DAS$/Nitin Kumar Das/
 s/^notnoop$/Mahmood Ali/
 s/^olegshtch$/Oleg Shchelykalnov/
 s/^patrickmeiring$/Patrick Meiring/
