@@ -95,6 +95,7 @@ s/^patrickmeiring$/Patrick Meiring/
 s/^pgbovine$/Philip Guo/
 s/^pkalauskas$/Peter Kalauskas/
 s/^plvines$/Paul Vines/
+s/^priti1999$/Priti Chattopadhyay/
 s/^racezhang$/Sai Zhang/
 s/^racezhang@gmail.com$/Sai Zhang/
 s/^renato$/Renato Athaydes/
