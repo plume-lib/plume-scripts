@@ -19,11 +19,12 @@ Args are:
   -debug        print debugging output
 This is like
   perl -pi -e 's/OLD/NEW/g'
-except that the timestamp on each file is updated only if the replacement
-is performed.  If the replacement is not performed (because the old regular
-expression did not match in the file), then the timestamp is unmodified.
-Thus, you can call it on as many files as you like without losing the
-historical information about when a file was last modified.
+except that it applies to all files recursively and the timestamp on each file
+is updated only if the replacement is performed.  If the replacement is not
+performed (because the old regular expression did not match in the file), then
+the timestamp is unmodified.  Thus, you can call it on as many files as you like
+without losing the historical information about when a file was last modified.
+
 END_OF_USAGE
 }
 
