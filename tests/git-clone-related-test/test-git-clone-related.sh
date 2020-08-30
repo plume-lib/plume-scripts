@@ -32,7 +32,8 @@ git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch 
 # shellcheck disable=SC2086
 (cd "$startdir" && "${PLUME_SCRIPTS}"/git-clone-related $ARGS "$goaldir")
 clonedrepo=$(git -C "$goaldir" config --get remote.origin.url)
-clonedbranch=$(git -C "$goaldir" branch --show-current)
+# git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
+clonedbranch=$(git -C "$goaldir" rev-parse --abbrev-ref HEAD)
 
 rm -rf "$startdir" "$goaldir"
 
