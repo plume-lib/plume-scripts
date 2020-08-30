@@ -21,6 +21,9 @@ set -o errexit -o nounset
 # set -x
 # set -v : Display shell input lines as they are read.
 
+if [ -z "$USER" ] ; then
+  USER=git-clone-related
+fi
 
 startdir=/scratch/$USER/git-clone-related-test-1
 goaldir=/scratch/$USER/git-clone-related-test-2
