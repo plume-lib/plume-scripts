@@ -8,19 +8,19 @@
 # clones the other, attempting to find a matching fork and branch.
 # This script also works in an Azure Pipelines, CircleCI, or Travis CI job.
 #
-# Usage:  git-clone-related [--debug] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_ARGS...]
+# Usage:  git-clone-related [--debug] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_CLONE_ARGS...]
 #   UPSTREAM_ORG is, if this is a fork, the parent organization.
 #   REPO_NAME is the repository name without the organization.
-#   DESTINATION is the new clone (not its parent), by default ../REPO .
+#   DESTINATION is the new clone (not its parent), by default ../REPO_NAME .
 #     If it exists, it is updated via "git pull", without changing its fork
 #     or branch.  No error is issued if the pull fails.
-#   GIT_ARGS is extra arguments to git clone.  It defaults to
+#   GIT_CLONE_ARGS is extra arguments to git clone.  It defaults to
 #     "-q --single-branch --depth 1" (without the quotes).
 #     It is not used if the destination already exists.
 #
 # When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
-# this script first chooses the first of these that exists:
-#   branch ${MYBRANCH} of https://github.com/${ORG}/${REPO_NAME}.git
+# this script chooses the first of these that exists:
+#   branch ${MYBRANCH} of https://github.com/${MYORG}/${REPO_NAME}.git
 #   branch ${MYBRANCH} of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
 #   branch master of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
 #
@@ -61,7 +61,7 @@ fi
 echo "In directory $(pwd) :"
 if [ -d "${DESTINATION}" ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
-  # Older versions of git don't support the -C command-line option.
+  # Use "cd" because older versions of git (eg, CircleCI) don't support the -C command-line option.
   # In a Travis pull request, a repository can be in state "(HEAD detached at b475d58d)"
   # and "git pull" fails.
   (cd "${DESTINATION}" && (git pull -q || (git branch && true)))
