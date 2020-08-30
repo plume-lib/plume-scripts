@@ -33,11 +33,10 @@
 # Fail if any command fails.
 set +e
 
-# set +x
-
 if [ "$1" = "--debug" ] ; then
   DEBUG=1
   shift
+  set +x
 fi
 
 FALLBACK_BRANCH=master
@@ -76,7 +75,7 @@ fi
 echo "In directory $(pwd) :"
 if [ -d "${DESTINATION}" ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
-  # Use "cd" because older versions of git don't support the -C command-line option.
+  # Use "cd" because older versions of git (eg, CircleCI) don't support the -C command-line option.
   # In a Travis pull request, a repository can be in state "(HEAD detached at b475d58d)"
   # and "git pull" fails.
   (cd "${DESTINATION}" && (git pull -q || (git branch && true)))
@@ -96,10 +95,10 @@ else
   fi
   UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
 
-  # REPO_URL is what will be cloned.  It might be the same as UPSTREAM_REPO_URL.
   if [ -n "$DEBUG" ] ; then
     echo "About to run git-find-fork" "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}"
   fi
+  # REPO_URL is what will be cloned.  It might be the same as UPSTREAM_REPO_URL.
   REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
   if [ -n "$DEBUG" ] ; then
     echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
