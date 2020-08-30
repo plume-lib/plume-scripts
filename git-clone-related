@@ -8,26 +8,44 @@
 # clones the other, attempting to find a matching fork and branch.
 # This script also works in an Azure Pipelines, CircleCI, or Travis CI job.
 #
-# Usage:  git-clone-related [--debug] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_ARGS...]
+# Usage:  git-clone-related [ARGS] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_CLONE_ARGS...]
+#   ARGS are:
+#     --upstream-branch FALLBACK_BRANCH
+#           the fallback branch name on the upstream repository; default "master"
+#     --debug                     print logging information
 #   UPSTREAM_ORG is, if this is a fork, the parent organization.
 #   REPO_NAME is the repository name without the organization.
-#   DESTINATION is the new clone (not its parent), by default ../REPO .
+#   DESTINATION is the new clone (not its parent), by default ../REPO_NAME .
 #     If it exists, it is updated via "git pull", without changing its fork
 #     or branch.  No error is issued if the pull fails.
-#   GIT_ARGS is extra arguments to git clone.  It defaults to
+#   GIT_CLONE_ARGS is extra arguments to git clone.  It defaults to
 #     "-q --single-branch --depth 1" (without the quotes).
 #     It is not used if the destination already exists.
 #
 # When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
-# this script first chooses the first of these that exists:
-#   branch ${MYBRANCH} of https://github.com/${ORG}/${REPO_NAME}.git
+# this script chooses the first of these that exists:
+#   branch ${MYBRANCH} of https://github.com/${MYORG}/${REPO_NAME}.git
 #   branch ${MYBRANCH} of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
-#   branch master of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
+#   branch ${FALLBACK_BRANCH} of https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
 # Fail if any command fails.
 set +e
+
+# set +x
+
+if [ "$1" = "--debug" ] ; then
+  DEBUG=1
+  shift
+fi
+
+FALLBACK_BRANCH=master
+if [ "$1" = "--upstream-branch" ] ; then
+  shift
+  FALLBACK_BRANCH=$1
+  shift
+fi
 
 if [ "$#" -lt 2 ]; then
   echo "Usage: $0 UPSTREAM_ORG REPO [DESTINATION] [GIT_ARGS...]" >&2
@@ -36,9 +54,6 @@ fi
 
 beginswith() { case $2 in "$1"*) true;; *) false;; esac; }
 
-if [ "$1" = "--debug" ] ; then
-  DEBUG=1
-fi
 UPSTREAM_ORG=$1; shift
 REPO_NAME=$1; shift
 if [ "$#" -ne 0 ] && ! beginswith "-" "$1"; then
@@ -61,7 +76,7 @@ fi
 echo "In directory $(pwd) :"
 if [ -d "${DESTINATION}" ]; then
   echo "(cd ${DESTINATION} && git pull -q)"
-  # Older versions of git don't support the -C command-line option.
+  # Use "cd" because older versions of git don't support the -C command-line option.
   # In a Travis pull request, a repository can be in state "(HEAD detached at b475d58d)"
   # and "git pull" fails.
   (cd "${DESTINATION}" && (git pull -q || (git branch && true)))
@@ -69,18 +84,41 @@ else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
   if [ -n "$DEBUG" ] ; then
+    echo "About to run ci-info --debug"
     "${SCRIPTDIR}/ci-info" --debug "${UPSTREAM_ORG}"
+    echo "Ran ci-info --debug"
+    echo "About to run ci-info"
   fi
 
   eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
+  if [ -n "$DEBUG" ] ; then
+    echo "Finished running ci-info"
+  fi
   UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
+
+  # REPO_URL is what will be cloned.  It might be the same as UPSTREAM_REPO_URL.
+  if [ -n "$DEBUG" ] ; then
+    echo "About to run git-find-fork" "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}"
+  fi
   REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
-  # echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
-  REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}")
-  # echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
+  if [ -n "$DEBUG" ] ; then
+    echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
+  fi
+  if [ -n "$DEBUG" ] ; then
+    echo "About to run git-find-branch" "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}"
+  fi
+  REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}")
+  if [ -n "$DEBUG" ] ; then
+    echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
+  fi
   if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ] ; then
-    ## Don't use branch master of the downstream repo
+    ## Don't use the fallback branch (e.g., master) of the downstream repo
     REPO_URL="$UPSTREAM_REPO_URL"
+    REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}")
+    if [ "$REPO_BRANCH" = "master" ] && [ "${FALLBACK_BRANCH}" != "master" ] ; then
+      echo "Error in git-clone-related: fallback branch ${FALLBACK_BRANCH} does not exist in ${REPO_URL}"
+      exit 2
+    fi
   fi
   echo "git clone -b ${REPO_BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
