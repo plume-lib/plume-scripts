@@ -29,6 +29,12 @@
 # Fail if any command fails.
 set +e
 
+if [ "$1" = "--debug" ] ; then
+  DEBUG=1
+  shift
+  set +x
+fi
+
 if [ "$#" -lt 2 ]; then
   echo "Usage: $0 UPSTREAM_ORG REPO [DESTINATION] [GIT_ARGS...]" >&2
   exit 1
@@ -36,9 +42,6 @@ fi
 
 beginswith() { case $2 in "$1"*) true;; *) false;; esac; }
 
-if [ "$1" = "--debug" ] ; then
-  DEBUG=1
-fi
 UPSTREAM_ORG=$1; shift
 REPO_NAME=$1; shift
 if [ "$#" -ne 0 ] && ! beginswith "-" "$1"; then
