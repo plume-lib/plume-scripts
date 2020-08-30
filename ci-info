@@ -57,6 +57,19 @@ if [ "$DEBUG" = "--debug" ] ; then
 fi
 
 
+### Functions
+
+# Returns either `git rev-parse HEAD^1` if HEAD^1 exists, or `git rev-parse HEAD`.
+# HEAD^1 does not exist if the clone was created with `git clone --depth=1`.
+head1 () {
+  if git rev-parse --verify --quiet HEAD^1 > /dev/null 2>&1 ; then
+    git rev-parse HEAD^1
+  else
+    git rev-parse HEAD
+  fi
+}
+
+
 ### Organization
 
 ## Continuous integration services
@@ -94,8 +107,6 @@ fi
 
 ### Other information (besides organization)
 
-# TODO: The uses of HEAD^1 can fail if the clone was created with `git clone --depth=1`.
-
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines pull request
   if [ "$DEBUG" = "--debug" ] ; then
@@ -108,7 +119,7 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
   # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that instead of
   # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
-  CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+  CI_COMMIT_RANGE_START=$(head1)
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
@@ -123,7 +134,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
-    DEFAULT_CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+    DEFAULT_CI_COMMIT_RANGE_START=$(head1)
 
     # If a build fails, we would like to continue failing subsequent
     # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
@@ -232,7 +243,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     if git show --summary HEAD | grep -q ^Merge: ; then
       CI_COMMIT_RANGE_START=$(git merge-base HEAD)
     else
-      CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+      CI_COMMIT_RANGE_START=$(head1)
     fi
     CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   else      
@@ -242,7 +253,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
       if git show --summary HEAD | grep -q ^Merge: ; then
         CI_COMMIT_RANGE_START=$(git merge-base HEAD)
       else
-        CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1)
+        CI_COMMIT_RANGE_START=$(head1)
       fi
     fi
     CI_COMMIT_RANGE_END=$(git rev-parse $CI_BRANCH_NAME)
@@ -266,7 +277,9 @@ if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge: ; then
     CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END")
   else
-    CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
+    if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1 ; then
+      CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
+    fi
   fi
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 fi
