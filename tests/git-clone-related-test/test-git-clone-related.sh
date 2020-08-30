@@ -23,8 +23,8 @@ set -o errexit -o nounset
 
 USER=${USER:-git-clone-related}
 PLUME_SCRIPTS=$(cd ../../; pwd -P)
-startdir=mytmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'startdir')
-goaldir=mytmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'goaldir')
+startdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'startdir')
+goaldir=$(mktemp -d 2>/dev/null || mktemp -d -t 'goaldir')
 rm -rf "$startdir" "$goaldir"
 
 git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch --depth 1
