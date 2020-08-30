@@ -91,4 +91,4 @@ test10:
 
 
 clean: 
-	rm -rf /scratch/$USER/git-clone-related-test-1 /scratch/$USER/git-clone-related-test-2
+# Nothing to do

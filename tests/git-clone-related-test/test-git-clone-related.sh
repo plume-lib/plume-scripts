@@ -23,8 +23,8 @@ set -o errexit -o nounset
 
 USER=${USER:-git-clone-related}
 
-startdir=/scratch/$USER/git-clone-related-test-1
-goaldir=/scratch/$USER/git-clone-related-test-2
+startdir=mytmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'startdir')
+goaldir=mytmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'goaldir')
 rm -rf "$startdir" "$goaldir"
 git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch --depth 1
 # $ARGS should not be quoted
@@ -32,6 +32,8 @@ git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch 
 (cd "$startdir" && git-clone-related $ARGS "$goaldir")
 clonedrepo=$(git -C "$goaldir" config --get remote.origin.url)
 clonedbranch=$(git -C "$goaldir" branch --show-current)
+
+rm -rf "$startdir" "$goaldir"
 
 if [ "$clonedrepo" != "$GOAL_REPO" ] ; then
     echo "test-git-clone-related \"$1\" \"$2\" \"$3\" \"$4\" \"$5\""
