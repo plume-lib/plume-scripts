@@ -211,9 +211,8 @@ else
     echo "echo Else clause: nothing matched;"
   fi
   CI_IS_PULL_REQUEST=false
-  # In git 2.22 and later, can use: CI_BRANCH_NAME=$(git branch --show-current)  (and update test below).
-  # shellcheck disable=SC2063
-  CI_BRANCH_NAME=$(git --no-pager branch | grep \* | cut -d ' ' -f2)
+  # git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
+  CI_BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
   # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
   # If you re-run a pull request via "Queue" rather than "Rebuild",
   # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
