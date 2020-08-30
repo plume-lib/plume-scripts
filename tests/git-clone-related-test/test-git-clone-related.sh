@@ -29,7 +29,7 @@ rm -rf "$startdir" "$goaldir"
 git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch --depth 1
 # $ARGS should not be quoted
 # shellcheck disable=SC2086
-(cd "$startdir" && git-clone-related $ARGS "$goaldir")
+(cd "$startdir" && ../../git-clone-related $ARGS "$goaldir")
 clonedrepo=$(git -C "$goaldir" config --get remote.origin.url)
 clonedbranch=$(git -C "$goaldir" branch --show-current)
 
