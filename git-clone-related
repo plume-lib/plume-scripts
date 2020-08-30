@@ -72,15 +72,33 @@ else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
   if [ -n "$DEBUG" ] ; then
+    echo "About to run ci-info --debug"
     "${SCRIPTDIR}/ci-info" --debug "${UPSTREAM_ORG}"
+    echo "Ran ci-info --debug"
+    echo "About to run ci-info"
   fi
 
   eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
+  if [ -n "$DEBUG" ] ; then
+    echo "Finished running ci-info"
+  fi
   UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
+
+  if [ -n "$DEBUG" ] ; then
+    echo "About to run git-find-fork" "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}"
+  fi
+  # REPO_URL is what will be cloned.  It might be the same as UPSTREAM_REPO_URL.
   REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
-  # echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
+  if [ -n "$DEBUG" ] ; then
+    echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
+  fi
+  if [ -n "$DEBUG" ] ; then
+    echo "About to run git-find-branch" "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}"
+  fi
   REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}")
-  # echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
+  if [ -n "$DEBUG" ] ; then
+    echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
+  fi
   if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ] ; then
     ## Don't use branch master of the downstream repo
     REPO_URL="$UPSTREAM_REPO_URL"
