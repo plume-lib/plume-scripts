@@ -109,6 +109,7 @@ s/^smeghani$/Samir Meghani/
 s/^smillst$/Suzanne Millstein/
 s/^stefan$/Stefan Heule/
 s/^stefanheule$/Stefan Heule/
+s/^sullis$/Sean C. Sullivan/
 s/^szhang$/Sai Zhang/
 s/^tamier$/Mier Ta/
 s/^ten3$/Tatyana Nikolova/
