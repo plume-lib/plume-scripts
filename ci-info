@@ -241,7 +241,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
   fi
   if [ "$CI_BRANCH_NAME" = "master" ]; then
     if git show --summary HEAD | grep -q ^Merge: ; then
-      CI_COMMIT_RANGE_START=$(git merge-base HEAD)
+      CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
     else
       CI_COMMIT_RANGE_START=$(head1)
     fi
@@ -251,7 +251,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
       CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
     else
       if git show --summary HEAD | grep -q ^Merge: ; then
-        CI_COMMIT_RANGE_START=$(git merge-base HEAD)
+        CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
       else
         CI_COMMIT_RANGE_START=$(head1)
       fi
@@ -275,7 +275,7 @@ if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
     echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
   fi
   if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge: ; then
-    CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END")
+    CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
   else
     if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1 ; then
       CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
