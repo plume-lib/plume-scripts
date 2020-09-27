@@ -47,7 +47,7 @@ if [ "$1" = "--upstream-branch" ] ; then
 fi
 
 if [ "$#" -lt 2 ]; then
-  echo "Usage: $0 UPSTREAM_ORG REPO [DESTINATION] [GIT_ARGS...]" >&2
+  echo "Usage: $0 UPSTREAM_ORG REPO [DESTINATION] [GIT_CLONE_ARGS...]" >&2
   exit 1
 fi
 
@@ -119,7 +119,7 @@ else
       exit 2
     fi
   fi
-  echo "git clone -b ${REPO_BRANCH} ${GIT_ARGS} ${REPO_URL} ${DESTINATION}"
+  echo "git clone -b ${REPO_BRANCH} $@ ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
   git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
     || git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}"
