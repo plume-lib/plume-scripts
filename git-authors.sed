@@ -137,5 +137,6 @@ s/^zhangjiangqige$/Jiangqi Zhang/
 /^doc\/index.html$/d
 
 /^dependabot-preview\[bot\]$/d
+/^dependabot\[bot\]$/d
 
 /^unknown$/d
