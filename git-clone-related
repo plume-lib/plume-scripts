@@ -11,7 +11,9 @@
 # Usage:  git-clone-related [ARGS] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_CLONE_ARGS...]
 #   ARGS are:
 #     --upstream-branch FALLBACK_BRANCH
-#           the fallback branch name on the upstream repository; default "master"
+#           the branch name to use if there is no branch matching this clone's
+#           branch name.  If not specified (or if no branch of the given name
+#           exists), uses the default branch name (often "master" or "main").
 #     --debug                     print logging information
 #   UPSTREAM_ORG is, if this is a fork, the parent organization.
 #   REPO_NAME is the repository name without the organization.
@@ -39,7 +41,7 @@ if [ "$1" = "--debug" ] ; then
   set +x
 fi
 
-FALLBACK_BRANCH=master
+# FALLBACK_BRANCH may be unset.
 if [ "$1" = "--upstream-branch" ] ; then
   shift
   FALLBACK_BRANCH=$1
@@ -104,22 +106,18 @@ else
     echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
   fi
   if [ -n "$DEBUG" ] ; then
-    echo "About to run git-find-branch" "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}"
+    echo "About to run git-find-branch" "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"}
   fi
-  REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}")
+  REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
   if [ -n "$DEBUG" ] ; then
     echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
   fi
   if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ] ; then
     ## Don't use the fallback branch (e.g., master) of the downstream repo
     REPO_URL="$UPSTREAM_REPO_URL"
-    REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" "${FALLBACK_BRANCH}")
-    if [ "$REPO_BRANCH" = "master" ] && [ "${FALLBACK_BRANCH}" != "master" ] ; then
-      echo "Error in git-clone-related: fallback branch ${FALLBACK_BRANCH} does not exist in ${REPO_URL}"
-      exit 2
-    fi
+    REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
   fi
-  echo "git clone -b ${REPO_BRANCH} $@ ${REPO_URL} ${DESTINATION}"
+  echo "git clone -b ${REPO_BRANCH} $* ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
   git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
     || git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}"
