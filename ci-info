@@ -107,6 +107,8 @@ fi
 
 ### Other information (besides organization)
 
+DEFAULT_BRANCH_NAME=$(git ls-remote --symref "${REPO_URL}" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   ## Azure Pipelines pull request
   if [ "$DEBUG" = "--debug" ] ; then
@@ -133,7 +135,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
-  if [ "$BUILD_SOURCEBRANCHNAME" = "master" ] ; then
+  if [ "$BUILD_SOURCEBRANCHNAME" = "$DEFAULT_BRANCH_NAME" ] ; then
     DEFAULT_CI_COMMIT_RANGE_START=$(head1)
 
     # If a build fails, we would like to continue failing subsequent
@@ -177,8 +179,8 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
     ## Use this because ci-last-success.py currently doesn't work.
     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
   else
-    git fetch origin master
-    CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
+    git fetch origin "$DEFAULT_BRANCH_NAME"
+    CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
   fi
   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
@@ -228,7 +230,7 @@ else
   # If you re-run a pull request via "Queue" rather than "Rebuild",
   # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
   if [ "$CI_BRANCH_NAME" = '(HEAD' ] ; then
-    CI_BRANCH_NAME=master
+    CI_BRANCH_NAME=$DEFAULT_BRANCH_NAME
   fi
 fi
 
@@ -239,7 +241,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH_NAME=$CI_BRANCH_NAME;"
   fi
-  if [ "$CI_BRANCH_NAME" = "master" ]; then
+  if [ "$CI_BRANCH_NAME" = "$DEFAULT_BRANCH_NAME" ]; then
     if git show --summary HEAD | grep -q ^Merge: ; then
       CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
     else
@@ -247,8 +249,8 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     fi
     CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   else      
-    if git rev-parse --verify --quiet origin/master > /dev/null 2>&1 ; then
-      CI_COMMIT_RANGE_START=$(git rev-parse origin/master)
+    if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1 ; then
+      CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
     else
       if git show --summary HEAD | grep -q ^Merge: ; then
         CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
@@ -256,7 +258,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
         CI_COMMIT_RANGE_START=$(head1)
       fi
     fi
-    CI_COMMIT_RANGE_END=$(git rev-parse $CI_BRANCH_NAME)
+    CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH_NAME")
   fi
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 fi
