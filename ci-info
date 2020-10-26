@@ -107,8 +107,8 @@ fi
 
 ### Other information (besides organization)
 
-# I don't necessarily have the URL.
-# DEFAULT_BRANCH_NAME=$(git ls-remote --symref "${URL}" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+## Both of these commands for DEFAULT_BRANCH_NAME seem to work.
+# DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ] ; then
   echo "echo DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
