@@ -107,10 +107,10 @@ fi
 
 ### Other information (besides organization)
 
-DEFAULT_BRANCH_NAME=$(git ls-remote --symref "${REPO_URL}" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+DEFAULT_BRANCH_NAME=$(git ls-remote --symref "${URL}" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
 if [ "$DEBUG" = "--debug" ] ; then
   echo "echo DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
-  echo "echo $(git ls-remote --symref "${REPO_URL}" HEAD);"
+  echo "echo $(git ls-remote --symref "${URL}" HEAD);"
 fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
