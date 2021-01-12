@@ -8,6 +8,7 @@ s/^Bohdan$/Bohdan Sharipov/
 s/^Carlos$/Carlos Pacheco/
 s/^Charles Chen Charleszhuochen@gmail.com$/Charles Chen/
 s/^CharlesZ-Chen$/Charles Chen/
+s/^ChristosToxiadis$/Chris Toxiadis/
 s/^Colin Gordon$/Colin S. Gordon/
 s/^Colin Stebbins Gordon$/Colin S. Gordon/
 s/^Haaris710$/Haaris Ahmed/
