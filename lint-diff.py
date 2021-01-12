@@ -39,7 +39,6 @@
 # 2. The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
 # suggests it has this same functionality, but my tests indicate it does not.
 
-from __future__ import print_function
 
 import argparse
 import os
