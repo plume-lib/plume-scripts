@@ -21,6 +21,7 @@ s/^Leo$/Leo Liu/
 s/^Maxi17$/Maximilian Gama/
 s/^Michèle$/Stefan Heule/
 s/^MrigankArora$/Mrigank Arora/
+s/^Nargeshdb$/Narges Shadab/
 s/^Oleg$/Oleg Shchelykalnov/
 s/^Rashmi$/Rashmi Mudduluru/
 s/^Sadaf$/Sadaf Tajik/
