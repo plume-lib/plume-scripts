@@ -38,7 +38,11 @@ while :; do
     shift
 done
 
-git fetch --depth=1000000 --quiet
+# shellcheck disable=SC2091 # Result is "true" or "false", surround with $(...) to interpret it.
+if $(git rev-parse --is-shallow-repository); then
+  # It would be more efficient to use --filter=tree:0, but that is legal only if extensions.partialClone is set.
+  git fetch --unshallow --quiet
+fi
 # shellcheck disable=SC2015 # sed won't fail.
 git log | grep '^\(Author\|    Co-authored-by\):' | \
   sed -E 's/(Author|    Co-authored-by): (.*)/\2/' | sed -E 's/(.*) <.*>/\1/' | \
