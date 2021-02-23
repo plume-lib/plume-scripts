@@ -4,8 +4,13 @@
 # CircleCI, or Travis CI.
 
 # On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
-# for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later, see
-# https://discuss.circleci.com/t/is-circle-compare-url-still-a-thing/33366
+# for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
+# https://discuss.circleci.com/t/is-circle-compare-url-still-a-thing/33366):
+# jobs:
+#   my-job:
+#     environment:
+#       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
+
 
 # Typical use:
 #
