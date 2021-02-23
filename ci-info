@@ -3,6 +3,10 @@
 # Outputs information about a CI job, when run under Azure Pipelines,
 # CircleCI, or Travis CI.
 
+# On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
+# for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later, see
+# https://discuss.circleci.com/t/is-circle-compare-url-still-a-thing/33366
+
 # Typical use:
 #
 #   if [ -d /tmp/$USER/plume-scripts ] ; then
@@ -50,7 +54,7 @@ if [ "$DEBUG" = "--debug" ] ; then
   echo
   env | sort | sed -e 's/^/echo /'
   echo
-  git --no-pager branch -a
+  git --no-pager branch -a | sed -e 's/^/echo /'
   echo
   git --no-pager log --graph | head --lines=1000 | sed -e 's/^/echo /'
   echo
@@ -131,7 +135,7 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
-  # It's not a pull request, but is a build for a branch (possibly master).
+  # Azure Pipelines build for a branch (possibly master).
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
@@ -206,7 +210,7 @@ elif [ "$TRAVIS" = "true" ] ; then
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 
 elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
-  ## CircleCI
+  ## CircleCI v2 or earlier, or CIRCLE_COMPARE_URL was set for compatibility.
   if [ "$DEBUG" = "--debug" ] ; then
     echo "echo CircleCI $CIRCLE_COMPARE_URL $CIRCLE_PULL_REQUEST;"
   fi
@@ -227,7 +231,11 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo Else clause: nothing matched;"
+    if [ -n "$CIRCLE_PULL_REQUEST" ]; then
+      echo "echo  CircleCI pull request with CIRCLE_COMPARE_URL not set: $CIRCLE_PULL_REQUEST;"
+    else
+      echo "echo Else clause: no CI environment detected;"
+    fi
   fi
   CI_IS_PULL_REQUEST=false
   # git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
