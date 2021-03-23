@@ -288,6 +288,9 @@ if [ -z "$CI_COMMIT_RANGE_START" ]; then
   fi
   CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
   CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
+  if [ -z "$CI_COMMIT_RANGE_START" ] ; then
+    CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_END}
+  fi
 fi
 
 # Avoid errors regarding empty range
