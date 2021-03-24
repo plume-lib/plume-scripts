@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Outputs information about a CI job, when run under Azure Pipelines,
-# CircleCI, or Travis CI.
+# CircleCI, GitHub Actions, or Travis CI.
 
 # On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
 # for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
@@ -23,9 +23,9 @@
 #
 # Here are the variables that it sets:
 # CI_IS_PULL_REQUEST: Either "true" or "false" (without the quotes).
-# CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source.
+# CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source or head.
 #   Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
-# CI_BRANCH_NAME: The name of the source branch (in a PR) or of the branch being tested.
+# CI_BRANCH_NAME: The name of the source/head branch (in a PR) or of the branch being tested.
 # CI_COMMIT_RANGE: An argument to `git diff` with the range of commits IDs.
 #    (Don't use it with `git log`, which interprets its argument differently.)
 # CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID.
@@ -108,6 +108,9 @@ if [ "$CI_ORGANIZATION" = "" ]; then
   CI_ORGANIZATION=${SLUG%/*}
   # TODO: Maybe add a sanity check here.
 fi
+
+# I think the above will work for GitHub Actions.  If not, GITHUB_REPOSITORY
+# is the owner and repository name. For example, octocat/Hello-World.
 
 ## Default
 if [ "$CI_ORGANIZATION" = "" ]; then
@@ -232,6 +235,14 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}" ;;
   esac
   CI_BRANCH_NAME=$CIRCLE_BRANCH
+
+elif [ -n "$GITHUB_HEAD_REF" ] ; then
+  # GitHub Actions pull request
+  CI_IS_PULL_REQUEST=true
+  CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
+  CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}")
+  CI_COMMIT_RANGE_END=$(git rev-parse "${GITHUB_HEAD_REF}")
+  CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
