@@ -78,3 +78,4 @@ if [ ! $ERR == /dev/null ]
     rm -f "$ERR"
 fi
 rm -f "$TRACE"
+exit $RESULT
