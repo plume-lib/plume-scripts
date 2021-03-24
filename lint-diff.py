@@ -20,8 +20,8 @@
 #              are also considered changed; the default is 2.
 #          --debug means to print diagnostic output.
 
-# Here is how you could use this in continuous integration (Azure
-# Pipelines, CircleCI, and Travis CI are currently supported) to require
+# Here is how you could use this in continuous integration (Azure Pipelines,
+# CircleCI, GitHub Actions, and Travis CI are currently supported) to require
 # that pull requests satisfy the command `command-that-issues-warnings`:
 #
 #  if [ -d /tmp/$USER/plume-scripts ] ; then

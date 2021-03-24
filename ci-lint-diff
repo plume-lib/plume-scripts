@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Given a file of warnings, reports only those that are in the diff for the
-# current pull request.  Works for Azure Pipelines, CircleCI, and Travis CI.
-# Exit status is non-zero if any warnings are output.
+# current pull request.  Works for Azure Pipelines, CircleCI, GitHub Actions,
+# and Travis CI.  Exit status is non-zero if any warnings are output.
 
 # Example use:
 #

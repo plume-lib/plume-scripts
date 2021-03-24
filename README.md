@@ -48,15 +48,15 @@ Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
 
 Obtains information about a CI (continuous integration) job, such as the
 organization, the branch, the range of commits, and whether it is a pull
-request.  Works for Azure Pipelines, CircleCI, and Travis CI.
+request.  Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 [Documentation](ci-info) at top of file.
 
 ### ci-lint-diff
 
 Given a file of warnings (such as those output by `lint` or other tools),
-reports only those that are in the diff for the current pull request.  Works for
-Azure Pipelines, CircleCI, and Travis CI.  [Documentation](ci-lint-diff) at top
-of file.
+reports only those that are in the diff for the current pull request.
+Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+[Documentation](ci-lint-diff) at top of file.
 
 ### ci-last-success.py
 
