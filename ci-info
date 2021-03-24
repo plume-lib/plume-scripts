@@ -109,9 +109,6 @@ if [ "$CI_ORGANIZATION" = "" ]; then
   # TODO: Maybe add a sanity check here.
 fi
 
-# I think the above will work for GitHub Actions.  If not, GITHUB_REPOSITORY
-# is the owner and repository name. For example, octocat/Hello-World.
-
 ## Default
 if [ "$CI_ORGANIZATION" = "" ]; then
   CI_ORGANIZATION=$1
@@ -237,7 +234,7 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   CI_BRANCH_NAME=$CIRCLE_BRANCH
 
 elif [ -n "$GITHUB_HEAD_REF" ] ; then
-  # GitHub Actions pull request
+  # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
   CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}")
