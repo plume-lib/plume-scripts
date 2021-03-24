@@ -7,7 +7,8 @@
 # When run from a clone of one (possibly in a fork and/or on a branch), this
 # clones the other, attempting to find a matching fork and branch.
 # This script also works in an Azure Pipelines, CircleCI, GitHub Actions, or
-# Travis CI job.
+# Travis CI job; in a CI job, it uses (for example) the pull request's branch
+# name even if the CI system uses a different branch name for its local clone.
 #
 # Usage:  git-clone-related [ARGS] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_CLONE_ARGS...]
 #   ARGS are:
