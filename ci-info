@@ -95,6 +95,8 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
     CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
     # CI_REPO=${BUILD_REPOSITORY_NAME##*/}
   fi
+elif [ -n "$CIRCLE_PR_USERNAME" ]; then
+  CI_ORGANIZATION="$CIRCLE_PR_USERNAME"
 fi
 
 ## Git clone
@@ -231,7 +233,13 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
     CI_COMMIT_RANGE_END=$(git rev-parse "${COMMIT_RANGE}")
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}" ;;
   esac
-  CI_BRANCH_NAME=$CIRCLE_BRANCH
+  # CIRCLE_BRANCH may be "pull/327"
+  case "$CIRCLE_BRANCH" in
+    pull/*)
+      CI_BRANCH_NAME=$(curl -s "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref') ;;
+    *)
+      CI_BRANCH_NAME=$CIRCLE_BRANCH ;;
+  esac
 
 elif [ -n "$GITHUB_HEAD_REF" ] ; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
