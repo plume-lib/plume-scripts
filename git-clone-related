@@ -9,6 +9,8 @@
 # This script also works in an Azure Pipelines, CircleCI, GitHub Actions, or
 # Travis CI job; in a CI job, it uses (for example) the pull request's branch
 # name even if the CI system uses a different branch name for its local clone.
+# (On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL;
+# see documentation of `ci-info` script for details.)
 #
 # Usage:  git-clone-related [ARGS] UPSTREAM_ORG REPO_NAME [DESTINATION] [GIT_CLONE_ARGS...]
 #   ARGS are:

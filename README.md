@@ -109,6 +109,7 @@ Lists all the authors of commits in a get repository.
 
 Clones a repository related to the one where this script is called, trying
 to match the fork and branch.
+Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 [Documentation](git-clone-related) at top of file.
 
 Suppose you have two related Git repositories:\
