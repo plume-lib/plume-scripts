@@ -90,6 +90,10 @@ if (scalar(@ARGV) < 2) {
 
 $fromregex = shift @ARGV;
 $toregex = shift @ARGV;
+if ($debug) {
+  print STDERR "fromregex = $fromregex\n";
+  print STDERR "toregex   = $toregex\n";
+}
 
 # Subroutine to set @filelist.  It's a callback; File::Find ignores its
 # return value.
