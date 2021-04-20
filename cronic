@@ -10,7 +10,7 @@
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
 #   debugging. Cronic has no options, it simply executes its arguments.
-# Extended by Michael Ernst to add --expected-status and --permit-stderr flags.
+# Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -32,6 +32,12 @@ if [ "$1" == "--permit-stderr" ]
   then
   shift
   PERMITSTDERR=1
+fi
+DUPLICATE_STDERR=0
+if [ "$1" == "--duplicate-stderr" ]
+  then
+  shift
+  DUPLICATE_STDERR=1
 fi
 
 set +e
@@ -69,6 +75,12 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$ERR" ]; }
         echo
         echo "TRACE-ERROR OUTPUT:"
         cat "$TRACE"
+    fi
+    if [ $DUPLICATE_STDERR -eq 1 ]
+    then
+        echo
+        echo "ERROR OUTPUT:"
+        cat "$ERR"
     fi
 fi
 
