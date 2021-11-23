@@ -131,6 +131,7 @@ s/^yoav.zibin$/Yoav Zibin/
 s/^yuriy.brun$/Yuriy Brun/
 s/^zcai$/Zhiping Cai/
 s/^zhangjiangqige$/Jiangqi Zhang/
+s/^shisheng-1$/Junhao Hu/
 
 /^daikonbuildtest$/d
 /^daikongroupmember$/d
