@@ -105,6 +105,7 @@ s/^rjust dev$/René Just/
 s/^rjust$/René Just/
 s/^salcianu$/Alexandru Salcianu/
 s/^scruffy$/Benjamin Morse/
+s/^shisheng-1$/Junhao Hu/
 s/^sjl$/Sandra Loosemore/
 s/^smcc$/Stephen McCamant/
 s/^smeghani$/Samir Meghani/
