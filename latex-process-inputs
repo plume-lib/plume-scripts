@@ -29,8 +29,8 @@
 #   latex-process-inputs -list 2015-icse-tqi.tex
 # The fix is challenging given the current design because the document is
 # treated as one huge block of text that is searched for \input, with that
-#replaced by the text of the inputted file and the process repeating until
-#there are no more \input commands.  The script does not know which file a
+# replaced by the text of the inputted file and the process repeating until
+# there are no more \input commands.  The script does not know which file a
 # given \input command came from.  The solution is to rewrite the script to
 # work line-by-line.  That will also do a better job of not handling \input
 # and %-comments in verbatm-included files.
