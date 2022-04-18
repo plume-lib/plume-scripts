@@ -87,6 +87,7 @@ s/^mharder$/Michael Harder/
 s/^michael.ernst$/Michael Ernst/
 s/^minilek$/Jelani Nelson/
 s/^mjollnir$/Matt Mullen/
++s/^naveensrinivasan$/Naveen Srinivasan/
 s/^nimakarimipour$/Nima Karimipour/
 s/^nitin23329$/Nitin Kumar Das/
 s/^NITIN DAS$/Nitin Kumar Das/
