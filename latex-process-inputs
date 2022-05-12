@@ -36,6 +36,8 @@
 # and %-comments in verbatm-included files.
 # Writing a test suite would help with validating this change.
 
+use Cwd;
+
 # This is not settable from the command line; edit this file to change it.
 my $debug = 0;
 # $debug = 1;
@@ -88,7 +90,21 @@ for my $line (@toplevel_lines) {
     } elsif (-e "$file") {
       open(F, "$file") or die("Can't open $file");
     } else {
-      die("File does not exist: $file.tex or $file");
+      # fwfd = "file_without_first_dir"
+      $fwfd = $file;
+      $fwfd =~ s/^[^\/]+\///;
+      my $dir = getcwd;
+      # For reasons I don't understand, just  (-e "$fwfd.tex")  here evaluates to false.
+      if (-e "$dir/$fwfd.tex") {
+	$fwfd .= ".tex";
+	open(F, "$dir/$fwfd") or die("Can't open $fwfd");
+	$file = "$fwfd";
+      } elsif (-e "$dir/$fwfd") {
+	open(F, "$dir/$fwfd") or die("Can't open $fwfd");
+	$file = "$fwfd";
+      }	else {
+	die("File does not exist: $file.tex or $file");
+      }
     }
     push @files, $file;
     my @lines = <F>;
