@@ -3,7 +3,7 @@ jobs:
   build:
 
     docker:
-      - image: circleci/python:3.8.1
+      - image: circleci/python:3.10
 
     steps:
 
@@ -18,7 +18,12 @@ jobs:
           paths:
             - ".git"
 
-      - run: make -C tests
+      - run: pip3 install black
+      - run: pip3 install pylint
+      - run: sudo apt-get update
+      - run: sudo apt-get -y install shellcheck devscripts
+
+      - run: make
 
 workflows:
   version: 2
