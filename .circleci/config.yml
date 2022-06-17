@@ -22,6 +22,8 @@ jobs:
 
       - run: yapf --version
 
+      - run: python-yapf3 --version
+
       - run: make
 
 workflows:
