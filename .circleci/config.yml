@@ -20,6 +20,7 @@ jobs:
 
       - run: pip3 install black
       - run: pip3 install pylint
+      - run: apt-get install shellcheck
 
       - run: make
 
