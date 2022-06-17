@@ -20,8 +20,6 @@ jobs:
 
       - run: sudo apt-get update --allow-releaseinfo-change && sudo apt-get -y install python3-yapf
 
-      - run: yapf --version
-
       - run: python-yapf3 --version
 
       - run: make
