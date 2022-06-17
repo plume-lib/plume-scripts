@@ -39,7 +39,6 @@
 # 2. The documentation for diffFilter (https://github.com/exussum12/coverageChecker)
 # suggests it has this same functionality, but my tests indicate it does not.
 
-
 import argparse
 import os
 import re
@@ -117,7 +116,7 @@ Fails if neither is lesser."""
         return pair1
     if pair1[0] >= pair2[0] and pair1[1] >= pair2[1]:
         return pair2
-    raise Exception("incomparable pairs: {} {}".format(pair1, pair2))
+    raise Exception(f"incomparable pairs: {pair1} {pair2}")
 
 
 ## Tests:
@@ -176,11 +175,10 @@ def guess_strip_files(diff_file, warning_file):
         # This is not necessarily a problem.  It is possible that all the
         # diffs, or all the lint output, happens to be in one subdirectory.
         if DEBUG:
-            eprint("lint-diff.py: guess_strip_files all in one subdirectory: " +
-                   "result={} diff_prefix={} warnings_prefix={}".format(
-                       result, diff_prefix, warnings_prefix))
-            eprint("diff_files={}".format(diff_files))
-            eprint("warning_files={}".format(warning_files))
+            eprint(f"lint-diff.py: guess_strip_files all in one subdirectory: " +
+                   "result={result} diff_prefix={diff_prefix} warnings_prefix={warnings_prefix}")
+            eprint(f"diff_files={diff_files}")
+            eprint(f"warning_files={warning_files}")
     return result
 
 
@@ -260,8 +258,8 @@ def parse_args():
             args.strip_diff = guessed_strip[0]
             args.strip_warnings = guessed_strip[1]
             if DEBUG:
-                eprint("lint-diff.py inferred --strip-diff={} --strip-warnings={}".format(
-                    args.strip_diff, args.strip_warnings))
+                eprint("lint-diff.py inferred " +
+                       f"--strip-diff={args.strip_diff} --strip-warnings={args.strip_warnings}")
 
     # A filename if the diff filenames start with "a/" and "b/", otherwise None.
     # Is set by changed_lines().
@@ -333,10 +331,10 @@ def warn_relative_diff(args):
             eprint("warning: (Maybe there were no files in common.)")
         result = True
         if DEBUG:
-            eprint("lint-diff.py: diff file {}:".format(args.diff_filename))
+            eprint(f"lint-diff.py: diff file {args.diff_filename}:")
             with open(args.diff_filename, 'r', encoding='utf-8') as fin:
                 eprint("{}", fin.read())
-            eprint("lint-diff.py: lint file {}:".format(args.warning_filename))
+            eprint(f"lint-diff.py: lint file {args.warning_filename}:")
             with open(args.warning_filename, 'r', encoding='utf-8') as fin:
                 eprint("{}", fin.read())
             eprint("lint-diff.py: end of input files.")
@@ -365,6 +363,7 @@ def main():
         args.warning_filename = "stdin"
         warnings = sys.stdin
     else:
+        # pylint: disable=consider-using-with
         warnings = open(args.warning_filename, encoding='utf-8')
 
     # 1 if this produced any output, 0 if not

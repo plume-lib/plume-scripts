@@ -23,7 +23,7 @@ DEBUG = False
 # DEBUG=True
 
 if len(sys.argv) != 3 and len(sys.argv) != 4:
-    print('Wrong number of arguments {}, expected 2 or 3'.format(len(sys.argv) - 1))
+    print(f'Wrong number of arguments {len(sys.argv) - 1}, expected 2 or 3')
     sys.exit(2)
 
 org = sys.argv[1]
@@ -38,7 +38,7 @@ else:
         raise Exception(gitRevParseResult)
 
 if DEBUG:
-    print("commit_arg: {}".format(commit_arg))
+    print(f"commit_arg: {commit_arg}")
 
 
 ### PROBLEM: api.github.com is returning   "state": "pending"   for commits with completed CI jobs.
@@ -46,14 +46,13 @@ if DEBUG:
 def successful(sha):
     "Return true if SHA's CI job succeeded."
     # message=commit['commit']['message']
-    url_status = 'https://api.github.com/repos/{}/{}/commits/{}/status'.format(org, repo, sha)
+    url_status = f'https://api.github.com/repos/{org}/{repo}/commits/{sha}/status'
     if DEBUG:
         print(url_status)
     resp_status = requests.get(url_status)
     if resp_status.status_code != 200:
         # This means something went wrong, possibly rate-limiting.
-        raise Exception('GET {} {} {}'.format(url_status, resp_status.status_code,
-                                              resp_status.headers))
+        raise Exception(f'GET {url_status} {resp_status.status_code} {resp_status.headers}')
     state = resp_status.json()['state']
     return state == "success"
 
@@ -69,13 +68,13 @@ def parent(sha):
 commit = commit_arg
 while True:
     if DEBUG:
-        print("Testing {}".format(commit))
+        print(f"Testing {commit}")
     if successful(commit):
-        print('{}'.format(commit))
+        print(f'{commit}')
         sys.exit(0)
     the_parent = parent(commit)
     if the_parent is None:
-        print('{}'.format(parent(commit_arg)))
+        print(f'{parent(commit_arg)}')
         sys.exit(0)
     commit = the_parent
 

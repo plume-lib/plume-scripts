@@ -6,7 +6,7 @@ test:
 PYTHON_FILES=$(wildcard *.py)
 
 python-style:
-	yapf -i --style='{column_limit: 100}' ${PYTHON_FILES}
+	yapf3 -i --style='{column_limit: 100}' ${PYTHON_FILES}
 	pylint -f parseable --disable=W,invalid-name ${PYTHON_FILES}
 
 SH_SCRIPTS = $(shell grep -r -l '^\#!/bin/sh' * | grep -v .git | grep -v "~" | grep -v cronic-orig)
