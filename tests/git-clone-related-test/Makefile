@@ -51,43 +51,43 @@ test: test1 test2 test3 test4 test5 test6 test7 test8 test9 test10
 
 # mernst/repo1, branch-downstream-all => mernst/repo2, branch-downstream-all
 test1:
-	./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-downstream-all "plume-lib git-clone-related-test-repo2" https://github.com/mernst/git-clone-related-test-repo2.git branch-downstream-all
+	USER=mernst ./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-downstream-all "plume-lib git-clone-related-test-repo2" https://github.com/mernst/git-clone-related-test-repo2.git branch-downstream-all
 
 #   plume-lib/repo1, branch-upstream-all => plume-lib/repo2, branch-upstream-all
 test2:
-	./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-upstream-all "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-upstream-all
+	USER=mernst ./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-upstream-all "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-upstream-all
 
 #   mernst/repo1, branch-not-in-downstream-repo2 => plume-lib/repo2, branch-not-in-downstream-repo2
 test3:
-	./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-not-in-downstream-repo2 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-not-in-downstream-repo2
+	USER=mernst ./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-not-in-downstream-repo2 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-not-in-downstream-repo2
 
 #   plume-lib/repo1, branch-not-in-downstream-repo2 => plume-lib/repo2, branch-not-in-downstream-repo2
 test4:
-	./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-not-in-downstream-repo2 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-not-in-downstream-repo2
+	USER=mernst ./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-not-in-downstream-repo2 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-not-in-downstream-repo2
 
 #   mernst/repo1, branch-downstream-repo1 => plume-lib/repo2, master
 test5:
-	./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-downstream-repo1 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git master
+	USER=mernst ./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-downstream-repo1 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git master
 
 #   plume-lib/repo1, branch-upstream-repo1 => plume-lib/repo2, master
 test6:
-	./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-upstream-repo1 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git master
+	USER=mernst ./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-upstream-repo1 "plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git master
 
 #   mernst/repo1, branch-downstream-repo1 => plume-lib/repo2, branch-fallback
 test7:
-	./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-downstream-repo1 "--upstream-branch branch-fallback plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-fallback
+	USER=mernst ./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-downstream-repo1 "--upstream-branch branch-fallback plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-fallback
 
 #   plume-lib/repo1, branch-upstream-repo1 => plume-lib/repo2, branch-fallback
 test8:
-	./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-upstream-repo1 "--upstream-branch branch-fallback plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-fallback
+	USER=mernst ./test-git-clone-related.sh https://github.com/plume-lib/git-clone-related-test-repo1 branch-upstream-repo1 "--upstream-branch branch-fallback plume-lib git-clone-related-test-repo2" https://github.com/plume-lib/git-clone-related-test-repo2.git branch-fallback
 
 #   mernst/repo1, master => plume-lib/repo3, master
 test9:
-	./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 master "plume-lib git-clone-related-test-repo3" https://github.com/plume-lib/git-clone-related-test-repo3.git master
+	USER=mernst ./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 master "plume-lib git-clone-related-test-repo3" https://github.com/plume-lib/git-clone-related-test-repo3.git master
 
 #  mernst/repo1, branch-fallback => plume-lib/repo3, branch-fallback
 test10:
-	./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-fallback "plume-lib git-clone-related-test-repo3" https://github.com/plume-lib/git-clone-related-test-repo3.git branch-fallback
+	USER=mernst ./test-git-clone-related.sh https://github.com/mernst/git-clone-related-test-repo1 branch-fallback "plume-lib git-clone-related-test-repo3" https://github.com/plume-lib/git-clone-related-test-repo3.git branch-fallback
 
 
 clean: 
