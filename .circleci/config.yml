@@ -19,6 +19,7 @@ jobs:
             - ".git"
 
       - run: pip3 install black
+      - run: pip3 install pylint
 
       - run: make
 
