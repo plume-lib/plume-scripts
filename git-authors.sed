@@ -15,6 +15,7 @@ s/^Haaris710$/Haaris Ahmed/
 s/^J Luo$/Jeff Luo/
 s/^Jianchu$/Jianchu Li/
 s/^JonathanGBurke$/Jonathan Burke/
+s/^Kenn Knowles/Kenneth Knowles/
 s/^LS@WATER$/Lian Sun/
 s/^L\. Sun$/Lian Sun/
 s/^Lázaro Clapp$/Lazaro Clapp/
