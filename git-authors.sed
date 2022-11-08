@@ -75,6 +75,7 @@ s/^juang$/Jeff Yuan/
 s/^jwa$/James Anderson/
 s/^jwnimmer$/Jeremy Nimmer/
 s/^jwyuan$/Jeff Yuan/
+s/^kanaksad$/Kanak Das/
 s/^kelloggm$/Martin Kellogg/
 s/^laurejt$/Laure Thompson/
 s/^leelin$/Lee Lin/
