@@ -64,6 +64,7 @@ s/^gregs$/Greg Sullivan/
 s/^gustavo$/Gustavo Santos/
 s/^hunkim$/Sung Kim/
 s/^iuliuv$/Iuliu Vasilescu/
+s/^Ivan-Kocherhin$/Ivan Kocherhin/
 s/^jaimeq$/Jaime Quinonez/
 s/^jake$/Jake Cockrell/
 s/^jburke$/Jonathan Burke/
