@@ -68,6 +68,7 @@ s/^Ivan-Kocherhin$/Ivan Kocherhin/
 s/^jaimeq$/Jaime Quinonez/
 s/^jake$/Jake Cockrell/
 s/^jburke$/Jonathan Burke/
+s/^Jck$/Shuqi Lin/
 s/^jhp$/Jeff Perkins/
 s/^jonathangburke$/Jonathan Burke/
 s/^joshkata$/Josh Kataoka/
