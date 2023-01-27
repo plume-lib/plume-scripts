@@ -72,6 +72,7 @@ s/^Jck$/Shuqi Lin/
 s/^jhp$/Jeff Perkins/
 s/^jonathangburke$/Jonathan Burke/
 s/^joshkata$/Josh Kataoka/
+s/^jpeterson2$/Joshua Peterson/
 s/^jthaine$/Javier Thaine/
 s/^juang$/Jeff Yuan/
 s/^jwa$/James Anderson/
