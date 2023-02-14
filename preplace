@@ -174,8 +174,10 @@ foreach my $file (@filelist) {
       $delimiter = "|";
     } elsif ($fromtoregex !~ m/:/) {
       $delimiter = ":";
+    } elsif ($fromtoregex !~ m/#/) {
+      $delimiter = "#";
     } else {
-      die "Cannot find delimiter";
+      die "Cannot choose delimiter; regexes use too many special characters";
     }
     # quote $file in case it contains whitespace
     my $command = "perl -pi$backupsuffix -e 'use strict; s$delimiter$fromregex$delimiter$toregex${delimiter}g' '$file'";

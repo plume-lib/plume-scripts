@@ -1,4 +1,4 @@
-all: python-style shell-script-style test
+all: check-python-style shell-script-style test
 
 test:
 	${MAKE} -C tests test
@@ -7,6 +7,10 @@ PYTHON_FILES=$(wildcard *.py)
 
 python-style:
 	black ${PYTHON_FILES}
+	pylint -f parseable --disable=W,invalid-name ${PYTHON_FILES}
+
+check-python-style:
+	black ${PYTHON_FILES} --check
 	pylint -f parseable --disable=W,invalid-name ${PYTHON_FILES}
 
 SH_SCRIPTS = $(shell grep -r -l '^\#!/bin/sh' * | grep -v .git | grep -v "~" | grep -v cronic-orig)
