@@ -46,6 +46,7 @@ fi
 # shellcheck disable=SC2015 # sed won't fail.
 git log | grep '^\(Author\|    Co-authored-by\):' | \
   sed -E 's/(Author|    Co-authored-by): (.*)/\2/' | sed -E 's/(.*) <.*>/\1/' | \
+  grep -v '^renovate\[bot\]$' | \
   LC_ALL=C sort -u | \
   sed -f "$(dirname "$0")"/git-authors.sed | LC_ALL=C sort -u | \
   ( [ -n "${html+x}" ] && sed -e "s/á/\\&aacute;/" -e "s/é/\\&eacute;/" -e "s/ß/\\&szlig;/" || cat ) | \
