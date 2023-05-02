@@ -80,10 +80,13 @@ elif [ ! -r /tmp/diff.txt ] ; then
   CI_LINT_DIFF_ERROR="/tmp/diff.txt does not exist"
 fi
 if [ ! -s /tmp/diff.txt ] ; then
-  # Other causes of an empty diff:
-  #  * the commit range is a commit and its revert
-  #  * HEAD is a merge commit and the merge took all its changes from its second argument
-  CI_LINT_DIFF_ERROR="ERROR: Empty diff for $CI_COMMIT_RANGE. Try pulling base branch (often master) into compare branch (often your feature branch)."
+  CI_LINT_DIFF_ERROR="ERROR: Empty diff for $CI_COMMIT_RANGE.
+Try pulling base branch (often main or master) into compare branch (often your feature branch).
+Other causes of an empty diff include:
+  * The commit range is a no-op, such as a commit and its revert.
+  * HEAD is a merge commit and the merge took all its changes from its second argument.
+  * Your compare branch does not differ from your base branch.
+"
 fi
 
 if [ -n "$CI_LINT_DIFF_ERROR" ] ; then
