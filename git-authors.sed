@@ -56,6 +56,7 @@ s/^drayside$/Derek Rayside/
 s/^emarcus$/Emily Marcus/
 s/^falaina$/Robert Rudd/
 s/^felly$/Eric Fellheimer/
+s/^flo2702$/Florian Lanzinger/
 s/^fmc$/Forrest Coward/
 s/^garland$/Stephen Garland/
 s/^garrett$/Charlie Garrett/
@@ -82,6 +83,7 @@ s/^kanaksad$/Kanak Das/
 s/^kelloggm$/Martin Kellogg/
 s/^laurejt$/Laure Thompson/
 s/^leelin$/Lee Lin/
+s/^lnsun$/Lian Sun/
 s/^looser$/Nitin Kumar Das/
 s/^mali$/Mahmood Ali/
 s/^marinov$/Darko Marinov/
@@ -135,6 +137,7 @@ s/^vkm$/Vikash Mansinghka/
 s/^wdietl$/Werner Dietl/
 s/^wmdietl$/Werner Dietl/
 s/^wmdietlGC$/Google Inc.\\ (via @wmdietlGC)/
+s/^xingweitian$/Weitian Xing/
 s/^yoav.zibin$/Yoav Zibin/
 s/^yuriy.brun$/Yuriy Brun/
 s/^zcai$/Zhiping Cai/
