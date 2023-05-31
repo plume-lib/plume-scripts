@@ -1,6 +1,6 @@
 # Plume-Scripts:  Scripts for programming and system administration #
 
-These scripts automate various programming as sysadmin tasks.
+These scripts automate various programming and sysadmin tasks.
 
 To install, run the following (or put it at the top of a script).
 Then, the scripts are available at `/tmp/$USER/plume-scripts`.
@@ -13,7 +13,7 @@ else
 fi
 ```
 
-For versions of git before 1.8.5 that do not support the `-C` command-line argument, use:
+For versions of git before 1.8.5 (released in December 2013) that do not support the `-C` command-line argument, use:
 
 ```
 if [ -d /tmp/$USER/plume-scripts ] ; then
@@ -217,3 +217,13 @@ directory, in sorted order; then, process subdirectories recursively, in
 sorted order. This is useful for users (e.g., when printing) and for making
 output deterministic.
 [Documentation](sort-directory-order) at top of file.
+
+
+## sort-compiler-output
+
+Sorts the input errors/warnings by filename.  Works for any tool that produces
+output in the [standard
+format](https://www.gnu.org/prep/standards/html_node/Errors.html).  This is
+useful for compilers such as javac that process files in nondeterministic order.
+[Documentation](sort-compiler-output) at top of file.
+
