@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 ## Given compiler output, sorts the errors/warnings by filename.
-## Writes the sorted errors to standard out.
+## Reads from standard input, writes the sorted errors to standard out.
 ## Works for any tool that produces output in the standard format
 ## (https://www.gnu.org/prep/standards/html_node/Errors.html).
 ## This script is useful for compilers such as javac that process files in
@@ -36,9 +36,9 @@ error_start_without_groups_re = re.compile(
 )
 error_start_with_groups_re = re.compile(error_start_with_groups_string)
 
-all = sys.stdin.read()
+all_input = sys.stdin.read()
 
-chunks = re.split(error_start_without_groups_re, all)
+chunks = re.split(error_start_without_groups_re, all_input)
 prefix = chunks[0]
 chunks = chunks[1:]
 
