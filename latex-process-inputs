@@ -18,6 +18,11 @@
 #       latex-process-inputs --list main-file.tex
 #       latex-process-inputs --makefilelist main-file.tex
 #       latex-process-inputs --antlist main-file.tex
+#
+# There are other ways to obtain the list of files:
+#  * examining the .fls file created by pdflatex
+#  * running latexmk with the `-deps` command-line argument (see INPUT lines at end of output)
+#  * using a LaTeX package, but that requires editing the LaTeX source
 
 # To do:
 # This script needs to be cognizant of directories/subdirectories; it does not
