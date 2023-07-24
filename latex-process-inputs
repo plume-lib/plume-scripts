@@ -83,11 +83,14 @@ for my $line (@toplevel_lines) {
   # kill comments on the line
   $line =~ s/((^|[^\\])%).*?$/$1/;
 
-  while ($line =~ s/\\(input|include|subfile|lstinputlisting|verbatiminput)(\[.*\])?\{([-a-z0-9_\.+\/]+)\}/___TOKEN___/i) {
+  while ($line =~ s/\\(input|include|subfile|lstinputlisting|verbatiminput)(\[.*\])?\{([-a-z0-9_\.+\/]+)\}/___TOKEN___/i
+	 || $line =~ s/\\(inputminted)(\[.*\])?\{([a-z]+)\}\{([-a-z0-9_\.+\/]+)\}/___TOKEN___/i) {
     my $inputcommand = $1;
     my $verbatim_p = ($inputcommand eq "verbatiminput");
     my $lstinput_p = ($inputcommand eq "lstinputlisting");
-    my $file = "$3";
+    my $minted_p = ($inputcommand eq "inputminted");
+    my $opt_args = "$2";
+    my $file = $minted_p ? "$4" : "$3";
     if ($debug) { print STDERR "INPUT: $file\n"; }
     if (-e "$file.tex") {
       $file .= ".tex";
@@ -123,6 +126,10 @@ for my $line (@toplevel_lines) {
       $replace = "\\begin{lstlisting}\n" .
 	$replace .
 	"\\end{lstlisting}\n";
+    } elsif ($minted_p) {
+      $replace = "\\begin{minted}${opt_args}{$3}\n" .
+	$replace .
+	"\\end{minted}\n";
     } else {
       # kill comments
       $replace =~ s/([^\\]%).*?$/$1/gm;
