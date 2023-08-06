@@ -21,16 +21,7 @@ bleeding-edge HEAD, you can run `git checkout _SHA_` after the `git clone`
 command.
 
 
-## Java utilities
-
-### classfile_check_version
-
-Check that a class file's version is &leq; the specified version.
-This ensures that the class will run on a particular version of Java.
-Documentation [at top of file](classfile_check_version).
-
-
-## Shell scripting utilities
+## Shell scripting
 
 ### cronic
 
@@ -38,13 +29,13 @@ A wrapper for cron jobs so that cron only sends
 email when an error has occurred.
 Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
 
-## lint-diff.py
+### lint-diff.py
 
 Filter the ouput of tools such as `lint`, to only show output for changed
 lines in a diff or pull request.
 [Documentation](lint-diff.py) at top of file.
 
-## mail-e
+### mail-e
 
 Reads standard input, and if not empty calls the `mail` program on it.
 In other words, acts like `mail -e` and isuseful when your version of `mail` does not support `-e`.
@@ -53,7 +44,7 @@ in all versions of `mail`.
 [Documentation](mail-e)
 at top of file.
 
-## path-remove
+### path-remove
 
 Cleans up a path environment variable by removing duplicates and
 non-existent directories.
@@ -62,7 +53,7 @@ Works for either space- or colon- delimiated paths.
 [Documentation](path-remove) at top of file.
 
 
-## Continuous integration utilities
+## Continuous integration
 
 ### ci-info
 
@@ -84,7 +75,7 @@ Prints the SHA commit id corresponding to the most recent successful CI job.
 [Documentation](ci-last-success.py) at top of file.
 
 
-## Git utilities
+## Git
 
 ### ediff-merge-script
 
@@ -140,9 +131,9 @@ statements.
 [Documentation](resolve-import-conflicts) at top of file.
 
 
-### LaTeX utilities
+## LaTeX
 
-## latex-process-inputs
+### latex-process-inputs
 
 Determines all files that are recursively `\input` by a given
 LaTeX file.
@@ -185,7 +176,7 @@ archives.
 
 ## Sorting
 
-## sort-directory-order
+### sort-directory-order
 
 Sorts the input lines by directory order:  first, every file in a given
 directory, in sorted order; then, process subdirectories recursively, in
@@ -194,10 +185,19 @@ output deterministic.
 [Documentation](sort-directory-order) at top of file.
 
 
-## sort-compiler-output
+### sort-compiler-output
 
 Sorts the input errors/warnings by filename.  Works for any tool that produces
 output in the [standard
 format](https://www.gnu.org/prep/standards/html_node/Errors.html).  This is
 useful for compilers such as javac that process files in nondeterministic order.
 [Documentation](sort-compiler-output) at top of file.
+
+
+## Java
+
+### classfile_check_version
+
+Check that a class file's version is &leq; the specified version.
+This ensures that the class will run on a particular version of Java.
+Documentation [at top of file](classfile_check_version).
