@@ -1,6 +1,15 @@
 # Plume-Scripts:  Scripts for programming and system administration #
 
 These scripts automate various programming and sysadmin tasks.
+This project contains utilities for
+
+ * [Shell scripting](#shell-scripting)
+ * [Continuous integration](#continuous-integration)
+ * [Git](#git)
+ * [Search and replace](#search-and-replace)
+ * [Sorting](#sorting)
+ * [Java](#java)
+ * [LaTeX](#latex)
 
 
 ## Installation
@@ -131,23 +140,6 @@ statements.
 [Documentation](resolve-import-conflicts) at top of file.
 
 
-## LaTeX
-
-### latex-process-inputs
-
-Determines all files that are recursively `\input` by a given
-LaTeX file.
-[Documentation](latex-process-inputs) at top of file.
-The program has two modes:
-
- * Inline mode (the default):  Create a single LaTeX file for the document,
-   by inlining `\input` commands and removing comments.
-   The result is appropriate to be sent to a publisher.
- * List mode: List all the files that are (transitively) `\input`.
-   This can be useful for getting a list of source files in a logical order,
-   for example to be used in a Makefile or Ant buildfile.
-
-
 ## Search and replace
 
 ### preplace
@@ -201,3 +193,20 @@ useful for compilers such as javac that process files in nondeterministic order.
 Check that a class file's version is &leq; the specified version.
 This ensures that the class will run on a particular version of Java.
 Documentation [at top of file](classfile_check_version).
+
+
+## LaTeX
+
+### latex-process-inputs
+
+Determines all files that are recursively `\input` by a given
+LaTeX file.
+[Documentation](latex-process-inputs) at top of file.
+The program has two modes:
+
+ * Inline mode (the default):  Create a single LaTeX file for the document,
+   by inlining `\input` commands and removing comments.
+   The result is appropriate to be sent to a publisher.
+ * List mode: List all the files that are (transitively) `\input`.
+   This can be useful for getting a list of source files in a logical order,
+   for example to be used in a Makefile or Ant buildfile.
