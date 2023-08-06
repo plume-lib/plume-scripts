@@ -2,6 +2,14 @@
 
 These scripts automate various programming and sysadmin tasks.
 
+:toc:
+:toc-placement: manual
+...
+toc::[]
+
+
+## Installation
+
 To install, run the following (or put it at the top of a script).
 Then, the scripts are available at `/tmp/$USER/plume-scripts`.
 
@@ -10,16 +18,6 @@ if [ -d /tmp/$USER/plume-scripts ] ; then
   git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 else
   mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
-fi
-```
-
-For versions of git before 1.8.5 (released in December 2013) that do not support the `-C` command-line argument, use:
-
-```
-if [ -d /tmp/$USER/plume-scripts ] ; then
-  (cd /tmp/$USER/plume-scripts && git pull -q) > /dev/null 2>&1
-else
-  mkdir -p /tmp/$USER && (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
 fi
 ```
 
