@@ -1,6 +1,18 @@
 # Plume-Scripts:  Scripts for programming and system administration #
 
 These scripts automate various programming and sysadmin tasks.
+This project contains utilities for
+
+ * [Shell scripting](#shell-scripting)
+ * [Continuous integration](#continuous-integration)
+ * [Git](#git)
+ * [Search and replace](#search-and-replace)
+ * [Sorting](#sorting)
+ * [Java](#java)
+ * [LaTeX](#latex)
+
+
+## Installation
 
 To install, run the following (or put it at the top of a script).
 Then, the scripts are available at `/tmp/$USER/plume-scripts`.
@@ -13,36 +25,44 @@ else
 fi
 ```
 
-For versions of git before 1.8.5 (released in December 2013) that do not support the `-C` command-line argument, use:
-
-```
-if [ -d /tmp/$USER/plume-scripts ] ; then
-  (cd /tmp/$USER/plume-scripts && git pull -q) > /dev/null 2>&1
-else
-  mkdir -p /tmp/$USER && (cd /tmp && git clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git)
-fi
-```
-
 If you want to use a specific version of `plume-scripts` rather than the
-bleeding-edge HEAD, you can do `git checkout _SHA_` after the `git clone`
+bleeding-edge HEAD, you can run `git checkout _SHA_` after the `git clone`
 command.
 
 
-## classfile_check_version
+## Shell scripting
 
-Check that a class file's version is &leq; the specified version.
-This ensures that the class will run on a particular version of Java.
-Documentation [at top of file](classfile_check_version).
-
-
-## cronic
+### cronic
 
 A wrapper for cron jobs so that cron only sends
 email when an error has occurred.
 Documentation [at top of file](cronic) and at http://habilis.net/cronic/.
 
+### lint-diff.py
 
-## Continuous integration utilities
+Filter the ouput of tools such as `lint`, to only show output for changed
+lines in a diff or pull request.
+[Documentation](lint-diff.py) at top of file.
+
+### mail-e
+
+Reads standard input, and if not empty calls the `mail` program on it.
+In other words, acts like `mail -e` and isuseful when your version of `mail` does not support `-e`.
+This feature is useful in scripts and cron jobs, but is not supported
+in all versions of `mail`.
+[Documentation](mail-e)
+at top of file.
+
+### path-remove
+
+Cleans up a path environment variable by removing duplicates and
+non-existent directories.
+Can optionally remove certain path elements.
+Works for either space- or colon- delimiated paths.
+[Documentation](path-remove) at top of file.
+
+
+## Continuous integration
 
 ### ci-info
 
@@ -64,36 +84,7 @@ Prints the SHA commit id corresponding to the most recent successful CI job.
 [Documentation](ci-last-success.py) at top of file.
 
 
-## Cygwin utilities
-
-### cygwin-runner
-
-Takes a command with arguments and translates those arguments from
-Cygwin-style filenames into Windows-style filenames.  Its real advantage
-is the little bit of intelligence it has as far as which things are files
-and which are not.
-[Documentation](cygwin-runner) at top of file.
-
-### java-cygwin
-
-A wrapper for calling Java from Cygwin, that tries to convert any
-arguments that are Unix-style paths into Windows-style paths.
-[Documentation](java-cygwin) at top of file.
-
-### javac-cygwin
-
-A wrapper for calling the Java compiler from Cygwin, that tries to convert any
-arguments that are Unix-style paths into Windows-style paths.
-[Documentation](javac-cygwin) at top of file.
-
-### javadoc-cygwin
-
-A wrapper for calling Javadoc from Cygwin, that tries to convert any
-arguments that are Unix-style paths into Windows-style paths.
-[Documentation](javadoc-cygwin) at top of file.
-
-
-## Git utilities
+## Git
 
 ### ediff-merge-script
 
@@ -142,46 +133,11 @@ Tests whether a branch exists in a Git repository;
 prints the branch, or prints "master" if the branch does not exist.
 [Documentation](git-find-branch) at top of file.
 
+### resolve-import-conflicts
 
-## latex-process-inputs
-
-Determines all files that are recursively `\input` by a given
-LaTeX file.
-[Documentation](latex-process-inputs) at top of file.
-The program has two modes:
-
- * Inline mode (the default):  Create a single LaTeX file for the document,
-   by inlining `\input` commands and removing comments.
-   The result is appropriate to be sent to a publisher.
- * List mode: List all the files that are (transitively) `\input`.
-   This can be useful for getting a list of source files in a logical order,
-   for example to be used in a Makefile or Ant buildfile.
-
-
-## lint-diff.py
-
-Filter the ouput of tools such as `lint`, to only show output for changed
-lines in a diff or pull request.
-[Documentation](lint-diff.py) at top of file.
-
-
-## mail-e
-
-Reads standard input, and if not empty calls the `mail` program on it.
-In other words, acts like `mail -e` and isuseful when your version of `mail` does not support `-e`.
-This feature is useful in scripts and cron jobs, but is not supported
-in all versions of `mail`.
-[Documentation](mail-e)
-at top of file.
-
-
-## path-remove
-
-Cleans up a path environment variable by removing duplicates and
-non-existent directories.
-Can optionally remove certain path elements.
-Works for either space- or colon- delimiated paths.
-[Documentation](path-remove) at top of file.
+Edits files in place to resolves git conflicts that arise from Java `import`
+statements.
+[Documentation](resolve-import-conflicts) at top of file.
 
 
 ## Search and replace
@@ -210,7 +166,9 @@ searches more thoroughly:  in git-ignored files, and in compressed
 archives.
 
 
-## sort-directory-order
+## Sorting
+
+### sort-directory-order
 
 Sorts the input lines by directory order:  first, every file in a given
 directory, in sorted order; then, process subdirectories recursively, in
@@ -219,7 +177,7 @@ output deterministic.
 [Documentation](sort-directory-order) at top of file.
 
 
-## sort-compiler-output
+### sort-compiler-output
 
 Sorts the input errors/warnings by filename.  Works for any tool that produces
 output in the [standard
@@ -227,3 +185,28 @@ format](https://www.gnu.org/prep/standards/html_node/Errors.html).  This is
 useful for compilers such as javac that process files in nondeterministic order.
 [Documentation](sort-compiler-output) at top of file.
 
+
+## Java
+
+### classfile_check_version
+
+Check that a class file's version is &leq; the specified version.
+This ensures that the class will run on a particular version of Java.
+Documentation [at top of file](classfile_check_version).
+
+
+## LaTeX
+
+### latex-process-inputs
+
+Determines all files that are recursively `\input` by a given
+LaTeX file.
+[Documentation](latex-process-inputs) at top of file.
+The program has two modes:
+
+ * Inline mode (the default):  Create a single LaTeX file for the document,
+   by inlining `\input` commands and removing comments.
+   The result is appropriate to be sent to a publisher.
+ * List mode: List all the files that are (transitively) `\input`.
+   This can be useful for getting a list of source files in a logical order,
+   for example to be used in a Makefile or Ant buildfile.
