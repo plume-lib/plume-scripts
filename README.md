@@ -139,6 +139,12 @@ Edits files in place to resolves git conflicts that arise from Java `import`
 statements.
 [Documentation](resolve-import-conflicts) at top of file.
 
+### resolve-adjacent-conflicts
+
+Edits files in place to resolves git conflicts that arise from edits to
+adjacent, but not overlapping, lines.
+[Documentation](resolve-adjacent-conflicts) at top of file.
+
 
 ## Search and replace
 
