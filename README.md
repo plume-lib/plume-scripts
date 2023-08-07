@@ -5,7 +5,7 @@ This project contains utilities for
 
  * [Shell scripting](#shell-scripting)
  * [Continuous integration](#continuous-integration)
- * [Git](#git)
+ * [Git version contril](#git-version-control)
  * [Search and replace](#search-and-replace)
  * [Sorting](#sorting)
  * [Java](#java)
@@ -84,7 +84,7 @@ Prints the SHA commit id corresponding to the most recent successful CI job.
 [Documentation](ci-last-success.py) at top of file.
 
 
-## Git
+## Git version control
 
 ### ediff-merge-script
 
