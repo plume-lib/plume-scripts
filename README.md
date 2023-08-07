@@ -142,7 +142,7 @@ statements.
 ### resolve-adjacent-conflicts
 
 Edits files in place to resolves git conflicts that arise from edits to
-adjacent, but not overlapping, lines.
+adjacent lines.
 [Documentation](resolve-adjacent-conflicts) at top of file.
 
 
