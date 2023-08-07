@@ -21,12 +21,12 @@ arg_parser = ArgumentParser()
 arg_parser.add_argument("filename")
 arg_parser.add_argument(
     "--java_imports",
-    action='store_true',
+    action="store_true",
     help="If set, resolve conflicts related to Java import statements",
 )
 arg_parser.add_argument(
     "--adjacent_lines",
-    action='store_true',
+    action="store_true",
     help="If set, resolve conflicts on adjacent lines",
 )
 args = arg_parser.parse_args()
@@ -148,7 +148,8 @@ def merge(base, parent1, parent2):
     print(base, parent1, parent2)
 
     if args.java_imports:
-        if (all_import_lines(base)
+        if (
+            all_import_lines(base)
             and all_import_lines(parent1)
             and all_import_lines(parent2)
         ):
@@ -180,7 +181,9 @@ def merge_edits_on_different_lines(base, parent1, parent2):
     result = None
     if base_len == len(parent1) and base_len == len(parent2):
         result = []
-        for base_line, parent1_line, parent2_line in itertools.zip_longest(base, parent1, parent2):
+        for base_line, parent1_line, parent2_line in itertools.zip_longest(
+            base, parent1, parent2
+        ):
             print("Considering line:", base_line, parent1_line, parent2_line)
             if parent1_line == parent2_line:
                 result.append(parent1_line)
@@ -196,7 +199,6 @@ def merge_edits_on_different_lines(base, parent1, parent2):
         print("merge_edits_on_different_lines =>", result)
         return result
 
-
     ### Deletions at the beginning or end.
     if base_len != 0:
         result = merge_base_is_prefix_or_suffix(base, parent1, parent2)
@@ -204,7 +206,7 @@ def merge_edits_on_different_lines(base, parent1, parent2):
             result = merge_base_is_prefix_or_suffix(base, parent2, parent1)
         if result is not None:
             return result
-        
+
     ### Interleaved deletions, with an empty merge outcome.
     if base_len != 0:
         if issubsequence(parent1, base) and issubsequence(parent2, base):
@@ -230,7 +232,7 @@ def merge_base_is_prefix_or_suffix(base, parent1, parent2):
         if parent1[:base_len] == base:
             print("startswith", parent1, base)
             return parent2 + parent1[base_len:]
-        elif parent1[-base_len:] == base:
+        if parent1[-base_len:] == base:
             print("endswith", parent1, base)
             return parent1[:-base_len] + parent2
     return None
@@ -243,11 +245,11 @@ def issubsequence(s1, s2):
 
     n, m = len(s1), len(s2)
     i, j = 0, 0
-    while (i < n and j < m):
-        if (s1[i] == s2[j]):
+    while i < n and j < m:
+        if s1[i] == s2[j]:
             i += 1
         j += 1
- 
+
     # If i reaches end of s1, we found all characters of s1 in s2,
     # so s1 is a subsequence of s2.
     return i == n

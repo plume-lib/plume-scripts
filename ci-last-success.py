@@ -5,7 +5,8 @@ Outputs the SHA commit id corresponding to the most recent successful CI job
 that is CANDIDATE (a SHA hash) or earlier.
 Currently works only for Azure Pipelines.
 
-Requires the Python requests module to be installed.
+Requires the Python requests module to be installed, which you can do via:
+  pip install requests
 """
 
 # This does no GitHub authentication, so it is limited to 60 requests per
