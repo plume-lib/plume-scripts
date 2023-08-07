@@ -18,6 +18,13 @@
 # However, this can be run after a git mergetool that leaves conflict markers
 # in files, as the default git mergetool does.
 
+# kdiff3 can resolve some conflicts that are on adjacent lines (but not as many
+# as this script does).  kdiff3 has no way of outputting a file containing
+# conflict markers.  Invoked like this, it still goes into a GUI if there are
+# any merge conflicts that a human must resolve:  Also, the `--auto` option is
+# ignored for folder comparison.
+##   kdiff3 --auto --cs "ShowInfoDialogs=0" base.txt parent1.txt parent2.txt -o merged.txt
+
 if [ "$#" -eq 0 ] ; then
   readarray -t files < <(grep -l -r '^<<<<<<< HEAD' .)
 else
