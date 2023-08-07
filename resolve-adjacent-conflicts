@@ -12,18 +12,24 @@
 #
 # The status code is 0 (success) if all conflicts are resolved.
 # The status code is 1 (failure) if any conflict remains.
-
+#
 # This is not a git mergetool.  A git mergetool is given the base, parent 1, and
 # parent 2 files, all without conflict markers.
 # However, this can be run after a git mergetool that leaves conflict markers
 # in files, as the default git mergetool does.
 
+# Comparison to other tools
+#
+# git-hires-merge does more than this script:  it resolves non-overlapping
+# changes at the character level rather than just the line level.  Also,
+# git-hires-merge is a mergetool whereas this script is not.
+#
 # kdiff3 can resolve some conflicts that are on adjacent lines (but not as many
 # as this script does).  kdiff3 has no way of outputting a file containing
 # conflict markers.  Invoked like this, it still goes into a GUI if there are
-# any merge conflicts that a human must resolve:  Also, the `--auto` option is
-# ignored for folder comparison.
-##   kdiff3 --auto --cs "ShowInfoDialogs=0" base.txt parent1.txt parent2.txt -o merged.txt
+# any merge conflicts that a human must resolve:
+#   kdiff3 --auto --cs "ShowInfoDialogs=0" base.txt parent1.txt parent2.txt -o merged.txt
+# Also, the `--auto` option is ignored for folder comparison.
 
 if [ "$#" -eq 0 ] ; then
   readarray -t files < <(grep -l -r '^<<<<<<< HEAD' .)
