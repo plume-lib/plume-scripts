@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script edits files in place to resolve conflict markers related to Java
-# imports.  The output includes every `import` statements that is in either of
+# imports.  The output includes every `import` statement that is in either of
 # the parents.  This script leaves other conflict markers untouched.
 # Usage:
 #   resolve-import-conflicts [file ...]

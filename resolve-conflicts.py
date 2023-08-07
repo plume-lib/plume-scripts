@@ -2,11 +2,12 @@
 
 """Edits a file in place to remove certain conflict markers.
 
+Usage: resolve-conflicts.py [options] <filenme>
+
 --java_imports: Resolves conflicts related to Java import statements
 The output includes every `import` statements that is in either of the parents.
 
 --adjacent_lines: Resolves conflicts on adjacent lines, by accepting both edits.
-
 """
 
 from argparse import ArgumentParser
