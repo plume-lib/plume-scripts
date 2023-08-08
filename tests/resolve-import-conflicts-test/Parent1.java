@@ -1,11 +1,11 @@
-import a;
-import b1;
-import c;
-import e;
-import g;
-import h;
-import i;
-import k;
-import l;
+import x.a;
+import x.b1;
+import x.c;
+import x.e;
+import x.g;
+import x.h;
+import x.i;
+import x.k;
+import x.l;
 
 class C {}
