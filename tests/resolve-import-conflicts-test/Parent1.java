@@ -7,3 +7,5 @@ import h;
 import i;
 import k;
 import l;
+
+class C {}

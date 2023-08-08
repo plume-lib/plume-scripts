@@ -102,3 +102,5 @@ import w___;
 import x___;
 import y___;
 import z___;
+
+class C {}

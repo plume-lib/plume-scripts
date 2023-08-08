@@ -12,3 +12,5 @@ import i;
 import k;
 import j;
 import l;
+
+class C {}
