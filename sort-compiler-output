@@ -11,11 +11,18 @@
 
 ## TODO: Need to sort *numerically*, not *lexicographically*, for line and column numbers.
 
+import os
 import re
 import sys
 
 from operator import itemgetter
 from itertools import groupby
+
+## TODO: permit reading from stdin *or* a file on the command line.
+## https://stackoverflow.com/questions/7576525/
+if len(sys.argv) != 1:
+    print(os.path.basename(__file__) + ": Do not pass arguments, use stdin and stdout.")
+    sys.exit(1)
 
 error_start_without_groups_string = (
     r"("
