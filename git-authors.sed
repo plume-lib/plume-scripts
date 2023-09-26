@@ -1,3 +1,8 @@
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 # This file converts authors found in a git history into full names.
 # It is necessary primarily when people have not configured git properly.
 

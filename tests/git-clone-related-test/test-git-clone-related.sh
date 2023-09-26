@@ -1,5 +1,10 @@
 #!/bin/sh
 
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 # Test one invocation of git-clone-related
 
 # arguments:

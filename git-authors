@@ -1,5 +1,10 @@
 #!/bin/sh
 
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 # Outputs a list of authors of commits, for the git repository where this is run.
 # The output contains one name per line, in alphabetical order by first name.
 

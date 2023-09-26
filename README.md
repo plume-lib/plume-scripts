@@ -1,4 +1,4 @@
-# Plume-Scripts:  Scripts for programming and system administration #
+# Plume-Scripts:  Scripts for programming and system administration
 
 These scripts automate various programming and sysadmin tasks.
 This project contains utilities for
@@ -136,15 +136,20 @@ Tests whether a branch exists in a Git repository;
 prints the branch, or prints "master" if the branch does not exist.
 [Documentation](git-find-branch) at top of file.
 
-### resolve-import-conflicts
+### resolve-conflicts.py
 
-Edits files in place to resolves git conflicts that arise from Java `import`
+Edits files in place to resolve git conflicts.
+[Documentation](resolve-conflicts.py) at top of file.
+
+#### resolve-import-conflicts
+
+Edits files in place to resolve git conflicts that arise from Java `import`
 statements.
 [Documentation](resolve-import-conflicts) at top of file.
 
-### resolve-adjacent-conflicts
+#### resolve-adjacent-conflicts
 
-Edits files in place to resolves git conflicts that arise from edits to
+Edits files in place to resolve git conflicts that arise from edits to
 adjacent lines.
 [Documentation](resolve-adjacent-conflicts) at top of file.
 

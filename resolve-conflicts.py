@@ -1,5 +1,10 @@
 #! /usr/bin/env python
 
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 """Edits a file in place to remove certain conflict markers.
 
 Usage: resolve-conflicts.py [options] <filenme>

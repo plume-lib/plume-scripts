@@ -1,5 +1,10 @@
 #!/bin/sh
 
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 # Usage:  git-find-branch REPO_URL BRANCH ...
 # Prints either the first BRANCH that exists in REPO_URL,
 # or else prints the default branch name if none of the given branches exists.

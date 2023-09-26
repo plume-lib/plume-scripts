@@ -1,5 +1,10 @@
 #!/bin/bash
 
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 ## USAGE:
 ## To make this be invoked when you run `git mergetool`, add the following
 ## to your git configuration file, such as ~/.gitconfig :

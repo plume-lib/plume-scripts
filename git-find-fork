@@ -1,5 +1,10 @@
 #!/bin/sh
 
+###
+### This script has been moved to the git-scripts repository:
+### https://github.com/plume-lib/git-scripts
+###
+
 # find-git-fork:  finds a fork of a GitHub repository, or returns the upstream
 #   repository if the fork does not exist.
 # Usage:  find-git-fork ORG UPSTREAM_ORG REPONAME
