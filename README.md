@@ -89,6 +89,9 @@ Prints the SHA commit id corresponding to the most recent successful CI job.
 
 ## Git version control
 
+**The maintained version of these scripts is in https://github.com/plume-lib/git-scripts.
+The scripts will be removed from the plume-scripts repository in the future.**
+
 ### ediff-merge-script
 
 A script for use as a git mergetool; runs Emacs ediff as the mergetool.
