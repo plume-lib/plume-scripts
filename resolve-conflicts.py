@@ -52,7 +52,7 @@ if args.blank_lines:
 if args.java_imports:
     num_options += 1
 if num_options != 1:
-    print("Supply exactly one option")
+    print("resolve-conflicts.py: supply exactly one option.")
     sys.exit(1)
 
 with open(filename) as file:
