@@ -10,5 +10,3 @@ tests/lint-diff-test/words2-lint-pruned.txt-nofilename
 tests/lint-diff-test/words2-lint.txt
 tests/lint-diff-test/words2.txt
 tests/sort-compiler-output-test/errors1-sorted.actual
-tests/resolve-adjacent-conflicts-test/Merged.java
-tests/resolve-adjacent-conflicts-test/MergedByGit.java

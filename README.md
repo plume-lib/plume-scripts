@@ -139,17 +139,24 @@ Tests whether a branch exists in a Git repository;
 prints the branch, or prints "master" if the branch does not exist.
 [Documentation](git-find-branch) at top of file.
 
+### resolve-adjacent-conflicts
+
+Edits files in place to resolve git conflicts that arise from edits to
+adjacent lines.
+[Documentation](resolve-adjacent-conflicts) at top of file.
+
+### resolve-blank-lines
+
+Edits files in place to resolve git conflicts that arise from differences in
+blank lines and whitespace.
+[Documentation](resolve-blank-lines) at top of file.
+
 ### resolve-import-conflicts
 
 Edits files in place to resolve git conflicts that arise from Java `import`
 statements.
 [Documentation](resolve-import-conflicts) at top of file.
 
-### resolve-adjacent-conflicts
-
-Edits files in place to resolve git conflicts that arise from edits to
-adjacent lines.
-[Documentation](resolve-adjacent-conflicts) at top of file.
 
 
 ## Search and replace
