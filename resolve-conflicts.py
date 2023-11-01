@@ -3,15 +3,18 @@
 """Edits a file in place to remove certain conflict markers.
 
 Usage: resolve-conflicts.py [options] <filenme>
-Only one option is acted upon.  You can run the program multiple times, though.
+Only one option is acted upon.  To address multiple types of conflict markers,
+run the program more than once.
 
---java_imports: Resolves conflicts related to Java import statements
-The output includes every `import` statements that is in either of the parents.
+--adjacent_lines: Resolves conflicts on adjacent lines, by accepting both edits.
+This is like the behavior of SVN and darcs, but different than the default
+behavior of Git, Mercurial, and Bazaar.
 
 --blank_lines: Resolves conflicts due to blank lines.
 If "ours" and "theirs" differ only in whitespace (including blank lines), then accept "ours".
 
---adjacent_lines: Resolves conflicts on adjacent lines, by accepting both edits.
+--java_imports: Resolves conflicts related to Java import statements
+The output includes every `import` statements that is in either of the parents.
 """
 
 from argparse import ArgumentParser
