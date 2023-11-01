@@ -1,4 +1,4 @@
-PROGRAM=../../resolve-adjacent-conflicts
+PROGRAM=../../resolve-blank-lines
 
 diff: MergedGoal.java Merged.java
 	diff -u $^
