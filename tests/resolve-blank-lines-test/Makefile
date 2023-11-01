@@ -9,12 +9,12 @@ clean:
 .PHONY: Merged.java
 Merged.java: Parent1.java Base.java Parent2.java
 	-git merge-file -q -p $^ > $@
-	${PROGRAM} $@
+	-${PROGRAM} $@
 
 .PHONY: resolve
 resolve:
 	mv -f MergedByGit.java Merged.java
-	${PROGRAM} Merged.java
+	-${PROGRAM} Merged.java
 
 MergedByGit.java: Parent1.java Base.java Parent2.java
 	-git merge-file -q  -p $^ > $@

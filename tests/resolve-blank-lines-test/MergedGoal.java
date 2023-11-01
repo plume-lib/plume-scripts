@@ -1,58 +1,62 @@
-// Modifications
 import x.a;
-import x.bmodified;
-import x.cmodified;
-import x.d;
-import x.emodified;
-import x.fmodified;
-import x.g;
-import x.hmodified;
-import x.imodified;
-import x.jmodified;
-import x.kmodified;
-import x.l;
-import x.mmodified;
-import x.nmodified;
-import x.omodified;
-import x.p;
-import x.qmodified;
-import x.rmodified;
-import x.smodified;
-import x.tmodified;
-import x.u;
-import x.vmodified;
-import x.wmodified;
-import x.xmodified;
-import x.ymodified;
-import x.zmodified;
 
-// Additions
+import x.bnew;
+
+import x.c;
+import x.d;
+import x.e;
+import x.f;
+
+import x.gnew;
+
+import x.h;
+import x.i;
+import x.j;
+import x.k;
+import x.lnew;
+
+import x.m;
+import x.n;
+import x.o;
+import x.p;
+import x.q;
+import x.r;
+import x.snew;
+
+import x.tnew;
+
+import x.unew;
+
+import x.v;
+import x.w;
+import x.x;
+import x.y;
+import x.z;
+
 import x.a_;
 import x.b_;
-<<<<<<< Parent1.java
-import x.b_added1;
-import x.b_added2;
-||||||| Base.java
-=======
-import x.b_added3;
->>>>>>> Parent2.java
 import x.c_;
-import x.d_modified;
-import x.d_added;
+
+<<<<<<< Parent1.java
+import x.d_different1;
+||||||| Base.java
+import x.d_;
+=======
+import x.d_different2;
+>>>>>>> Parent2.java
+
 import x.e_;
 import x.f_;
-import x.f_added;
-import x.g_modified;
+import x.g_;
 import x.h_;
 import x.i_;
-import x.i_added;
-import x.k_;
-import x.k_added;
+import x.j_;import x.k_;
+import x.l_;
 import x.m_;
 import x.n_;
-import x.n_added1;
-import x.n_added2;
-import x.n_added3;
+import x.o_;
+import x.p_;
+import x.q_;
 import x.r_;
 import x.s_;
 import x.t_;
@@ -63,12 +67,30 @@ import x.x_;
 import x.y_;
 import x.z_;
 
-// Deletions
 import x.a__;
+import x.b__;
+import x.c__;
 import x.d__;
+import x.e__;
+import x.f__;
 import x.g__;
+import x.h__;
+import x.i__;
+import x.j__;
+import x.k__;
+import x.l__;
 import x.m__;
+import x.n__;
+import x.o__;
+import x.p__;
+import x.q__;
 import x.r__;
+import x.s__;
+import x.t__;
+import x.u__;
+import x.v__;
+import x.w__;
+import x.x__;
 import x.y__;
 import x.z__;
 

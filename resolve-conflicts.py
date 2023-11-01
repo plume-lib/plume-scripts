@@ -174,8 +174,9 @@ def merge(base, parent1, parent2):
             return adjacent_line_merge
 
     if args.blank_lines:
-        # TODO
-        pass
+        blank_line_merge = merge_blank_lines(base, parent1, parent2)
+        if blank_line_merge is not None:
+            return blank_line_merge
 
     if args.java_imports:
         if (
@@ -248,6 +249,8 @@ def merge_base_is_prefix_or_suffix(base, parent1, parent2):
     this because there is no common line in base and parent2.  If there were, it
     would also be in parent1, and the hunk would have been split into two at the
     common line that's in all three texts.)
+    [TODO: Maybe it wouldn't be split because there's only one common line, but
+    the diff context is larger.  Check this.]
     We know the relative position of the additions in parent1.
     """
     base_len = len(base)
@@ -278,6 +281,26 @@ def issubsequence(s1, s2):
     # If i reaches end of s1, we found all characters of s1 in s2,
     # so s1 is a subsequence of s2.
     return i == n
+
+
+def merge_blank_lines(base, parent1, parent2):
+    "Returns parent1 if parent1 and parent2 differ only in whitespace."
+    parent1_string = without_whitespace(parent1)
+    parent2_string = without_whitespace(parent2)
+    if parent1_string == parent2_string:
+        return parent1
+    return None
+
+
+def without_whitespace(lines):
+    "Turns a list of strings into a single string without whitespace."
+    # This could be more efficient.  Even better, I could write a loop in
+    # merge_blank_lines that wouldn't need to create new strings at all.
+    # But this is expedient to write.
+    result_lines = []
+    for line in lines:
+        result_lines += line.split()
+    return "".join(result_lines)
 
 
 if __name__ == "__main__":
