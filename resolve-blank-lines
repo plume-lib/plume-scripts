@@ -4,7 +4,7 @@
 # differences are only in whitespace, including blank lines.  This script
 # leaves other conflict markers untouched.
 # Usage:
-#   resolve-adjacent-conflicts [file ...]
+#   resolve-blank-lines [file ...]
 #
 # The script works on all files given on the command line.
 # If none are given, the script works on all files in or under the current directory.

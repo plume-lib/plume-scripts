@@ -145,13 +145,11 @@ Edits files in place to resolve git conflicts that arise from edits to
 adjacent lines.
 [Documentation](resolve-adjacent-conflicts) at top of file.
 
-
-### resolve-import-conflicts
+### resolve-blank-lines
 
 Edits files in place to resolve git conflicts that arise from differences in
 blank lines and whitespace.
 [Documentation](resolve-blank-lines) at top of file.
-
 
 ### resolve-import-conflicts
 
