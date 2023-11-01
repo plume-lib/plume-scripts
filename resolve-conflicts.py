@@ -248,9 +248,8 @@ def merge_base_is_prefix_or_suffix(base, parent1, parent2):
     deleted all the lines, possibly replacing them by something else.  (We know
     this because there is no common line in base and parent2.  If there were, it
     would also be in parent1, and the hunk would have been split into two at the
-    common line that's in all three texts.)
-    [TODO: Maybe it wouldn't be split because there's only one common line, but
-    the diff context is larger.  Check this.]
+    common line that's in all three texts.  The Git Merge output doesn't include
+    any common context lines within the conflict markers.)
     We know the relative position of the additions in parent1.
     """
     base_len = len(base)
