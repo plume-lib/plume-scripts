@@ -1,16 +1,15 @@
 #! /usr/bin/env python
 
-###
-### This script has been moved to the git-scripts repository:
-### https://github.com/plume-lib/git-scripts
-###
-
 """Edits a file in place to remove certain conflict markers.
 
 Usage: resolve-conflicts.py [options] <filenme>
+Only one option is acted upon.  You can run the program multiple times, though.
 
 --java_imports: Resolves conflicts related to Java import statements
 The output includes every `import` statements that is in either of the parents.
+
+--blank_lines: Resolves conflicts due to blank lines.
+If "ours" and "theirs" differ only in whitespace (including blank lines), then accept "ours".
 
 --adjacent_lines: Resolves conflicts on adjacent lines, by accepting both edits.
 """
@@ -30,6 +29,11 @@ arg_parser.add_argument(
     help="If set, resolve conflicts related to Java import statements",
 )
 arg_parser.add_argument(
+    "--blank_lines",
+    action="store_true",
+    help="If set, resolve conflicts due to blank lines",
+)
+arg_parser.add_argument(
     "--adjacent_lines",
     action="store_true",
     help="If set, resolve conflicts on adjacent lines",
@@ -39,6 +43,17 @@ args = arg_parser.parse_args()
 # Global variables: `filename` and `lines`.
 
 filename = args.filename
+
+num_options = 0
+if args.adjacent_lines:
+    num_options += 1
+if args.blank_lines:
+    num_options += 1
+if args.java_imports:
+    num_options += 1
+if num_options != 1:
+    print("Supply exactly one option")
+    sys.exit(1)
 
 with open(filename) as file:
     lines = file.readlines()
@@ -150,7 +165,14 @@ def merge(base, parent1, parent2):
         a list of lines, or None if it cannot do merging.
     """
 
-    print(base, parent1, parent2)
+    if args.adjacent_lines:
+        adjacent_line_merge = merge_edits_on_different_lines(base, parent1, parent2)
+        if adjacent_line_merge is not None:
+            return adjacent_line_merge
+
+    if args.blank_lines:
+        # TODO
+        pass
 
     if args.java_imports:
         if (
@@ -160,11 +182,6 @@ def merge(base, parent1, parent2):
         ):
             # A simplistic merge that retains all import lines in either parent.
             return list(set(parent1 + parent2)).sort()
-
-    if args.adjacent_lines:
-        adjacent_line_merge = merge_edits_on_different_lines(base, parent1, parent2)
-        if adjacent_line_merge is not None:
-            return adjacent_line_merge
 
     return None
 
