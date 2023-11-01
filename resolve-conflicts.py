@@ -284,22 +284,21 @@ def issubsequence(s1, s2):
 
 def merge_blank_lines(base, parent1, parent2):
     "Returns parent1 if parent1 and parent2 differ only in whitespace."
-    parent1_string = without_whitespace(parent1)
-    parent2_string = without_whitespace(parent2)
-    if parent1_string == parent2_string:
+    if with_one_space(parent1) == with_one_space(parent2):
         return parent1
     return None
 
 
-def without_whitespace(lines):
-    "Turns a list of strings into a single string without whitespace."
-    # This could be more efficient.  Even better, I could write a loop in
-    # merge_blank_lines that wouldn't need to create new strings at all.
-    # But this is expedient to write.
+def with_one_space(lines):
+    """Turns a list of strings into a single string, with each run of whitespace replaced
+    by a single space."""
+    # TODO: This could be more efficient.  Even better, I could write a loop in
+    # merge_blank_lines that wouldn't need to create new strings at all. But this is
+    # expedient to write and is probably fast enough.
     result_lines = []
     for line in lines:
         result_lines += line.split()
-    return "".join(result_lines)
+    return " ".join(result_lines)
 
 
 if __name__ == "__main__":
