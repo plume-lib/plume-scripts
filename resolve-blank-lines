@@ -1,4 +1,5 @@
 #!/bin/bash
+# bash, not POSIX sh, because of "readarray".
 
 # This script edits files in place to resolve conflict markers in which the
 # differences are only in whitespace, including blank lines.  This script
@@ -9,8 +10,8 @@
 # The script works on all files given on the command line.
 # If none are given, the script works on all files in or under the current directory.
 #
-# The status code is 0 (success) if all conflicts are resolved.
-# The status code is 1 (failure) if any conflict remains.
+# The exit status code is 0 (success) if all conflicts are resolved.
+# The exit status code is 1 (failure) if any conflict remains.
 #
 # This is not a git mergetool.  A git mergetool is given the base, parent 1, and
 # parent 2 files, all without conflict markers.
