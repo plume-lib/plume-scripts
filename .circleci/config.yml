@@ -3,7 +3,7 @@ jobs:
   build:
 
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.12
 
     steps:
 
@@ -18,8 +18,9 @@ jobs:
           paths:
             - ".git"
 
-      - run: pip3 install black
-      - run: pip3 install pylint
+      - run: pip install black
+      - run: pip install pylint
+      - run: pip install requests
       - run: sudo apt-get update
       - run: sudo apt-get -y install shellcheck devscripts
 
