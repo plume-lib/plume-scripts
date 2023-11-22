@@ -32,7 +32,7 @@ startdir=$(mktemp -d 2>/dev/null || mktemp -d -t 'startdir')
 goaldir=$(mktemp -d 2>/dev/null || mktemp -d -t 'goaldir')
 rm -rf "$startdir" "$goaldir"
 
-git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch --depth 1
+git clone --branch "$START_BRANCH" "$START_REPO" "$startdir" -q --single-branch --filter=blob:none
 # $ARGS should not be quoted
 # shellcheck disable=SC2086
 (cd "$startdir" && "${PLUME_SCRIPTS}"/git-clone-related $ARGS "$goaldir")

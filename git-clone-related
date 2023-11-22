@@ -30,7 +30,7 @@
 #     If it exists, it is updated via "git pull", without changing its fork
 #     or branch.  No error is issued if the pull fails.
 #   GIT_CLONE_ARGS is extra arguments to git clone.  It defaults to
-#     "-q --single-branch --depth 1" (without the quotes).
+#     "-q --single-branch --filter=blob:none" (without the quotes).
 #     It is not used if the destination already exists.
 #
 # When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
@@ -80,7 +80,7 @@ else
   DESTINATION=../${REPO_NAME}
 fi
 if [ "$#" -eq 0 ]; then
-  set -- -q --single-branch --depth 1
+  set -- -q --single-branch --filter=blob:none
 fi
 
 echo "In directory $(pwd) :"

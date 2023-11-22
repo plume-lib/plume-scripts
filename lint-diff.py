@@ -28,7 +28,7 @@
 #    git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 #  else
 #    mkdir -p /tmp/$USER \
-#      && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+#      && git -C /tmp/$USER clone --filter=blob:none -q https://github.com/plume-lib/plume-scripts.git
 #  fi
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt

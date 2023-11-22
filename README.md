@@ -21,7 +21,7 @@ Then, the scripts are available at `/tmp/$USER/plume-scripts`.
 if [ -d /tmp/$USER/plume-scripts ] ; then
   git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 else
-  mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+  mkdir -p /tmp/$USER && git -C /tmp/$USER clone --filter=blob:none -q https://github.com/plume-lib/plume-scripts.git
 fi
 ```
 
@@ -122,7 +122,7 @@ Here is how to accomplish that:
   if [ -d "/tmp/$USER/plume-scripts" ] ; then
     git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
   else
-    mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth 1 -q https://github.com/plume-lib/plume-scripts.git
+    mkdir -p /tmp/$USER && git -C /tmp/$USER clone --filter=blob:none -q https://github.com/plume-lib/plume-scripts.git
   fi
   /tmp/$USER/plume-scripts/git-clone-related codespecs fjalar
 ```
