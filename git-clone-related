@@ -128,7 +128,7 @@ else
   fi
   echo "git clone -b ${REPO_BRANCH} $* ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
-  git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
-    || (sleep 60 && git clone -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}")
+  git clone --filter=blob:none -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
+    || (sleep 60 && git clone--filter=blob:none -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}")
 fi
 echo "Done in directory ${DESTINATION} : $(cd "${DESTINATION}" && git rev-parse HEAD)"
