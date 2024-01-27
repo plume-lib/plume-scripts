@@ -104,6 +104,9 @@ Lists all the authors of commits in a get repository.
 
 ### git-clone-related
 
+This script has been superseded by `git-clone-related`
+in the [git-scripts](https://github.com/plume-lib/git-scripts) repository.
+
 Clones a repository related to the one where this script is called, trying
 to match the fork and branch.
 Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.

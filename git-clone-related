@@ -30,7 +30,7 @@
 #     If it exists, it is updated via "git pull", without changing its fork
 #     or branch.  No error is issued if the pull fails.
 #   GIT_CLONE_ARGS is extra arguments to git clone.  It defaults to
-#     "-q --single-branch --filter=blob:none" (without the quotes).
+#     "-q --single-branch --depth 1" (without the quotes).
 #     It is not used if the destination already exists.
 #
 # When invoked from within a clone of MYORG/MYREPO, at branch MYBRANCH,
@@ -44,13 +44,16 @@
 echo "This is an outdated git-clone-related from the plume-scripts repository."
 echo "Please use git-clone-related from https://github.com/plume-lib/git-scripts ."
 
+# Do not attempt to add "--filter=blob:none" to the git command, as older git
+# clients (apparently including GitHub, as of 2024-01-27) do not support it.
+
 # Fail if any command fails.
 set +e
 
 if [ "$1" = "--debug" ] ; then
   DEBUG=1
   shift
-  set +x
+  set -x
 fi
 
 # FALLBACK_BRANCH may be unset.
@@ -83,7 +86,11 @@ else
   DESTINATION=../${REPO_NAME}
 fi
 if [ "$#" -eq 0 ]; then
-  set -- -q --single-branch --filter=blob:none
+  set -- -q --single-branch --depth 1
+fi
+
+if [ -n "$DEBUG" ] ; then
+  echo "Entering git-clone-related $UPSTREAM_ORG $REPO_NAME $DESTINATION $*"
 fi
 
 echo "In directory $(pwd) :"
@@ -96,14 +103,29 @@ if [ -d "${DESTINATION}" ]; then
 else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
+  CI_INFO="$SCRIPTDIR/../plume-scripts/ci-info"
+  if [ ! -f "$CI_INFO" ] ; then
+    CI_INFO="$SCRIPTDIR/../.plume-scripts/ci-info"
+  fi
+  if [ ! -f "$CI_INFO" ] ; then
+    CI_INFO="$SCRIPTDIR/.plume-scripts/ci-info"
+  fi
+  if [ ! -f "$CI_INFO" ] ; then
+    (cd "$SCRIPTDIR" && git clone --depth 1 https://github.com/plume-lib/plume-scripts .plume-scripts)
+  fi
+  if [ ! -f "$CI_INFO" ] ; then
+    echo "CI_INFO does not exist: $CI_INFO"
+    exit 1
+  fi
+
   if [ -n "$DEBUG" ] ; then
     echo "About to run ci-info --debug"
-    "${SCRIPTDIR}/ci-info" --debug "${UPSTREAM_ORG}"
+    "${CI_INFO}" --debug "${UPSTREAM_ORG}"
     echo "Ran ci-info --debug"
     echo "About to run ci-info"
   fi
 
-  eval "$("${SCRIPTDIR}"/ci-info "${UPSTREAM_ORG}")"
+  eval "$("${CI_INFO}" "${UPSTREAM_ORG}")"
   if [ -n "$DEBUG" ] ; then
     echo "Finished running ci-info"
   fi
