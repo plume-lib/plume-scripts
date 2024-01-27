@@ -41,6 +41,9 @@
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
+echo "This is an outdated git-clone-related from the plume-scripts repository."
+echo "Please use git-clone-related from https://github.com/plume-lib/git-scripts ."
+
 # Fail if any command fails.
 set +e
 
@@ -128,7 +131,7 @@ else
   fi
   echo "git clone -b ${REPO_BRANCH} $* ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.
-  git clone --filter=blob:none -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
-    || (sleep 60 && git clone--filter=blob:none -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}")
+  git clone --depth 1 -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}" \
+    || (sleep 60 && git clone --depth 1 -b "${REPO_BRANCH}" "$@" "${REPO_URL}" "${DESTINATION}")
 fi
 echo "Done in directory ${DESTINATION} : $(cd "${DESTINATION}" && git rev-parse HEAD)"
