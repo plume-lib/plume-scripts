@@ -132,6 +132,7 @@ s/^MichalStehlikCz$/Michal Stehlik/
 s/^sullis$/Sean C. Sullivan/
 s/^szhang$/Sai Zhang/
 s/^tamier$/Mier Ta/
+s/^nod694$/Hamed Taghani/
 s/^ten3$/Tatyana Nikolova/
 s/^todd.schiller$/Todd Schiller/
 s/^tohn$/Toh Ne Win/
