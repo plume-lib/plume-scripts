@@ -1,9 +1,16 @@
 /randoop/src/main/java/randoop/main/Help.java:16: missing documentation for Help
 /randoop/src/main/java/randoop/main/Help.java:95: missing documentation for introMessage
 /randoop/src/main/java/randoop/main/Main.java:18: missing documentation for handlers
+  a continuation line about handlers
 /randoop/src/main/java/randoop/main/Main.java:27: missing documentation for baz
+  a continuation line about baz
+  another continuation line about baz
+  one more continuation line about baz
 /randoop/src/main/java/randoop/main/Main.java:30: missing documentation for main
+  a continuation line about main
 /randoop/src/main/java/randoop/main/Main.java:41: missing documentation for nonStaticMain
+  a continuation line about nonStaticMain
 /randoop/src/main/java/randoop/main/Main.java:135: missing documentation for foo
 /randoop/src/main/java/randoop/main/RandoopClassNameError.java:7: missing documentation for className
+  a continuation line about className
 /randoop/src/main/java/randoop/main/RandoopClassNameError.java:9: missing documentation for RandoopClassNameError

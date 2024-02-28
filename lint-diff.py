@@ -50,7 +50,10 @@ DEBUG = False
 
 PLUSPLUSPLUS_RE = re.compile(r"\+\+\+ (\S*).*")
 
+# This cannot be multiline because files are read one line at a time.
 FILENAME_LINENO_RE = re.compile("([^:]*):([0-9]+):.*")
+
+INITIAL_WHITESPACE_RE = re.compile("[ \t]")
 
 
 def eprint(*args, **kwargs):
@@ -391,8 +394,15 @@ def main():
 
     # 1 if this produced any output, 0 if not
     status = 0
+    # true if we just printed a warning and are looking for continuation lines to print
+    print_multiline_warning = False
 
     for warning_line in warnings:
+        if print_multiline_warning and INITIAL_WHITESPACE_RE.match(warning_line):
+            print(warning_line, end="")
+            continue
+        print_multiline_warning = False
+
         match = FILENAME_LINENO_RE.match(warning_line)
         if match:
             try:
@@ -422,6 +432,7 @@ def main():
             if filename in changed and lineno in changed[filename]:
                 print(warning_line, end="")
                 status = 1
+                print_multiline_warning = True
 
     if warnings is not sys.stdin:
         warnings.close
