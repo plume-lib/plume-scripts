@@ -25,10 +25,10 @@
 # that pull requests satisfy the command `command-that-issues-warnings`:
 #
 #  if [ -d /tmp/$USER/plume-scripts ] ; then
-#    git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
+#   git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 #  else
-#    mkdir -p /tmp/$USER \
-#      && git -C /tmp/$USER clone --filter=blob:none -q https://github.com/plume-lib/plume-scripts.git
+#   mkdir -p /tmp/$USER \
+#    && git -C /tmp/$USER clone --filter=blob:none -q https://github.com/plume-lib/plume-scripts.git
 #  fi
 # (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 # /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt
