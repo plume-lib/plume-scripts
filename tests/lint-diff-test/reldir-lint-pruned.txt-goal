@@ -1,2 +1,5 @@
 /randoop/src/main/java/randoop/main/Main.java:27: missing documentation for baz
+  a continuation line about baz
+  another continuation line about baz
+  one more continuation line about baz
 /randoop/src/main/java/randoop/main/Main.java:135: missing documentation for foo
