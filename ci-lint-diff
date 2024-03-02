@@ -66,20 +66,20 @@ if ! git cat-file -e "${CI_COMMIT_RANGE_END}^{commit}" ; then
 fi
 
 set +e
-rm -rf /tmp/diff.txt
-echo "git diff $CI_COMMIT_RANGE > /tmp/diff.txt"
-git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > /tmp/diff.txt 2>&1
+diff_file=$(mktemp /tmp/diff-XXXXXX.txt)
+echo "git diff $CI_COMMIT_RANGE > $diff_file"
+git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2>&1
 git_status=$?
 if [ $git_status -gt 1 ] ; then
   CI_LINT_DIFF_ERROR="git diff exited with status $git_status"
-  cat /tmp/diff.txt
+  cat "$diff_file"
   git --no-pager diff --exit-code "$CI_COMMIT_RANGE"
   git --no-pager branch -a
   git --no-pager diff "$CI_COMMIT_RANGE"
-elif [ ! -r /tmp/diff.txt ] ; then
-  CI_LINT_DIFF_ERROR="/tmp/diff.txt does not exist"
+elif [ ! -r "$diff_file" ] ; then
+  CI_LINT_DIFF_ERROR="$diff_file does not exist"
 fi
-if [ ! -s /tmp/diff.txt ] ; then
+if [ ! -s "$diff_file" ] ; then
   CI_LINT_DIFF_ERROR="ERROR: Empty diff for $CI_COMMIT_RANGE.
 Try pulling base branch (often main or master) into compare branch (often your feature branch).
 Other causes of an empty diff include:
@@ -167,11 +167,11 @@ if [ "$DEBUG" = "--debug" ] ; then
     echo "warnings file $WARNINGSFILE:"
     cat "$WARNINGSFILE"
     echo "end of warnings file $WARNINGSFILE."
-    echo "/tmp/diff.txt file:"
-    cat /tmp/diff.txt
-    echo "end of /tmp/diff.txt file."
+    echo "$diff_file file:"
+    cat "$diff_file"
+    echo "end of $diff_file file."
 fi
 
 set -e
 
-"${SCRIPTDIR}"/lint-diff.py $DEBUG --guess-strip /tmp/diff.txt "$WARNINGSFILE"
+"${SCRIPTDIR}"/lint-diff.py $DEBUG --guess-strip "$diff_file" "$WARNINGSFILE"
