@@ -18,6 +18,8 @@
 #              Affects matching, but not output, of lines.
 #          --context=N is how many lines adjacent to the changed ones
 #              are also considered changed; the default is 2.
+#          --methodwise means that if a Java method's body is changed, then show
+#              output for every line in the method, not just the changed lines.
 #          --debug means to print diagnostic output.
 
 # Here is how you could use this in continuous integration (Azure Pipelines,
@@ -240,6 +242,13 @@ def parse_args():
         type=int,
         default=2,
         help="how many lines around each changed one are also considered changed",
+    )
+    parser.add_argument(
+        "--methodwise",
+        dest="methodwise
+        action="store_true",
+        default=False,
+        help="whether to report all warnings in a changed method",
     )
     parser.add_argument(
         "--debug", dest="DEBUG", action="store_true", help="print diagnostic output"
