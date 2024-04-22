@@ -124,8 +124,8 @@ if (scalar(@ARGV) == 0) {
   push @ARGV, ".";
 }
 
-# Must pass an absolute filename, not ".", to collect, because "-e", "-f",
-# etc. fail if a filename starts with "./" and contains any other "/".
+# Must pass an absolute filename, not ".", to collect(), because flags like "-e"
+# and "-f" fail if a filename starts with "./" and contains any other "/".
 my $pwd = `pwd`;
 chomp($pwd);
 
@@ -179,7 +179,8 @@ foreach my $file (@filelist) {
     } else {
       die "Cannot choose delimiter; regexes use too many special characters";
     }
-    # quote $file in case it contains whitespace
+    # Quote $file in case it contains whitespace.
+    # Unfortunately, if the from or to regex contains a single quote, then the command is mangled.
     my $command = "perl -pi$backupsuffix -e 'use strict; s$delimiter$fromregex$delimiter$toregex${delimiter}g' '$file'";
     if ($debug) {
       print STDERR "command: $command\n";
