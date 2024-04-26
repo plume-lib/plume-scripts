@@ -4,6 +4,8 @@
 ### This script has been moved to the git-scripts repository:
 ### https://github.com/plume-lib/git-scripts
 ###
+echo "Please use $0 from https://github.com/plume-lib/git-scripts ."
+echo "You are using an obsolete version from https://github.com/plume-lib/plume-scripts ."
 
 # Outputs a list of authors of commits, for the git repository where this is run.
 # The output contains one name per line, in alphabetical order by first name.

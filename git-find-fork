@@ -4,6 +4,8 @@
 ### This script has been moved to the git-scripts repository:
 ### https://github.com/plume-lib/git-scripts
 ###
+echo "Please use $0 from https://github.com/plume-lib/git-scripts ."
+echo "You are using an obsolete version from https://github.com/plume-lib/plume-scripts ."
 
 # find-git-fork:  finds a fork of a GitHub repository, or returns the upstream
 #   repository if the fork does not exist.
