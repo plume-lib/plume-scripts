@@ -1,7 +1,7 @@
 # Plume-Scripts:  Scripts for programming and system administration
 
 These scripts automate various programming and sysadmin tasks.
-This project contains utilities for
+This project contains utilities for:
 
  * [Shell scripting](#shell-scripting)
  * [Continuous integration](#continuous-integration)
@@ -99,7 +99,7 @@ A script for use as a git mergetool; runs Emacs ediff as the mergetool.
 
 ### git-authors
 
-Lists all the authors of commits in a get repository.
+Lists all the authors of commits in a git repository.
 [Documentation](git-authors) at top of file.
 
 ### git-clone-related
@@ -174,8 +174,8 @@ if the replacement is performed.
 
 ### search
 
-Jeffrey Friedl's search program combines `find` and `grep`
--- more or less do a 'grep' on a whole directory tree, but is more
+Jeffrey Friedl's `search` program combines `find` and `grep` --
+more or less do a 'grep' on a whole directory tree.  `search` is more
 efficient, uses Perl regular expressions, and is much more powerful.
 This version fixes a tiny bug or two.  For full documentation, see its
 [manpage](search.manpage).
