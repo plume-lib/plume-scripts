@@ -821,7 +821,7 @@ sub read_rc
 		print " $do contents: $check";
 	    }
 	    ## Check to make sure the thing at least compiles.
-	    eval  "package magic; (\$H = '1'x \$main'bytes) && (\n$check\n)\n";
+	    eval  "package magic; (\$H = '1'x \$main::bytes) && (\n$check\n)\n";
 	    $! = 2, die "$file $ln: ".&clean_eval_error($@) if $@;
 
 	    $HEADER_BYTES = $bytes if $bytes > $HEADER_BYTES;
@@ -882,7 +882,7 @@ sub dummy {
 
     1 || &dummy || &dir_done || &bad || &message || $NEXT_DIR_ENTRY ||
     $VV_SIZE || $VV_PRINT_COUNT || $STDERR_SCREWS_STDOUT || @files ||
-    @files || $magic'H || $magic'H || $magic'val || $magic'val ||
+    @files || $magic::H || $magic::H || $magic::val || $magic::val ||
     $filter_cmd{1} || $xdev{''} || $MARK;
 
 }
@@ -1056,7 +1056,7 @@ sub dodir
 
     undef $filter;
     foreach $expr (keys %filter_cmd) {
-	next unless eval "{ package filter; \$N = \$main'file; { $expr }}";
+	next unless eval "{ package filter; \$N = \$main::file; { $expr }}";
 	$filter = $filter_cmd{$expr};
 	$filter .= " $file" unless $filter =~ s/%/$file/g;
 	last;
@@ -1068,7 +1068,7 @@ sub dodir
 	    warn qq/$0: can\'t open: $file\n/;
 	    next;
 	}
-	unless (read(FILE_IN, $magic'H, $HEADER_BYTES)) {#'
+	unless (read(FILE_IN, $magic::H, $HEADER_BYTES)) {#'
 	    &clear_message if $VERBOSE && $STDERR_SCREWS_STDOUT;
 	    warn qq/$0: can\'t read from "$file"\n/;
 	    close(FILE_IN);
@@ -1076,7 +1076,7 @@ sub dodir
 	}
 
 	eval $MAGIC_TESTS;
-	if ($magic'val) {#'
+	if ($magic::val) {#'
 	    close(FILE_IN);
 	    warn qq/skip (magic): $file\n/ if $WHY;
 	    next;
