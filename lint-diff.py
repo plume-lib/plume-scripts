@@ -179,7 +179,7 @@ def guess_strip_files(diff_file, warning_file):
         # diffs, or all the lint output, happens to be in one subdirectory.
         if DEBUG:
             eprint(
-                f"lint-diff.py: guess_strip_files all in one subdirectory: "
+                "lint-diff.py: guess_strip_files all in one subdirectory: "
                 + "result={result} diff_prefix={diff_prefix} warnings_prefix={warnings_prefix}"
             )
             eprint(f"diff_files={diff_files}")
@@ -293,8 +293,8 @@ def changed_lines(args):
     changed = {}
 
     with open(args.diff_filename, encoding="utf-8") as diff:
-        atat_re = re.compile("@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*")
-        content_re = re.compile("[ +-].*")
+        atat_re = re.compile("@@ -([0-9]+)(,[0-9]+)? \\+([0-9]+)(,[0-9]+)? @@.*")
+        # content_re = re.compile("[ +-].*")
 
         filename = ""
         lineno = -1000000
