@@ -13,8 +13,6 @@ Requires the Python requests module to be installed, which you can do via:
 # hour.  It fails (and prints nothing to standard out, only to standard
 # error) if it goes over the limit.
 
-import json
-import pprint
 import subprocess
 import sys
 

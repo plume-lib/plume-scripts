@@ -18,8 +18,7 @@ jobs:
           paths:
             - ".git"
 
-      - run: pip install black
-      - run: pip install pylint
+      - run: pip install ruff
       - run: pip install requests
       - run: sudo apt-get update
       - run: sudo apt-get -y install shellcheck devscripts
