@@ -134,6 +134,7 @@ for my $arg (@ARGV) {
   if ($arg eq ".") { $arg = $pwd; }
   $arg =~ s|^\./|$pwd/|;
   # Occurrences of abs_path() are because -f doesn't work on relative paths.
+  # It also prevents `perl -i` from converting a symbolic link to a copy of the linked-to file.
   if (-d $arg) {
     find(\&collect, abs_path($arg));
   } elsif (-f abs_path($arg)) {
