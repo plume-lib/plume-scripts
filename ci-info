@@ -352,14 +352,3 @@ if [ "$VERBOSE" = "--verbose" ] ; then
   echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
 fi
 echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
-
-# Temporary, for backward compatibility
-# Deprecated 2019-07-10; remove on 2020-07-10
-if [ "$CI_IS_PULL_REQUEST" = "true" ]; then
-  echo "CI_IS_PR=1; export CI_IS_PR;"
-fi
-# Deprecated 2019-12-10; remove on 2020-12-10
-if [ "$VERBOSE" = "--verbose" ] ; then
-  echo "echo CI_BRANCH=$CI_BRANCH_NAME;"
-fi
-echo "CI_BRANCH=$CI_BRANCH_NAME; export CI_BRANCH;"
