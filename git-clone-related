@@ -50,14 +50,14 @@ echo "which is an obsolete version from https://github.com/plume-lib/plume-scrip
 # Fail if any command fails.
 set +e
 
-if [ "$1" = "--debug" ] ; then
+if [ "$1" = "--debug" ]; then
   DEBUG=1
   shift
   set -x
 fi
 
 # FALLBACK_BRANCH may be unset.
-if [ "$1" = "--upstream-branch" ] ; then
+if [ "$1" = "--upstream-branch" ]; then
   shift
   FALLBACK_BRANCH=$1
   shift
@@ -68,13 +68,19 @@ if [ "$#" -lt 2 ]; then
   exit 1
 fi
 
-beginswith() { case $2 in "$1"*) true;; *) false;; esac; }
+beginswith() { case $2 in "$1"*) true ;; *) false ;; esac }
 
-UPSTREAM_ORG=$1; shift
-REPO_NAME=$1; shift
+UPSTREAM_ORG=$1
+shift
+REPO_NAME=$1
+shift
 if [ "$#" -ne 0 ] && ! beginswith "-" "$1"; then
-  DESTINATION=$1; shift
-  if [ -d "$DESTINATION" ] && [ "$(pwd -P)" = "$(cd "$DESTINATION"; pwd -P)" ]; then
+  DESTINATION=$1
+  shift
+  if [ -d "$DESTINATION" ] && [ "$(pwd -P)" = "$(
+    cd "$DESTINATION"
+    pwd -P
+  )" ]; then
     echo "git-clone-related: destination is same as current directory"
     exit 1
   fi
@@ -89,7 +95,7 @@ if [ "$#" -eq 0 ]; then
   set -- -q --single-branch --depth 1
 fi
 
-if [ -n "$DEBUG" ] ; then
+if [ -n "$DEBUG" ]; then
   echo "Entering git-clone-related $UPSTREAM_ORG $REPO_NAME $DESTINATION $*"
 fi
 
@@ -104,21 +110,21 @@ else
   SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
   CI_INFO="$SCRIPTDIR/../plume-scripts/ci-info"
-  if [ ! -f "$CI_INFO" ] ; then
+  if [ ! -f "$CI_INFO" ]; then
     CI_INFO="$SCRIPTDIR/../.plume-scripts/ci-info"
   fi
-  if [ ! -f "$CI_INFO" ] ; then
+  if [ ! -f "$CI_INFO" ]; then
     CI_INFO="$SCRIPTDIR/.plume-scripts/ci-info"
   fi
-  if [ ! -f "$CI_INFO" ] ; then
+  if [ ! -f "$CI_INFO" ]; then
     (cd "$SCRIPTDIR" && git clone --depth 1 https://github.com/plume-lib/plume-scripts .plume-scripts)
   fi
-  if [ ! -f "$CI_INFO" ] ; then
+  if [ ! -f "$CI_INFO" ]; then
     echo "CI_INFO does not exist: $CI_INFO"
     exit 1
   fi
 
-  if [ -n "$DEBUG" ] ; then
+  if [ -n "$DEBUG" ]; then
     echo "About to run ci-info --debug"
     "${CI_INFO}" --debug "${UPSTREAM_ORG}"
     echo "Ran ci-info --debug"
@@ -126,27 +132,27 @@ else
   fi
 
   eval "$("${CI_INFO}" "${UPSTREAM_ORG}")"
-  if [ -n "$DEBUG" ] ; then
+  if [ -n "$DEBUG" ]; then
     echo "Finished running ci-info"
   fi
   UPSTREAM_REPO_URL="https://github.com/${UPSTREAM_ORG}/${REPO_NAME}.git"
 
-  if [ -n "$DEBUG" ] ; then
+  if [ -n "$DEBUG" ]; then
     echo "About to run git-find-fork" "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}"
   fi
   # REPO_URL is what will be cloned.  It might be the same as UPSTREAM_REPO_URL.
   REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
-  if [ -n "$DEBUG" ] ; then
+  if [ -n "$DEBUG" ]; then
     echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
   fi
-  if [ -n "$DEBUG" ] ; then
+  if [ -n "$DEBUG" ]; then
     echo "About to run git-find-branch" "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"}
   fi
   REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
-  if [ -n "$DEBUG" ] ; then
+  if [ -n "$DEBUG" ]; then
     echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
   fi
-  if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ] ; then
+  if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ]; then
     ## Don't use the fallback branch (e.g., master) of the downstream repo
     REPO_URL="$UPSTREAM_REPO_URL"
     REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})

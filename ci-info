@@ -11,7 +11,6 @@
 #     environment:
 #       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
 
-
 # Typical use:
 #
 #   if [ -d /tmp/$USER/plume-scripts ] ; then
@@ -35,18 +34,17 @@
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
-
 DEBUG=""
-if [ "$1" = "--verbose" ] ; then
-    VERBOSE="--verbose"
-    shift
+if [ "$1" = "--verbose" ]; then
+  VERBOSE="--verbose"
+  shift
 fi
-if [ "$1" = "--debug" ] ; then
-    DEBUG="--debug"
-    VERBOSE="--verbose"
-    shift
+if [ "$1" = "--debug" ]; then
+  DEBUG="--debug"
+  VERBOSE="--verbose"
+  shift
 fi
-if [ "$#" -gt 1 ] ; then
+if [ "$#" -gt 1 ]; then
   echo "echo Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION];"
   echo "Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION]" >&2
   echo "exit 2"
@@ -55,7 +53,7 @@ fi
 
 # SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 
-if [ "$DEBUG" = "--debug" ] ; then
+if [ "$DEBUG" = "--debug" ]; then
   echo
   env | sort | sed -e 's/^/echo /'
   echo
@@ -65,19 +63,17 @@ if [ "$DEBUG" = "--debug" ] ; then
   echo
 fi
 
-
 ### Functions
 
 # Returns either `git rev-parse HEAD^1` if HEAD^1 exists, or `git rev-parse HEAD`.
 # HEAD^1 does not exist if the clone was created with `git clone --depth=1`.
-head1 () {
-  if git rev-parse --verify --quiet HEAD^1 > /dev/null 2>&1 ; then
+head1() {
+  if git rev-parse --verify --quiet HEAD^1 >/dev/null 2>&1; then
     git rev-parse HEAD^1
   else
     git rev-parse HEAD
   fi
 }
-
 
 ### Organization
 
@@ -121,16 +117,16 @@ fi
 ## Both of these commands for DEFAULT_BRANCH_NAME seem to work.
 # DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-if [ "$DEBUG" = "--debug" ] ; then
+if [ "$DEBUG" = "--debug" ]; then
   echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
   echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" | sed -e 's/^/echo /'
   echo "echo current branch: $(git branch --show-current)"
   echo "echo current repo: $(git config --get remote.origin.url)"
 fi
 
-if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
+if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
   ## Azure Pipelines pull request
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH;"
   fi
   CI_IS_PULL_REQUEST=true
@@ -143,9 +139,9 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
   CI_COMMIT_RANGE_START=$(head1)
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
-elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
+elif [ -n "$BUILD_SOURCEBRANCH" ]; then
   # Azure Pipelines build for a branch (possibly master).
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
   fi
@@ -154,7 +150,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH_NAME=$BUILD_SOURCEBRANCHNAME
-  if [ "$BUILD_SOURCEBRANCHNAME" = "$DEFAULT_BRANCH_NAME" ] ; then
+  if [ "$BUILD_SOURCEBRANCHNAME" = "$DEFAULT_BRANCH_NAME" ]; then
     DEFAULT_CI_COMMIT_RANGE_START=$(head1)
 
     # If a build fails, we would like to continue failing subsequent
@@ -203,14 +199,14 @@ elif [ -n "$BUILD_SOURCEBRANCH" ] ; then
   fi
   CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
-elif [ "$TRAVIS" = "true" ] ; then
+elif [ "$TRAVIS" = "true" ]; then
   ## Travis CI
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo Travis CI $TRAVIS;"
   fi
   CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   CI_BRANCH_NAME=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
-  if [ "$VERBOSE" = "--verbose" ] ; then
+  if [ "$VERBOSE" = "--verbose" ]; then
     echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
     echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
     echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
@@ -218,9 +214,9 @@ elif [ "$TRAVIS" = "true" ] ; then
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 
-elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
+elif [ -n "$CIRCLE_COMPARE_URL" ]; then
   ## CircleCI v2 or earlier, or CIRCLE_COMPARE_URL was set for compatibility.
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo CircleCI $CIRCLE_COMPARE_URL $CIRCLE_PULL_REQUEST;"
   fi
   if [ -n "$CIRCLE_PULL_REQUEST" ]; then
@@ -231,21 +227,24 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
   CI_COMMIT_RANGE=$(echo "${CIRCLE_COMPARE_URL}" | cut -d/ -f7)
   case $CI_COMMIT_RANGE in
     *"..."*)
-    CI_COMMIT_RANGE_START=$(git rev-parse "${COMMIT_RANGE}")
-    CI_COMMIT_RANGE_END=$(git rev-parse "${COMMIT_RANGE}")
-    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}" ;;
+      CI_COMMIT_RANGE_START=$(git rev-parse "${COMMIT_RANGE}")
+      CI_COMMIT_RANGE_END=$(git rev-parse "${COMMIT_RANGE}")
+      CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+      ;;
   esac
   # CIRCLE_BRANCH may be "pull/327"
   case "$CIRCLE_BRANCH" in
     pull/*)
-      CI_BRANCH_NAME=$(curl -s "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref') ;;
+      CI_BRANCH_NAME=$(curl -s "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref')
+      ;;
     *)
-      CI_BRANCH_NAME=$CIRCLE_BRANCH ;;
+      CI_BRANCH_NAME=$CIRCLE_BRANCH
+      ;;
   esac
 
-elif [ -n "$GITHUB_HEAD_REF" ] ; then
+elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_REF};"
     echo "echo   base_ref=${GITHUB_BASE_REF}, head_ref=${GITHUB_HEAD_REF};"
     echo "echo   pwd=$(pwd);"
@@ -259,7 +258,7 @@ elif [ -n "$GITHUB_HEAD_REF" ] ; then
 
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     if [ -n "$CIRCLE_PULL_REQUEST" ]; then
       echo "echo CircleCI pull request with CIRCLE_COMPARE_URL not set: $CIRCLE_PULL_REQUEST;"
     else
@@ -272,12 +271,12 @@ else
   # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
   # If you re-run a pull request via "Queue" rather than "Rebuild",
   # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
-  if [ "$CI_BRANCH_NAME" = '(HEAD' ] ; then
+  if [ "$CI_BRANCH_NAME" = '(HEAD' ]; then
     CI_BRANCH_NAME=$DEFAULT_BRANCH_NAME
   fi
 fi
 
-if [ "$DEBUG" = "--debug" ] ; then
+if [ "$DEBUG" = "--debug" ]; then
   echo "echo CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST};"
   echo "echo CI_BRANCH_NAME=${CI_BRANCH_NAME};"
   echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START};"
@@ -289,21 +288,21 @@ fi
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ -z "$CI_COMMIT_RANGE" ]; then
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH_NAME=$CI_BRANCH_NAME;"
   fi
   if [ "$CI_BRANCH_NAME" = "$DEFAULT_BRANCH_NAME" ]; then
-    if git show --summary HEAD | grep -q ^Merge: ; then
+    if git show --summary HEAD | grep -q ^Merge:; then
       CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
     else
       CI_COMMIT_RANGE_START=$(head1)
     fi
     CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
-  else      
-    if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1 ; then
+  else
+    if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" >/dev/null 2>&1; then
       CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
     else
-      if git show --summary HEAD | grep -q ^Merge: ; then
+      if git show --summary HEAD | grep -q ^Merge:; then
         CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
       else
         CI_COMMIT_RANGE_START=$(head1)
@@ -315,25 +314,25 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
 fi
 
 if [ -z "$CI_COMMIT_RANGE_START" ]; then
-  if [ "$DEBUG" = "--debug" ] ; then
+  if [ "$DEBUG" = "--debug" ]; then
     echo "echo Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
   fi
   CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
   CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
-  if [ -z "$CI_COMMIT_RANGE_START" ] ; then
+  if [ -z "$CI_COMMIT_RANGE_START" ]; then
     CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_END}
   fi
 fi
 
 # Avoid errors regarding empty range
 if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
-  if [ "$VERBOSE" = "--verbose" ] ; then
+  if [ "$VERBOSE" = "--verbose" ]; then
     echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
   fi
-  if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge: ; then
+  if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
     CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
   else
-    if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1 ; then
+    if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" >/dev/null 2>&1; then
       CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
     fi
   fi
@@ -344,27 +343,27 @@ fi
 
 ### Print it out
 
-if [ "$VERBOSE" = "--verbose" ] ; then
+if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
 fi
 echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
-if [ "$VERBOSE" = "--verbose" ] ; then
+if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
 fi
 echo "CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST; export CI_IS_PULL_REQUEST;"
-if [ "$VERBOSE" = "--verbose" ] ; then
+if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_BRANCH_NAME=$CI_BRANCH_NAME;"
 fi
 echo "CI_BRANCH_NAME=$CI_BRANCH_NAME; export CI_BRANCH_NAME;"
-if [ "$VERBOSE" = "--verbose" ] ; then
+if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
 fi
 echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
-if [ "$VERBOSE" = "--verbose" ] ; then
+if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
 fi
 echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
-if [ "$VERBOSE" = "--verbose" ] ; then
+if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
 fi
 echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
