@@ -243,6 +243,10 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
 
 elif [ -n "$GITHUB_HEAD_REF" ] ; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
+  if [ "$DEBUG" = "--debug" ] ; then
+    echo "echo GitHub Actions pull request $GITHUB_HEAD_REF"
+  fi
+
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
   CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}")
@@ -253,7 +257,7 @@ else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
   if [ "$DEBUG" = "--debug" ] ; then
     if [ -n "$CIRCLE_PULL_REQUEST" ]; then
-      echo "echo  CircleCI pull request with CIRCLE_COMPARE_URL not set: $CIRCLE_PULL_REQUEST;"
+      echo "echo CircleCI pull request with CIRCLE_COMPARE_URL not set: $CIRCLE_PULL_REQUEST;"
     else
       echo "echo Else clause: no CI environment detected;"
     fi
@@ -267,6 +271,14 @@ else
   if [ "$CI_BRANCH_NAME" = '(HEAD' ] ; then
     CI_BRANCH_NAME=$DEFAULT_BRANCH_NAME
   fi
+fi
+
+if [ "$DEBUG" = "--debug" ] ; then
+  echo "CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST}"
+  echo "CI_BRANCH_NAME=${CI_BRANCH_NAME}"
+  echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
+  echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
+  echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
 fi
 
 ## The above may have not set CI_COMMIT_RANGE.  Set it.
