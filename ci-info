@@ -122,8 +122,8 @@ fi
 # DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ] ; then
-  echo "echo DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
-  echo "echo $(git ls-remote --symref "${URL}" HEAD);"
+  echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
+  echo "echo HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD);"
 fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ] ; then
