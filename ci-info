@@ -123,8 +123,7 @@ fi
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ] ; then
   echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
-  echo "echo HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD | head --lines=1);"
-  echo "echo HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD | tail --lines=1);"
+  echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" | sed -e 's/^/echo /'
   echo "echo current branch: $(git branch --show-current)"
   echo "echo current repo: $(git config --get remote.origin.url)"
 fi
@@ -247,7 +246,9 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
 elif [ -n "$GITHUB_HEAD_REF" ] ; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo GitHub Actions pull request, base_ref=${GITHUB_BASE_REF}, head_ref=${GITHUB_HEAD_REF};"
+    echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_REF};"
+    echo "echo   base_ref=${GITHUB_BASE_REF}, head_ref=${GITHUB_HEAD_REF};"
+    echo "echo   pwd=$(pwd);"
   fi
 
   CI_IS_PULL_REQUEST=true
