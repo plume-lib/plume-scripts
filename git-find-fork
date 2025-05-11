@@ -33,7 +33,7 @@ REPONAME=$3
 # export GITEXISTS="git ls-remote"
 export GITEXISTS="wget -q --spider"
 
-if (${GITEXISTS} "https://github.com/${ORG}/${REPONAME}.git" >/dev/null); then
+if (${GITEXISTS} "https://github.com/${ORG}/${REPONAME}.git" > /dev/null); then
   OWNER="${ORG}"
 else
   OWNER="${UPSTREAM_ORG}"

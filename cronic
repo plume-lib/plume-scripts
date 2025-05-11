@@ -38,13 +38,13 @@ if [ "$1" == "--duplicate-stderr" ]; then
 fi
 
 set +e
-"$@" >$OUT 2>$TRACE
+"$@" > $OUT 2> $TRACE
 RESULT=$?
 set -e
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
 if grep -q "$PATTERN" $TRACE; then
-  grep -v "$PATTERN" $TRACE >$ERR
+  grep -v "$PATTERN" $TRACE > $ERR
 else
   ERR=$TRACE
 fi

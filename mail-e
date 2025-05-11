@@ -11,12 +11,12 @@
 
 # Read standard input
 BODY=/tmp/maile-input-$$
-cat >$BODY 2>&1
+cat > $BODY 2>&1
 
 # Invoke mail if body is non-empty.
 if [ -s $BODY ]; then
   # Non-empty body
-  mail "$@" <$BODY
+  mail "$@" < $BODY
 fi
 rm -f $BODY
 
