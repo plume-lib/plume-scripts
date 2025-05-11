@@ -274,11 +274,11 @@ else
 fi
 
 if [ "$DEBUG" = "--debug" ] ; then
-  echo "CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST}"
-  echo "CI_BRANCH_NAME=${CI_BRANCH_NAME}"
-  echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
-  echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
-  echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
+  echo "echo CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST}"
+  echo "echo CI_BRANCH_NAME=${CI_BRANCH_NAME}"
+  echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
+  echo "echo CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
+  echo "echo CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
 fi
 
 ## The above may have not set CI_COMMIT_RANGE.  Set it.
