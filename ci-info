@@ -244,7 +244,7 @@ elif [ -n "$CIRCLE_COMPARE_URL" ] ; then
 elif [ -n "$GITHUB_HEAD_REF" ] ; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   if [ "$DEBUG" = "--debug" ] ; then
-    echo "echo GitHub Actions pull request $GITHUB_HEAD_REF"
+    echo "echo GitHub Actions pull request, base_ref=${GITHUB_BASE_REF}, head_ref=${GITHUB_HEAD_REF};"
   fi
 
   CI_IS_PULL_REQUEST=true
@@ -274,11 +274,11 @@ else
 fi
 
 if [ "$DEBUG" = "--debug" ] ; then
-  echo "echo CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST}"
-  echo "echo CI_BRANCH_NAME=${CI_BRANCH_NAME}"
-  echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
-  echo "echo CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
-  echo "echo CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
+  echo "echo CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST};"
+  echo "echo CI_BRANCH_NAME=${CI_BRANCH_NAME};"
+  echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START};"
+  echo "echo CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END};"
+  echo "echo CI_COMMIT_RANGE=${CI_COMMIT_RANGE};"
 fi
 
 ## The above may have not set CI_COMMIT_RANGE.  Set it.
