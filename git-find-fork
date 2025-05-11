@@ -18,10 +18,10 @@ echo "which is an obsolete version from https://github.com/plume-lib/plume-scrip
 # Often, you can use the `git-clone-related` script instead of this one.
 
 if [ "$#" -ne 3 ]; then
-    script=$(basename -- "$0")
-    >&2 echo "Error: $script requires 3 arguments, got $#"
-    >&2 echo "Usage: $script ORG UPSTREAM_ORG REPONAME"
-    exit 1
+  script=$(basename -- "$0")
+  echo >&2 "Error: $script requires 3 arguments, got $#"
+  echo >&2 "Usage: $script ORG UPSTREAM_ORG REPONAME"
+  exit 1
 fi
 
 ORG=$1
@@ -33,10 +33,9 @@ REPONAME=$3
 # export GITEXISTS="git ls-remote"
 export GITEXISTS="wget -q --spider"
 
-
-if ( ${GITEXISTS} "https://github.com/${ORG}/${REPONAME}.git" > /dev/null ); then
-   OWNER="${ORG}"
+if (${GITEXISTS} "https://github.com/${ORG}/${REPONAME}.git" >/dev/null); then
+  OWNER="${ORG}"
 else
-   OWNER="${UPSTREAM_ORG}"
+  OWNER="${UPSTREAM_ORG}"
 fi
 echo "https://github.com/${OWNER}/${REPONAME}.git"

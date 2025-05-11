@@ -23,7 +23,7 @@
 # `git diff` has a `--ignore-blank-lines` option, but `git merge` has
 # no option for ignoring blank lines.  This script addresses that shortcoming.
 
-if [ "$#" -eq 0 ] ; then
+if [ "$#" -eq 0 ]; then
   readarray -t files < <(grep -l -r '^<<<<<<< HEAD' .)
 else
   files=("$@")
@@ -33,8 +33,8 @@ SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 status=0
 
-for file in "${files[@]}" ; do
-  if ! "${SCRIPTDIR}"/resolve-conflicts.py --blank_lines "$file" ; then
+for file in "${files[@]}"; do
+  if ! "${SCRIPTDIR}"/resolve-conflicts.py --blank_lines "$file"; then
     status=1
   fi
 done

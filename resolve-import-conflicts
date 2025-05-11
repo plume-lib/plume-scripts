@@ -23,7 +23,7 @@ echo "You are using an obsolete $0 from https://github.com/plume-lib/plume-scrip
 # However, this can be run after a git mergetool that leaves conflict markers
 # in files, as the default git mergetool does.
 
-if [ "$#" -eq 0 ] ; then
+if [ "$#" -eq 0 ]; then
   readarray -t files < <(grep -l -r '^<<<<<<< HEAD' .)
 else
   files=("$@")
@@ -33,8 +33,8 @@ SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 status=0
 
-for file in "${files[@]}" ; do
-  if ! "${SCRIPTDIR}"/resolve-conflicts.py --java_imports "$file" ; then
+for file in "${files[@]}"; do
+  if ! "${SCRIPTDIR}"/resolve-conflicts.py --java_imports "$file"; then
     status=1
   fi
 done

@@ -37,7 +37,7 @@ echo "You are using an obsolete $0 from https://github.com/plume-lib/plume-scrip
 
 DEBUG=0
 
-if [ "$#" -eq 0 ] ; then
+if [ "$#" -eq 0 ]; then
   readarray -t files < <(grep -l -r '^<<<<<<< HEAD' .)
 else
   files=("$@")
@@ -47,15 +47,15 @@ SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 status=0
 
-for file in "${files[@]}" ; do
-  if [ "$DEBUG" ] ; then
+for file in "${files[@]}"; do
+  if [ "$DEBUG" ]; then
     echo "before resolve-conflicts.py: $(sha256sum "$file")"
     cat "$file"
   fi
-  if ! "${SCRIPTDIR}"/resolve-conflicts.py --adjacent_lines "$file" ; then
+  if ! "${SCRIPTDIR}"/resolve-conflicts.py --adjacent_lines "$file"; then
     status=1
   fi
-  if [ "$DEBUG" ] ; then
+  if [ "$DEBUG" ]; then
     echo "after resolve-conflicts.py: (status=$status: $(sha256sum "$file")"
     cat "$file"
   fi

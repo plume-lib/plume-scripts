@@ -21,7 +21,7 @@ jobs:
       - run: pip install ruff
       - run: pip install requests
       - run: sudo apt-get update
-      - run: sudo apt-get -y install shellcheck devscripts
+      - run: sudo apt-get -y install shfmt shellcheck devscripts
 
       - run: make
 
