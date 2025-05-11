@@ -18,7 +18,7 @@ REPO_URL=$1
 shift
 
 for BRANCH in "$@"; do
-  if (git ls-remote --quiet --exit-code --heads "${REPO_URL}" "${BRANCH}" >/dev/null); then
+  if (git ls-remote --quiet --exit-code --heads "${REPO_URL}" "${BRANCH}" > /dev/null); then
     echo "${BRANCH}"
     exit 0
   fi
