@@ -6,7 +6,7 @@ style-check: python-style-check python-typecheck shell-style-check
 test:
 	${MAKE} -C tests test
 
-PYTHON_FILES=$(wildcard *.py)
+PYTHON_FILES=$(wildcard *.py) $(shell grep -r -l --exclude='*.py' --exclude='*~' --exclude='*.tar' --exclude=gradlew --exclude-dir=.git '^\#! \?\(/bin/\|/usr/bin/env \)python')
 install-mypy:
 	@if ! command -v mypy ; then pip install mypy ; fi
 install-ruff:
@@ -18,7 +18,7 @@ python-style-check: install-ruff
 	@ruff -q format --check ${PYTHON_FILES}
 	@ruff -q check ${PYTHON_FILES}
 python-typecheck: install-mypy
-	@-mypy --strict ${PYTHON_FILES} > /dev/null 2>&1
+	@mypy --strict ${PYTHON_FILES} > /dev/null 2>&1 || true
 	@mypy --install-types --non-interactive
 	mypy --strict --ignore-missing-imports ${PYTHON_FILES}
 

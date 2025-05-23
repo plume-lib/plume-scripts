@@ -60,7 +60,8 @@ chunk_it = iter(chunks)
 errors = [x + y for x, y in zip(chunk_it, chunk_it)]
 
 
-def error_sort_key(error):
+def error_sort_key(error: str) -> str:
+    """Given an error, return its sort key."""
     match = re.match(error_start_with_groups_re, error)
     if match is None:
         # print("sortkey: no match for", error)
@@ -70,7 +71,7 @@ def error_sort_key(error):
         str(matchdict.get("filename"))
         + str(matchdict.get("lineno")).zfill(6)
         + str(matchdict.get("columnno")).zfill(3)
-        + matchdict.get("most")
+        + str(matchdict.get("most"))
     )
     # print("sortkey =", result, "for", error)
     return result
