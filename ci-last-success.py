@@ -18,6 +18,9 @@ import sys
 
 import requests
 
+from typing import Optional
+
+
 DEBUG = False
 # DEBUG=True
 
@@ -44,7 +47,7 @@ if DEBUG:
 
 ### PROBLEM: api.github.com is returning   "state": "pending"   for commits with completed CI jobs.
 ### Maybe I need to screen-scrape a different github.com page.  :-(
-def successful(sha):
+def successful(sha: str) -> bool:
     "Return true if SHA's CI job succeeded."
     # message=commit['commit']['message']
     url_status = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}/status"
@@ -57,10 +60,11 @@ def successful(sha):
             f"GET {url_status} {resp_status.status_code} {resp_status.headers}"
         )
     state = resp_status.json()["state"]
-    return state == "success"
+    result: bool = state == "success"
+    return result
 
 
-def parent(sha):
+def parent(sha: str) -> Optional[str]:
     "Return the SHA of the first parent of the given SHA.  Return None if this is the root."
     getParentResult = subprocess.run(
         ["git", "rev-parse", sha + "^"], capture_output=True

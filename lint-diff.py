@@ -44,6 +44,9 @@ import os
 import re
 import sys
 
+from typing import Any
+
+
 PROGRAM = os.path.basename(__file__)
 
 DEBUG = False
@@ -56,12 +59,12 @@ FILENAME_LINENO_RE = re.compile("([^:]*):([0-9]+):.*")
 INITIAL_WHITESPACE_RE = re.compile("[ \t]")
 
 
-def eprint(*args, **kwargs):
+def eprint(*args: object, **kwargs: Any) -> None:
     """Print to stderr."""
     print(*args, file=sys.stderr, **kwargs)
 
 
-def strip_dirs(filename, num_dirs):
+def strip_dirs(filename: str, num_dirs: int) -> str:
     """Strip off `num_dirs` leading "/" characters."""
     if num_dirs == 0:
         return filename
@@ -84,7 +87,7 @@ assert strip_dirs("/a/b/c/", 4) == ''
 """
 
 
-def min_strips(filename1, filename2):
+def min_strips(filename1: str, filename2: str) -> tuple[int, int, str, str]:
     """Returns a 4-tuple of 2 integers and 2 strings.  The integers
     indicate the smallest strip values that make the two filenames equal,
     or a maximal pair if the files have different basenames.  The last two
@@ -112,8 +115,10 @@ assert min_strips("/a/b/c/d", "/e/f/g/h") == (1000, 1000, "/a/b/c/d", "/e/f/g/h"
 """
 
 
-def pair_min(pair1, pair2):
-    """Given two pairs, returns the one that is pointwise lesser in its first two elements.
+def pair_min(
+    pair1: tuple[int, int, str, str], pair2: tuple[int, int, str, str]
+) -> tuple[int, int, str, str]:
+    """Given two tuples, returns the one that is pointwise lesser in its first two elements.
     Fails if neither is lesser."""
     if pair1[0] <= pair2[0] and pair1[1] <= pair2[1]:
         return pair1
@@ -132,20 +137,20 @@ assert pair_min((40,30,"a","b"), (6,5,"c","d")) == (6,5,"c","d")
 """
 
 
-def diff_filenames(diff_filename):
+def diff_filenames(diff_filename: str) -> set[str]:
     """All the filenames in the given diff file."""
     result = set()
     with open(diff_filename, encoding="utf-8") as diff:
         for diff_line in diff:
             match = PLUSPLUSPLUS_RE.match(diff_line)
             if match:
-                filename = match.group(1)
+                filename: str = match.group(1)
                 if filename != "/dev/null":
                     result.add(filename)
     return result
 
 
-def warning_filenames(warning_filename):
+def warning_filenames(warning_filename: str) -> set[str]:
     """All the filenames in the given warning file."""
     result = set()
     with open(warning_filename, encoding="utf-8") as warnings:
@@ -156,7 +161,9 @@ def warning_filenames(warning_filename):
     return result
 
 
-def guess_strip_filenames(diff_filenames, warning_filenames):
+def guess_strip_filenames(
+    diff_filenames: set[str], warning_filenames: set[str]
+) -> tuple[int, int, str, str]:
     """Arguments are two lists of file names.
     Result is a pair of integers."""
     result = (1000, 1000, "no files seen yet", "no files seen yet")
@@ -166,7 +173,7 @@ def guess_strip_filenames(diff_filenames, warning_filenames):
     return result
 
 
-def guess_strip_files(diff_file, warning_file):
+def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str, str]:
     """Arguments are files produced by diff and a lint tool, respectively.
     Result is a pair of integers."""
     diff_files = diff_filenames(diff_file)
@@ -190,7 +197,7 @@ def guess_strip_files(diff_file, warning_file):
 ### Main routine
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse and return the command-line arguments."""
     global DEBUG
 
@@ -287,10 +294,10 @@ def parse_args():
     return args
 
 
-def changed_lines(args):
+def changed_lines(args: argparse.Namespace) -> dict[str, set[int]]:
     """Returns a dictionary from file names to a set of ints (line numbers for changed lines)."""
 
-    changed = {}
+    changed: dict[str, set[int]] = {}
 
     with open(args.diff_filename, encoding="utf-8") as diff:
         atat_re = re.compile("@@ -([0-9]+)(,[0-9]+)? \\+([0-9]+)(,[0-9]+)? @@.*")
@@ -339,7 +346,7 @@ def changed_lines(args):
     return changed
 
 
-def warn_relative_diff(args):
+def warn_relative_diff(args: argparse.Namespace) -> bool:
     """Possibly warn about relative directories."""
 
     result = False
@@ -368,7 +375,7 @@ def warn_relative_diff(args):
     return result
 
 
-def main():
+def main() -> None:
     """The main routine"""
 
     global DEBUG

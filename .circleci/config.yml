@@ -18,6 +18,7 @@ jobs:
           paths:
             - ".git"
 
+      - run: pip install mypy
       - run: pip install ruff
       - run: pip install requests
       - run: sudo apt-get update
