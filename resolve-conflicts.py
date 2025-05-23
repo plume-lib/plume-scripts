@@ -30,7 +30,7 @@ import shutil
 import sys
 import tempfile
 
-from typing import List, Union, Tuple, TypeVar, Sequence
+from typing import Optional, TypeVar, Sequence
 
 T = TypeVar("T")  # Type variable for use in type hints
 
@@ -38,7 +38,7 @@ T = TypeVar("T")  # Type variable for use in type hints
 debug = False
 
 
-def main():  # pylint: disable=too-many-locals
+def main() -> None:  # pylint: disable=too-many-locals
     """The main entry point."""
     arg_parser = ArgumentParser()
     arg_parser.add_argument("filename")
@@ -114,8 +114,8 @@ def main():  # pylint: disable=too-many-locals
 
 
 def looking_at_conflict(  # pylint: disable=too-many-return-statements
-    filename: str, start_index: int, lines: List[str]
-) -> Union[None, Tuple[List[str], List[str], List[str], int]]:
+    filename: str, start_index: int, lines: list[str]
+) -> Optional[tuple[list[str], list[str], list[str], int]]:
     """Tests whether the following text starts a conflict.
     If not, returns None.
     If so, returns a 4-tuple of (base, parent1, parent2, num_lines_in_conflict)
@@ -185,13 +185,13 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
 
 
 def merge(  # pylint: disable=too-many-arguments
-    base: List[str],
-    parent1: List[str],
-    parent2: List[str],
+    base: list[str],
+    parent1: list[str],
+    parent2: list[str],
     adjacent_lines: bool,
     blank_lines: bool,
     java_imports: bool,
-) -> Union[List[str], None]:
+) -> Optional[list[str]]:
     """Given text for the base and two parents, return merged text.
 
     Args:
@@ -227,14 +227,14 @@ def merge(  # pylint: disable=too-many-arguments
     return None
 
 
-def all_import_lines(lines: List[str]) -> bool:
+def all_import_lines(lines: list[str]) -> bool:
     """Return true if every given line is a Java import line or is blank."""
     return all(line.startswith("import ") or line.strip() == "" for line in lines)
 
 
 def merge_edits_on_different_lines(
-    base, parent1: List[str], parent2: List[str]
-) -> Union[List[str], None]:
+    base: list[str], parent1: list[str], parent2: list[str]
+) -> Optional[list[str]]:
     """Return a merged version, if at most parent1 or parent2 edits each line.
     Otherwise, return None.
     """
@@ -243,7 +243,7 @@ def merge_edits_on_different_lines(
 
     ### No lines are added or removed, only modified.
     base_len = len(base)
-    result = None
+    result: Optional[list[str]] = None
     if base_len == len(parent1) and base_len == len(parent2):
         result = []
         for base_line, parent1_line, parent2_line in itertools.zip_longest(
@@ -282,8 +282,8 @@ def merge_edits_on_different_lines(
 
 
 def merge_base_is_prefix_or_suffix(
-    base: List[str], parent1: List[str], parent2: List[str]
-) -> Union[List[str], None]:
+    base: list[str], parent1: list[str], parent2: list[str]
+) -> Optional[list[str]]:
     """Special cases when the base is a prefix or suffix of parent1.
     That is, parent1 is pure additions at the beginning or end of base.  Parent2
     deleted all the lines, possibly replacing them by something else.  (We know
@@ -323,14 +323,16 @@ def is_subsequence(s1: Sequence[T], s2: Sequence[T]) -> bool:
     return i == n
 
 
-def merge_blank_lines(base, parent1, parent2):
+def merge_blank_lines(
+    base: list[str], parent1: list[str], parent2: list[str]
+) -> Optional[list[str]]:
     "Returns parent1 if parent1 and parent2 differ only in whitespace."
     if with_one_space(parent1) == with_one_space(parent2):
         return parent1
     return None
 
 
-def with_one_space(lines):
+def with_one_space(lines: list[str]) -> str:
     """Turns a list of strings into a single string, with each run of whitespace replaced
     by a single space."""
     # TODO: This could be more efficient.  Even better, I could write a loop in
@@ -342,7 +344,7 @@ def with_one_space(lines):
     return " ".join(result_lines)
 
 
-def debug_print(*args):
+def debug_print(*args: object) -> None:
     """If debugging is enabled, pass the arguments to `print`."""
     if debug:
         print(*args)
