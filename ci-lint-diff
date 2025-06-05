@@ -51,12 +51,9 @@ if [ "$DEBUG" = "--debug" ]; then
   git log --graph | head --lines=10000
 fi
 
-SCRIPTDIR="$(
-  cd "$(dirname "$0")"
-  pwd -P
-)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
-eval "$("${SCRIPTDIR}"/ci-info)"
+eval "$("${SCRIPT_DIR}"/ci-info)"
 
 # Ensure the commits mentioned in $CI_COMMIT_RANGE are available.
 if ! git cat-file -e "${CI_COMMIT_RANGE_START}^{commit}"; then
@@ -101,9 +98,9 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
 
   # This is not very effective because environment variables were set by
   # the previous invocation of ci-info.
-  echo "${SCRIPTDIR}"/ci-info --debug
-  "${SCRIPTDIR}"/ci-info --debug
-  echo end of "${SCRIPTDIR}"/ci-info --debug
+  echo "${SCRIPT_DIR}"/ci-info --debug
+  "${SCRIPT_DIR}"/ci-info --debug
+  echo end of "${SCRIPT_DIR}"/ci-info --debug
   echo
 
   echo git rev-parse \$CI_COMMIT_RANGE_START
@@ -175,4 +172,4 @@ fi
 
 set -e
 
-"${SCRIPTDIR}"/lint-diff.py $DEBUG --guess-strip "$diff_file" "$WARNINGSFILE"
+"${SCRIPT_DIR}"/lint-diff.py $DEBUG --guess-strip "$diff_file" "$WARNINGSFILE"

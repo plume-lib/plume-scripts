@@ -29,12 +29,12 @@ else
   files=("$@")
 fi
 
-SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 status=0
 
 for file in "${files[@]}"; do
-  if ! "${SCRIPTDIR}"/resolve-conflicts.py --blank_lines "$file"; then
+  if ! "${SCRIPT_DIR}"/resolve-conflicts.py --blank_lines "$file"; then
     status=1
   fi
 done

@@ -43,7 +43,7 @@ else
   files=("$@")
 fi
 
-SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 status=0
 
@@ -52,7 +52,7 @@ for file in "${files[@]}"; do
     echo "before resolve-conflicts.py: $(sha256sum "$file")"
     cat "$file"
   fi
-  if ! "${SCRIPTDIR}"/resolve-conflicts.py --adjacent_lines "$file"; then
+  if ! "${SCRIPT_DIR}"/resolve-conflicts.py --adjacent_lines "$file"; then
     status=1
   fi
   if [ "$DEBUG" ]; then

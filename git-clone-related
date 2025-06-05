@@ -107,17 +107,17 @@ if [ -d "${DESTINATION}" ]; then
   # and "git pull" fails.
   (cd "${DESTINATION}" && (git pull -q || (git branch && true)))
 else
-  SCRIPTDIR="$(cd "$(dirname "$0")" && pwd -P)"
+  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
-  CI_INFO="$SCRIPTDIR/../plume-scripts/ci-info"
+  CI_INFO="$SCRIPT_DIR/../plume-scripts/ci-info"
   if [ ! -f "$CI_INFO" ]; then
-    CI_INFO="$SCRIPTDIR/../.plume-scripts/ci-info"
+    CI_INFO="$SCRIPT_DIR/../.plume-scripts/ci-info"
   fi
   if [ ! -f "$CI_INFO" ]; then
-    CI_INFO="$SCRIPTDIR/.plume-scripts/ci-info"
+    CI_INFO="$SCRIPT_DIR/.plume-scripts/ci-info"
   fi
   if [ ! -f "$CI_INFO" ]; then
-    (cd "$SCRIPTDIR" && git clone --depth 1 https://github.com/plume-lib/plume-scripts .plume-scripts)
+    (cd "$SCRIPT_DIR" && git clone --depth 1 https://github.com/plume-lib/plume-scripts .plume-scripts)
   fi
   if [ ! -f "$CI_INFO" ]; then
     echo "CI_INFO does not exist: $CI_INFO"
@@ -141,21 +141,21 @@ else
     echo "About to run git-find-fork" "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}"
   fi
   # REPO_URL is what will be cloned.  It might be the same as UPSTREAM_REPO_URL.
-  REPO_URL=$("${SCRIPTDIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
+  REPO_URL=$("${SCRIPT_DIR}"/git-find-fork "${CI_ORGANIZATION}" "${UPSTREAM_ORG}" "${REPO_NAME}")
   if [ -n "$DEBUG" ]; then
     echo "git-find-fork ${CI_ORGANIZATION} ${UPSTREAM_ORG} ${REPO_NAME} => ${REPO_URL}"
   fi
   if [ -n "$DEBUG" ]; then
     echo "About to run git-find-branch" "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"}
   fi
-  REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
+  REPO_BRANCH=$("${SCRIPT_DIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
   if [ -n "$DEBUG" ]; then
     echo "git-find-branch ${REPO_URL} ${CI_BRANCH_NAME} => ${REPO_BRANCH}"
   fi
   if [ "$UPSTREAM_REPO_URL" != "$REPO_URL" ] && [ "$REPO_BRANCH" != "$CI_BRANCH_NAME" ]; then
     ## Don't use the fallback branch (e.g., master) of the downstream repo
     REPO_URL="$UPSTREAM_REPO_URL"
-    REPO_BRANCH=$("${SCRIPTDIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
+    REPO_BRANCH=$("${SCRIPT_DIR}"/git-find-branch "${REPO_URL}" "${CI_BRANCH_NAME}" ${FALLBACK_BRANCH:+"$FALLBACK_BRANCH"})
   fi
   echo "git clone -b ${REPO_BRANCH} $* ${REPO_URL} ${DESTINATION}"
   # Try twice in case of network lossage.

@@ -51,7 +51,7 @@ if [ "$#" -gt 1 ]; then
   exit 2
 fi
 
-# SCRIPTDIR="$( cd "$(dirname "$0")" ; pwd -P )"
+# SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if [ "$DEBUG" = "--debug" ]; then
   echo
@@ -172,7 +172,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
     #   (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
     # fi
     # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-    #   CI_COMMIT_RANGE_START=$(${SCRIPTDIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START})
+    #   CI_COMMIT_RANGE_START=$(${SCRIPT_DIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START})
     #   if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
     #     echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
     #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
