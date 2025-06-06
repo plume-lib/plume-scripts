@@ -39,6 +39,7 @@ if [ "$1" = "--verbose" ]; then
   VERBOSE="--verbose"
   shift
 fi
+
 if [ "$1" = "--debug" ]; then
   DEBUG="--debug"
   VERBOSE="--verbose"
@@ -55,7 +56,11 @@ fi
 
 if [ "$DEBUG" = "--debug" ]; then
   echo
-  env | sort | sed -e 's/^/echo /'
+  # shellcheck disable=SC2016
+  echo '---------------- start of `env`'
+  env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
+  # shellcheck disable=SC2016
+  echo '---------------- end of `env`'
   echo
   git --no-pager branch -a | sed -e 's/^/echo /'
   echo
