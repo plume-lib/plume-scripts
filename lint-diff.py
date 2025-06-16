@@ -7,6 +7,12 @@
 # making the changes globally in your project would be too burdensome.
 # You can make the requirement only for new and changed lines, so your
 # codebase will conform to the new standard gradually, as you edit it.
+#
+# Note: If the warnings output indicates a catastrophic failure of the
+# program that produces warnings, then this program will issue no
+# warnings because there will be no warnings on specific lines.
+# Example:
+#   Exception in thread "main" java.lang.IllegalAccessError
 
 # Usage:  lint-diff.py [options] diff.txt [warnings.txt]
 #         If warnings.txt is omitted, use standard input.
@@ -376,13 +382,13 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
 
 
 def main() -> None:
-    """The main routine"""
+    """The main routine."""
 
     global DEBUG
 
     args = parse_args()
 
-    # A dictionary from file names to a set of ints (line numbers for changed lines)
+    # A dictionary from file names to a set of ints (line numbers for changed lines).
     changed = changed_lines(args)
 
     if DEBUG:
@@ -399,9 +405,9 @@ def main() -> None:
         # pylint: disable=consider-using-with
         warnings = open(args.warning_filename, encoding="utf-8")
 
-    # 1 if this produced any output, 0 if not
+    # 1 if this produced any output, 0 if not.
     status = 0
-    # true if we just printed a warning and are looking for continuation lines to print
+    # true if we just printed a warning and are looking for continuation lines to print.
     print_multiline_warning = False
 
     for warning_line in warnings:
