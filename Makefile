@@ -6,21 +6,28 @@ style-check: python-style-check python-typecheck shell-style-check
 test:
 	${MAKE} -C tests test
 
-PYTHON_FILES=$(wildcard *.py) $(shell grep -r -l --exclude='*.py' --exclude='*~' --exclude='*.tar' --exclude=gradlew --exclude-dir=.git '^\#! \?\(/bin/\|/usr/bin/env \)python')
+PYTHON_FILES=$(wildcard **/*.py) $(shell grep -r -l --exclude='*.py' --exclude='*~' --exclude='*.tar' --exclude=gradlew --exclude-dir=.git '^\#! \?\(/bin/\|/usr/bin/env \)python')
+PYTHON_FILES_TO_CHECK:=$(filter-out ${lcb_runner},${PYTHON_FILES})
 install-mypy:
 	@if ! command -v mypy ; then pip install mypy ; fi
 install-ruff:
 	@if ! command -v ruff ; then pipx install ruff ; fi
 python-style-fix: install-ruff
-	@ruff format ${PYTHON_FILES}
-	@ruff -q check ${PYTHON_FILES} --fix
+ifneq (${PYTHON_FILES},)
+	@ruff format ${PYTHON_FILES_TO_CHECK}
+	@ruff -q check ${PYTHON_FILES_TO_CHECK} --fix
+endif
 python-style-check: install-ruff
-	@ruff -q format --check ${PYTHON_FILES}
-	@ruff -q check ${PYTHON_FILES}
+ifneq (${PYTHON_FILES},)
+	@ruff -q format --check ${PYTHON_FILES_TO_CHECK}
+	@ruff -q check ${PYTHON_FILES_TO_CHECK}
+endif
 python-typecheck: install-mypy
-	@mypy --strict ${PYTHON_FILES} > /dev/null 2>&1 || true
+ifneq (${PYTHON_FILES},)
+	@mypy --strict ${PYTHON_FILES_TO_CHECK} > /dev/null 2>&1 || true
 	@mypy --install-types --non-interactive
-	mypy --strict --ignore-missing-imports ${PYTHON_FILES}
+	mypy --strict --ignore-missing-imports ${PYTHON_FILES_TO_CHECK}
+endif
 
 SH_SCRIPTS   = $(shell grep -r -l --exclude='*~' --exclude='*.tar' --exclude=gradlew --exclude-dir=.git '^\#! \?\(/bin/\|/usr/bin/env \)sh'   | grep -v addrfilter | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
 BASH_SCRIPTS = $(shell grep -r -l --exclude='*~' --exclude='*.tar' --exclude=gradlew --exclude-dir=.git '^\#! \?\(/bin/\|/usr/bin/env \)bash' | grep -v addrfilter | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
