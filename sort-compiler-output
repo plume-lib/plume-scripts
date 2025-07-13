@@ -1,41 +1,43 @@
 #!/usr/bin/env python3
 
-## Given compiler output, sorts the errors/warnings by filename.
-## Reads from standard input, writes the sorted errors to standard out.
-## Works for any tool that produces output in the standard format
-## (https://www.gnu.org/prep/standards/html_node/Errors.html).
-## This script is useful for compilers such as javac that process files in
-## nondeterministic order.
+"""Given compiler output, sort the errors/warnings by filename.
+
+Reads from standard input, writes the sorted errors to standard out.
+Works for any tool that produces output in the standard format
+(https://www.gnu.org/prep/standards/html_node/Errors.html).
+This script is useful for compilers such as javac that process files in
+nondeterministic order.
+"""
 
 ## TODO: Maybe use the comparison from the `sort-directory-order` script.
 
 ## TODO: Need to sort *numerically*, not *lexicographically*, for line and column numbers.
 
-import os
 import re
 import sys
 from itertools import groupby
 from operator import itemgetter
+from pathlib import Path
 
 ## TODO: permit reading from stdin *or* a file on the command line.
 ## https://stackoverflow.com/questions/7576525/
 if len(sys.argv) != 1:
-    print(os.path.basename(__file__) + ": Do not pass arguments, use stdin and stdout.")
+    print(Path(__file__).name + ": Do not pass arguments, use stdin and stdout.")
     sys.exit(1)
 
 error_start_without_groups_string = (
     r"("
-     r"^(?:\[(?:ERROR|WARNING)\] )?"
-     r"(?:-> \[Help|"
-     r"[^ ].*:\[?[0-9]+(?:[:,](?:[0-9]+))?\]? "
-     r")"
-     r")"
+    r"^(?:\[(?:ERROR|WARNING)\] )?"
+    r"(?:-> \[Help|"
+    r"[^ ].*:\[?[0-9]+(?:[:,](?:[0-9]+))?\]? "
+    r")"
+    r")"
 )
 error_start_with_groups_string = (
     r"^(?:\[(?:ERROR|WARNING)\] )?"
-     r"(?P<most>-> \[Help|"
-     r"(?P<filename>[^ ].*):\[?(?P<lineno>[0-9]+)(?:[:,](?P<columnno>[0-9]+))?\]? "
-     r")"
+    r"(?P<most>-> \[Help|"
+    r"(?P<filename>[^ ].*):\[?(?P<lineno>[0-9]+)(?:[:,](?P<columnno>[0-9]+))?\]? "
+    r")"
 )
 error_start_without_groups_re = re.compile(error_start_without_groups_string, re.MULTILINE)
 error_start_with_groups_re = re.compile(error_start_with_groups_string)
@@ -58,7 +60,14 @@ errors = [x + y for x, y in zip(chunk_it, chunk_it)]
 
 
 def error_sort_key(error: str) -> str:
-    """Given an error, return its sort key."""
+    """Given an error, return its sort key.
+
+    Args:
+        error: an error message
+
+    Returns:
+        the sort key of the message
+    """
     match = re.match(error_start_with_groups_re, error)
     if match is None:
         # print("sortkey: no match for", error)
