@@ -14,9 +14,8 @@
 import os
 import re
 import sys
-
-from operator import itemgetter
 from itertools import groupby
+from operator import itemgetter
 
 ## TODO: permit reading from stdin *or* a file on the command line.
 ## https://stackoverflow.com/questions/7576525/
@@ -26,21 +25,19 @@ if len(sys.argv) != 1:
 
 error_start_without_groups_string = (
     r"("
-    + r"^(?:\[(?:ERROR|WARNING)\] )?"
-    + r"(?:-> \[Help|"
-    + r"[^ ].*:\[?[0-9]+(?:[:,](?:[0-9]+))?\]? "
-    + r")"
-    + r")"
+     r"^(?:\[(?:ERROR|WARNING)\] )?"
+     r"(?:-> \[Help|"
+     r"[^ ].*:\[?[0-9]+(?:[:,](?:[0-9]+))?\]? "
+     r")"
+     r")"
 )
 error_start_with_groups_string = (
     r"^(?:\[(?:ERROR|WARNING)\] )?"
-    + r"(?P<most>-> \[Help|"
-    + r"(?P<filename>[^ ].*):\[?(?P<lineno>[0-9]+)(?:[:,](?P<columnno>[0-9]+))?\]? "
-    + r")"
+     r"(?P<most>-> \[Help|"
+     r"(?P<filename>[^ ].*):\[?(?P<lineno>[0-9]+)(?:[:,](?P<columnno>[0-9]+))?\]? "
+     r")"
 )
-error_start_without_groups_re = re.compile(
-    error_start_without_groups_string, re.MULTILINE
-)
+error_start_without_groups_re = re.compile(error_start_without_groups_string, re.MULTILINE)
 error_start_with_groups_re = re.compile(error_start_with_groups_string)
 
 all_input = sys.stdin.read()
