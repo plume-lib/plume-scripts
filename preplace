@@ -169,7 +169,9 @@ foreach my $file (@filelist) {
     # Should rewrite in perl rather than invoking external command, I suppose.
     my $delimiter;
     my $fromtoregex = $fromregex . $toregex;
-    if ($fromtoregex !~ m|/|) {
+    if ($fromtoregex =~ m/'/) {
+      die "arguments to preplace cannot contain single-quote marks";
+    } elsif ($fromtoregex !~ m|/|) {
       $delimiter = "/";
     } elsif ($fromtoregex !~ m/\|/) {
       $delimiter = "|";
