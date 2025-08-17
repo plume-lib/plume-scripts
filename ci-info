@@ -1,15 +1,7 @@
 #!/bin/sh
 
 # Outputs information about a CI job, when run under Azure Pipelines,
-# CircleCI, GitHub Actions, or Travis CI.
-
-# On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
-# for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
-# https://discuss.circleci.com/t/is-circle-compare-url-still-a-thing/33366):
-# jobs:
-#   my-job:
-#     environment:
-#       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
+# CircleCI, GitHub Actions, or Travis CI.  (See note below about CircleCI v1.)
 
 # Typical use:
 #
@@ -33,6 +25,14 @@
 # For example use, see comments in file `lint-diff.py` in this directory.
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
+#
+# On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
+# for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
+# https://discuss.circleci.com/t/is-circle-compare-url-still-a-thing/33366):
+# jobs:
+#   my-job:
+#     environment:
+#       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
 
 DEBUG=""
 if [ "$1" = "--verbose" ]; then
