@@ -272,9 +272,7 @@ def parse_args() -> argparse.Namespace:
         sys.exit(2)
 
     if args.guess_strip and args.warning_filename is None:
-        eprint(
-            PROGRAM, 'needs "warnings.txt" file argument when --guess-strip is provided'
-        )
+        eprint(PROGRAM, 'needs "warnings.txt" file argument when --guess-strip is provided')
         sys.exit(2)
 
     if args.guess_strip:
@@ -416,6 +414,12 @@ def main() -> None:
             continue
         print_multiline_warning = False
 
+        should_output = False
+
+        # Special case for Java exception in the output.
+        if warning_line.startswith("Exception in thread"):
+            should_output = True
+
         match = FILENAME_LINENO_RE.match(warning_line)
         if match:
             try:
@@ -443,9 +447,12 @@ def main() -> None:
                     relative_diff_warned = True
             lineno = int(match.group(2))
             if filename in changed and lineno in changed[filename]:
-                print(warning_line, end="")
-                status = 1
-                print_multiline_warning = True
+                should_output = True
+
+        if should_output:
+            print(warning_line, end="")
+            status = 1
+            print_multiline_warning = True
 
     if warnings is not sys.stdin:
         warnings.close

@@ -41,3 +41,5 @@ showvars:
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
 
+clean:
+	make -C tests clean

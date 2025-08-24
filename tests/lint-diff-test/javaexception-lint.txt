@@ -1,0 +1,28 @@
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+
+> Task :requireJavadoc FAILED
+Exception in thread "main" java.lang.Error: null package for /home/mernst/research/types/checker-framework-branch-master/checker-qual/src/main/java/module-info.java
+	at org.plumelib.javadoc.RequireJavadoc$RequireJavadocVisitor.visitTopLevel(RequireJavadoc.java:744)
+	at org.plumelib.javadoc.RequireJavadoc.main(RequireJavadoc.java:202)
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file '/home/mernst/research/types/checker-framework-branch-master/build.gradle' line: 730
+
+* What went wrong:
+Execution failed for task ':requireJavadoc'.
+> No such property: standardOutput for class: org.gradle.process.internal.DefaultExecHandle$ExecResultImpl
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+3 actionable tasks: 1 executed, 2 up-to-date
