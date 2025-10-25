@@ -56,7 +56,7 @@ if False:
 
 chunk_it = iter(chunks)
 # Pass the SAME iterator to both, so alternating elements are taken
-errors = [x + y for x, y in zip(chunk_it, chunk_it)]
+errors = [x + y for x, y in zip(chunk_it, chunk_it, strict=True)]
 
 
 def error_sort_key(error: str) -> str:
