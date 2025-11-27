@@ -91,6 +91,17 @@ if [ "$TRAVIS" = "true" ]; then
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
+    if [ -z "$SLUG" ]; then
+      sleep 5
+      SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
+      if [ -z "$SLUG" ]; then
+        echo "error: bad output for wget:"
+        wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+        echo "error: bad output for wget:" >&2
+        wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" >&2
+        exit 1
+      fi
+    fi
     CI_ORGANIZATION=${SLUG%:*}
   else
     CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
