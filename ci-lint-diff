@@ -149,8 +149,11 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "Current directory:"
   pwd
   echo
-  echo "Contents of /tmp:"
+  echo "Listing of /tmp:"
   ls -l /tmp/
+  echo
+  echo "Contents of /tmp:"
+  cat more /tmp/*
   echo
   echo "Environment:"
   env | sort

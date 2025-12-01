@@ -135,7 +135,9 @@ fi
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ]; then
   echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
-  echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" | sed -e 's/^/echo /'
+  if [ "${URL}" != "" ]; then
+    echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | sed -e 's/^/echo /'
+  fi
   echo "echo current branch: $(git branch --show-current)"
   echo "echo current repo: $(git config --get remote.origin.url)"
 fi
