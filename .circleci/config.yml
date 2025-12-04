@@ -24,8 +24,8 @@ jobs:
       - run: pip install mypy
       - run: pip install ruff
       - run: pip install requests
-      - run: sudo apt-get update
-      - run: sudo apt-get -y install shfmt shellcheck devscripts
+      - run: sudo apt update
+      - run: sudo apt -y install shfmt shellcheck devscripts
 
       - run: make
 
