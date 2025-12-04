@@ -53,6 +53,7 @@ if [ "$#" -gt 1 ]; then
 fi
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+SCRIPT_NAME="$(basename "$0")"
 
 if [ "$DEBUG" = "--debug" ]; then
   echo
@@ -95,11 +96,9 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       sleep 5
       SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
-        echo "error: bad output for wget:"
-        wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-        echo "error: bad output for wget:" >&2
-        wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" >&2
-        exit 1
+        echo "echo ${SCRIPT_NAME} error: bad output for wget:"
+        wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | sed -e 's/^/echo /'
+        exit 2
       fi
     fi
     CI_ORGANIZATION=${SLUG%:*}

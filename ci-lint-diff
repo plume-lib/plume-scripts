@@ -52,6 +52,7 @@ if [ "$DEBUG" = "--debug" ]; then
 fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+SCRIPT_NAME="$(basename -- "$0")"
 
 eval "$("${SCRIPT_DIR}"/ci-info)"
 
@@ -65,15 +66,15 @@ fi
 
 set +e
 diff_file=$(mktemp /tmp/diff-XXXXXX.txt)
-echo "git diff $CI_COMMIT_RANGE > $diff_file"
+echo "echo ${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file"
 git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2>&1
 git_status=$?
 if [ $git_status -gt 1 ]; then
   CI_LINT_DIFF_ERROR="git diff exited with status $git_status"
-  cat "$diff_file"
-  git --no-pager diff --exit-code "$CI_COMMIT_RANGE"
-  git --no-pager branch -a
-  git --no-pager diff "$CI_COMMIT_RANGE"
+  sed -e 's/^/echo /' "$diff_file"
+  git --no-pager diff --exit-code "$CI_COMMIT_RANGE" | sed -e 's/^/echo /'
+  git --no-pager branch -a | sed -e 's/^/echo /'
+  git --no-pager diff "$CI_COMMIT_RANGE" | sed -e 's/^/echo /'
 elif [ ! -r "$diff_file" ]; then
   CI_LINT_DIFF_ERROR="$diff_file does not exist"
 fi
@@ -93,7 +94,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "$CI_LINT_DIFF_ERROR"
   echo "*****"
   echo
-  echo "$0 will print diagnostic information, then exit."
+  echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
   # This is not very effective because environment variables were set by
