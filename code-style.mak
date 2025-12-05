@@ -50,13 +50,17 @@ style-check: python-style-check python-typecheck
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 python-style-fix:
 ifneq (${PYTHON_FILES},)
-#	@uvx ruff --version
+# The first `uvx ruff` command outputs "Downloading ruff (13.4MiB) ...
+# Downloaded ruff", which we don't want to see.
+	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES} --fix
 endif
 python-style-check:
 ifneq (${PYTHON_FILES},)
-#	@uvx ruff --version
+# The first `uvx ruff` command outputs "Downloading ruff (13.4MiB) ...
+# Downloaded ruff", which we don't want to see.
+	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format --check ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES}
 endif
