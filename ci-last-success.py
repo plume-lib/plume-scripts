@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Usage:  ci-last-success ORG REPO [CANDIDATE]
+"""Outputs the SHA commit id of a successful CI job.
+
+Usage:  ci-last-success ORG REPO [CANDIDATE]
 
 Outputs the SHA commit id corresponding to the most recent successful CI job
 that is CANDIDATE (a SHA hash) or earlier.
@@ -17,9 +19,6 @@ import subprocess
 import sys
 
 import requests
-
-from typing import Optional
-
 
 DEBUG = False
 # DEBUG=True
@@ -46,7 +45,7 @@ if DEBUG:
 ### PROBLEM: api.github.com is returning   "state": "pending"   for commits with completed CI jobs.
 ### Maybe I need to screen-scrape a different github.com page.  :-(
 def successful(sha: str) -> bool:
-    "Return true if SHA's CI job succeeded."
+    """Return true if SHA's CI job succeeded."""
     # message=commit['commit']['message']
     url_status = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}/status"
     if DEBUG:
@@ -60,8 +59,8 @@ def successful(sha: str) -> bool:
     return result
 
 
-def parent(sha: str) -> Optional[str]:
-    "Return the SHA of the first parent of the given SHA.  Return None if this is the root."
+def parent(sha: str) -> str | None:
+    """Return the SHA of the first parent of the given SHA.  Return None if this is the root."""
     getParentResult = subprocess.run(["git", "rev-parse", sha + "^"], capture_output=True)
     if getParentResult.returncode != 0:
         return None
