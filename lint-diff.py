@@ -47,12 +47,12 @@
 
 import argparse
 import os
-import pathlib
+from pathlib import Path
 import re
 import sys
 from typing import Any
 
-PROGRAM = pathlib.Path(__file__).name
+PROGRAM = Path(__file__).name
 
 DEBUG = False
 
@@ -165,7 +165,7 @@ def diff_filenames(diff_filename: str) -> set[str]:
         All the filenames in the given diff file.
     """
     result = set()
-    with pathlib.Path(diff_filename).open(encoding="utf-8") as diff:
+    with Path(diff_filename).open(encoding="utf-8") as diff:
         for diff_line in diff:
             match = PLUSPLUSPLUS_RE.match(diff_line)
             if match:
@@ -182,7 +182,7 @@ def warning_filenames(warning_filename: str) -> set[str]:
         All the filenames in the given warning file.
     """
     result = set()
-    with pathlib.Path(warning_filename).open(encoding="utf-8") as warnings:
+    with Path(warning_filename).open(encoding="utf-8") as warnings:
         for warning_line in warnings:
             match = FILENAME_LINENO_RE.match(warning_line)
             if match:
@@ -294,7 +294,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--debug", dest="DEBUG", action="store_true", help="print diagnostic output"
     )
-    parser.add_argument("diff_filename", metavar="diff.txt", default=pathlib.Path.cwd())
+    parser.add_argument("diff_filename", metavar="diff.txt", default=Path.cwd())
     parser.add_argument("warning_filename", metavar="warnings.txt", default=None)
 
     args = parser.parse_args()
@@ -343,7 +343,7 @@ def changed_lines(args: argparse.Namespace) -> dict[str, set[int]]:
     """
     changed: dict[str, set[int]] = {}
 
-    with pathlib.Path(args.diff_filename).open(encoding="utf-8") as diff:
+    with Path(args.diff_filename).open(encoding="utf-8") as diff:
         atat_re = re.compile(r"@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*")
         # content_re = re.compile("[ +-].*")
 
@@ -412,10 +412,10 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
         result = True
         if DEBUG:
             eprint(f"lint-diff.py: diff file {args.diff_filename}:")
-            with pathlib.Path(args.diff_filename).open(encoding="utf-8") as fin:
+            with Path(args.diff_filename).open(encoding="utf-8") as fin:
                 eprint("{}", fin.read())
             eprint(f"lint-diff.py: lint file {args.warning_filename}:")
-            with pathlib.Path(args.warning_filename).open(encoding="utf-8") as fin:
+            with Path(args.warning_filename).open(encoding="utf-8") as fin:
                 eprint("{}", fin.read())
             eprint("lint-diff.py: end of input files.")
 
@@ -443,7 +443,7 @@ def main() -> None:
         warnings = sys.stdin
     else:
         # pylint: disable=consider-using-with
-        warnings = pathlib.Path(args.warning_filename).open(encoding="utf-8")  # noqa: SIM115
+        warnings = Path(args.warning_filename).open(encoding="utf-8")  # noqa: SIM115
 
     # 1 if this produced any output, 0 if not.
     status = 0

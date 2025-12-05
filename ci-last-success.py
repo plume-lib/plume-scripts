@@ -58,7 +58,7 @@ def successful(sha: str) -> bool:
     resp_status = requests.get(url_status)
     if resp_status.status_code != 200:
         # This means something went wrong, possibly rate-limiting.
-        msg = f"GET {url_status} {resp_status.status_code} {resp_status.headers}"
+        msg = f"GET {url_status} {resp_status.status_code} {resp_status.headers} {resp_status.text}"
         raise Exception(msg)
     state = resp_status.json()["state"]
     result: bool = state == "success"
