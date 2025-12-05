@@ -23,7 +23,6 @@ Exit status is 0 (success) if no conflicts remain.
 Exit status is 1 (failure) if conflicts remain.
 """
 
-import itertools
 import pathlib
 import shutil
 import sys
@@ -248,7 +247,7 @@ def merge_edits_on_different_lines(
     result: list[str] | None = None
     if base_len == len(parent1) and base_len == len(parent2):
         result = []
-        for base_line, parent1_line, parent2_line in itertools.zip_longest(base, parent1, parent2):
+        for base_line, parent1_line, parent2_line in zip(base, parent1, parent2, strict=True):
             debug_print("Considering line:", base_line, parent1_line, parent2_line)
             if parent1_line == parent2_line:
                 result.append(parent1_line)

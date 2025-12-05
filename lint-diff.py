@@ -294,7 +294,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--debug", dest="DEBUG", action="store_true", help="print diagnostic output"
     )
-    parser.add_argument("diff_filename", metavar="diff.txt", default=Path.cwd())
+    parser.add_argument("diff_filename", metavar="diff.txt", default=pathlib.Path.cwd())
     parser.add_argument("warning_filename", metavar="warnings.txt", default=None)
 
     args = parser.parse_args()

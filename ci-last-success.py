@@ -86,8 +86,8 @@ while True:
         sys.exit(0)
     the_parent = parent(commit)
     if the_parent is None:
-        print(f"{parent(commit_arg)}")
-        sys.exit(0)
+        print(f"No successful CI job found at or before {commit_arg}", file=sys.stderr)
+        sys.exit(1)
     commit = the_parent
 
 sys.exit(1)
