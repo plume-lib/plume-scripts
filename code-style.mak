@@ -1,36 +1,53 @@
-# This Makefile fragment defines `style-fix` and `style-check` targets.
+# -*- makefile -*-
+
+# This Makefile fragment defines targets:
+# * style-fix
+# * style-check
+# * plume-scripts-update
+#
 # To use it, add to another Makefile (after the default target is defined):
 #
 # ifeq (,$(wildcard .plume-scripts))
-#   git clone https://github.com/plume-lib/plume-scripts.git .plume-scripts
+# dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
 # endif
 # include .plume-scripts/code-style.mak
 #
-# You can also define variables such as:
+# BEFORE the above, you can also define variables such as:
 #
 # SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
 # BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
 # CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew
 
+# `checkbashisms` is not included by source because it uses the GPL.
+ifeq (,$(wildcard .plume-scripts/checkbashisms))
+dummy2 != (cd .plume-scripts \
+   && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
+   && chmod +x checkbashisms)
+endif
 
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts \
-  --exclude='#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
 style-fix: perl-style-fix
 style-check: perl-style-check
-PERL_FILES   := $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' | grep -v addrfilter | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
+# Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
+PERL_FILES   := $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .)
 perl-style-fix:
+ifneq (${PERL_FILES},)
 	@rm -rf *.tdy
-	@perltidy -b -gnu ${PERL_FILES}
+	@perltidy -bext='/' -gnu ${PERL_FILES}
+endif
 perl-style-check:
+ifneq (${PERL_FILES},)
 	@rm -rf *.tdy
 	@perltidy -w ${PERL_FILES}
+endif
 showvars::
 	@echo "PERL_FILES=${PERL_FILES}"
 
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
-PYTHON_FILES:=$(wildcard **/*.py) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python')
+# Any file ending with ".py" or containing a Python shebang line.
+PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 python-style-fix:
 ifneq (${PYTHON_FILES},)
 #	@uvx ruff --version
@@ -45,15 +62,17 @@ ifneq (${PYTHON_FILES},)
 endif
 python-typecheck:
 ifneq (${PYTHON_FILES},)
-	@plume-scripts/cronic uv run ty check --error-on-warning --no-progress
+	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
 
 style-fix: shell-style-fix
 style-check: shell-style-check
-SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' | grep -v addrfilter | grep -v conda-initialize.sh | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
-BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' | grep -v addrfilter | grep -v conda-initialize.sh | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
+# Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
+SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' .)
+# Any file ending with ".bash" or containing a bash shebang line.
+BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .)
 shell-style-fix:
 ifneq ($(SH_SCRIPTS)$(BASH_SCRIPTS),)
 	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_SCRIPTS} ${BASH_SCRIPTS}
@@ -72,5 +91,4 @@ showvars::
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
 
 plume-scripts-update:
-	@.plume-scripts-update git -q -C .plume-scripts pull --ff-only
-
+	@.plume-scripts/cronic git -q -C .plume-scripts pull --ff-only

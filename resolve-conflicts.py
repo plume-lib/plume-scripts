@@ -23,14 +23,15 @@ Exit status is 0 (success) if no conflicts remain.
 Exit status is 1 (failure) if conflicts remain.
 """
 
-from argparse import ArgumentParser
-import itertools
-import os
+import pathlib
 import shutil
 import sys
 import tempfile
+from argparse import ArgumentParser
+from typing import TYPE_CHECKING, TypeVar
 
-from typing import Optional, TypeVar, Sequence
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 T = TypeVar("T")  # Type variable for use in type hints
 
@@ -39,7 +40,7 @@ debug = False
 
 
 def main() -> None:  # pylint: disable=too-many-locals
-    """The main entry point."""
+    """Edit a file in place to remove certain conflict markers."""
     arg_parser = ArgumentParser()
     arg_parser.add_argument("filename")
     arg_parser.add_argument(
@@ -71,7 +72,7 @@ def main() -> None:  # pylint: disable=too-many-locals
         print("resolve-conflicts.py: supply exactly one option.")
         sys.exit(1)
 
-    with open(filename) as file:
+    with pathlib.Path(filename).open() as file:
         lines = file.readlines()
 
     # Exit status 0 means no conflicts remain, 1 means some merge conflict remains.
@@ -105,7 +106,7 @@ def main() -> None:  # pylint: disable=too-many-locals
 
         tmp.close()
         shutil.copy(tmp.name, filename)
-        os.unlink(tmp.name)
+        pathlib.Path(tmp.name).unlink()
 
     if conflicts_remain:
         sys.exit(1)
@@ -115,14 +116,17 @@ def main() -> None:  # pylint: disable=too-many-locals
 
 def looking_at_conflict(  # pylint: disable=too-many-return-statements
     filename: str, start_index: int, lines: list[str]
-) -> Optional[tuple[list[str], list[str], list[str], int]]:
-    """Tests whether the following text starts a conflict.
+) -> tuple[list[str], list[str], list[str], int] | None:
+    """Test whether the following text starts a conflict.
+
     If not, returns None.
     If so, returns a 4-tuple of (base, parent1, parent2, num_lines_in_conflict)
     where the first 3 elements of the tuple are lists of lines.
     The filename argument is used only for diagnostic messages.
-    """
 
+    Returns:
+        a 4-tuple of (base, parent1, parent2, num_lines_in_conflict), or None.
+    """
     if not lines[start_index].startswith("<<<<<<<"):
         return None
 
@@ -134,9 +138,7 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
     index = start_index + 1
     if index == num_lines:
         return None
-    while not (
-        lines[index].startswith("|||||||") or lines[index].startswith("=======")
-    ):
+    while not (lines[index].startswith("|||||||") or lines[index].startswith("=======")):
         parent1.append(lines[index])
         index = index + 1
         if index == num_lines:
@@ -157,10 +159,7 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
             index = index + 1
             if index == num_lines:
                 debug_print(
-                    "Starting at line "
-                    + str(start_index)
-                    + ", did not find ======= in "
-                    + filename
+                    "Starting at line " + str(start_index) + ", did not find ======= in " + filename
                 )
                 return None
     assert lines[index].startswith("=======")
@@ -173,10 +172,7 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
         index = index + 1
         if index == num_lines:
             debug_print(
-                "Starting at line "
-                + str(start_index)
-                + ", did not find >>>>>>> in "
-                + filename
+                "Starting at line " + str(start_index) + ", did not find >>>>>>> in " + filename
             )
             return None
     index = index + 1
@@ -191,18 +187,20 @@ def merge(  # pylint: disable=too-many-arguments
     adjacent_lines: bool,
     blank_lines: bool,
     java_imports: bool,
-) -> Optional[list[str]]:
+) -> list[str] | None:
     """Given text for the base and two parents, return merged text.
 
     Args:
         base: a list of lines
         parent1: a list of lines
         parent2: a list of lines
+        adjacent_lines: if true, try to perform adjacent-line merging
+        blank_lines: if true, try to perform blank-line merging
+        java_imports: if true, try to perform Java-import merging
 
     Returns:
         a list of lines, or None if it cannot do merging.
     """
-
     if adjacent_lines:
         adjacent_line_merge = merge_edits_on_different_lines(base, parent1, parent2)
         if adjacent_line_merge is not None:
@@ -214,11 +212,7 @@ def merge(  # pylint: disable=too-many-arguments
             return blank_line_merge
 
     if java_imports:
-        if (
-            all_import_lines(base)
-            and all_import_lines(parent1)
-            and all_import_lines(parent2)
-        ):
+        if all_import_lines(base) and all_import_lines(parent1) and all_import_lines(parent2):
             # A simplistic merge that retains all import lines in either parent.
             result = list(set(parent1 + parent2))
             result.sort()
@@ -228,27 +222,32 @@ def merge(  # pylint: disable=too-many-arguments
 
 
 def all_import_lines(lines: list[str]) -> bool:
-    """Return true if every given line is a Java import line or is blank."""
+    """Return true if every given line is a Java import line or is blank.
+
+    Returns:
+        true if every given line is a Java import line or is blank.
+    """
     return all(line.startswith("import ") or line.strip() == "" for line in lines)
 
 
 def merge_edits_on_different_lines(
     base: list[str], parent1: list[str], parent2: list[str]
-) -> Optional[list[str]]:
+) -> list[str] | None:
     """Return a merged version, if at most parent1 or parent2 edits each line.
-    Otherwise, return None.
-    """
 
+    Otherwise, return None.
+
+    Returns:
+        a merged version, or None
+    """
     debug_print("Entered merge_edits_on_different_lines", len(parent1), len(parent2))
 
     ### No lines are added or removed, only modified.
     base_len = len(base)
-    result: Optional[list[str]] = None
+    result: list[str] | None = None
     if base_len == len(parent1) and base_len == len(parent2):
         result = []
-        for base_line, parent1_line, parent2_line in itertools.zip_longest(
-            base, parent1, parent2
-        ):
+        for base_line, parent1_line, parent2_line in zip(base, parent1, parent2, strict=True):
             debug_print("Considering line:", base_line, parent1_line, parent2_line)
             if parent1_line == parent2_line:
                 result.append(parent1_line)
@@ -283,8 +282,9 @@ def merge_edits_on_different_lines(
 
 def merge_base_is_prefix_or_suffix(
     base: list[str], parent1: list[str], parent2: list[str]
-) -> Optional[list[str]]:
-    """Special cases when the base is a prefix or suffix of parent1.
+) -> list[str] | None:
+    """Handle special cases when the base is a prefix or suffix of parent1.
+
     That is, parent1 is pure additions at the beginning or end of base.  Parent2
     deleted all the lines, possibly replacing them by something else.  (We know
     this because there is no common line in base and parent2.  If there were, it
@@ -292,6 +292,9 @@ def merge_base_is_prefix_or_suffix(
     common line that's in all three texts.  The Git Merge output doesn't include
     any common context lines within the conflict markers.)
     We know the relative position of the additions in parent1.
+
+    Returns:
+        a list of strings, or null
     """
     base_len = len(base)
     parent1_len = len(parent1)
@@ -307,8 +310,11 @@ def merge_base_is_prefix_or_suffix(
 
 
 def is_subsequence(s1: Sequence[T], s2: Sequence[T]) -> bool:
-    """Returns true if s1 is subsequence of s2."""
+    """Return true if s1 is subsequence of s2.
 
+    Returns:
+        true if s1 is subsequence of s2.
+    """
     # Iterative implementation.
 
     n, m = len(s1), len(s2)
@@ -323,18 +329,25 @@ def is_subsequence(s1: Sequence[T], s2: Sequence[T]) -> bool:
     return i == n
 
 
-def merge_blank_lines(
-    base: list[str], parent1: list[str], parent2: list[str]
-) -> Optional[list[str]]:
-    "Returns parent1 if parent1 and parent2 differ only in whitespace."
+def merge_blank_lines(_base: list[str], parent1: list[str], parent2: list[str]) -> list[str] | None:
+    """Return parent1 if parent1 and parent2 differ only in whitespace.
+
+    Returns:
+        parent1 if parent1 and parent2 differ only in whitespace.
+    """
     if with_one_space(parent1) == with_one_space(parent2):
         return parent1
     return None
 
 
 def with_one_space(lines: list[str]) -> str:
-    """Turns a list of strings into a single string, with each run of whitespace replaced
-    by a single space."""
+    """Turn a list of strings into a single string, with whitespace compressed.
+
+    In the result, each run of whitespace is replaced by a single space.
+
+    Returns:
+        a string with no consecutive whitespace.
+    """
     # TODO: This could be more efficient.  Even better, I could write a loop in
     # merge_blank_lines that wouldn't need to create new strings at all. But this is
     # expedient to write and is probably fast enough.

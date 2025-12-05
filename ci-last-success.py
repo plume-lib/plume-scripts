@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Usage:  ci-last-success ORG REPO [CANDIDATE]
+"""Outputs the SHA commit id of a successful CI job.
+
+Usage:  ci-last-success ORG REPO [CANDIDATE]
 
 Outputs the SHA commit id corresponding to the most recent successful CI job
 that is CANDIDATE (a SHA hash) or earlier.
@@ -18,9 +20,6 @@ import sys
 
 import requests
 
-from typing import Optional
-
-
 DEBUG = False
 # DEBUG=True
 
@@ -30,16 +29,15 @@ if len(sys.argv) != 3 and len(sys.argv) != 4:
 
 org = sys.argv[1]
 repo = sys.argv[2]
+commit_arg = None
 if len(sys.argv) == 4:
     commit_arg = sys.argv[3]
 else:
-    gitRevParseResult = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True
-    )
-    if gitRevParseResult.returncode == 0:
-        commit_arg = gitRevParseResult.stdout.rstrip().decode("utf-8")
+    git_rev_parse_result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True)
+    if git_rev_parse_result.returncode == 0:
+        commit_arg = git_rev_parse_result.stdout.rstrip().decode("utf-8")
     else:
-        raise Exception(gitRevParseResult)
+        raise Exception(git_rev_parse_result.stderr.decode("utf-8", errors="replace"))
 
 if DEBUG:
     print(f"commit_arg: {commit_arg}")
@@ -48,7 +46,11 @@ if DEBUG:
 ### PROBLEM: api.github.com is returning   "state": "pending"   for commits with completed CI jobs.
 ### Maybe I need to screen-scrape a different github.com page.  :-(
 def successful(sha: str) -> bool:
-    "Return true if SHA's CI job succeeded."
+    """Return true if `sha`'s CI job succeeded.
+
+    Returns:
+        true if `sha`'s CI job succeeded.
+    """
     # message=commit['commit']['message']
     url_status = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}/status"
     if DEBUG:
@@ -56,22 +58,23 @@ def successful(sha: str) -> bool:
     resp_status = requests.get(url_status)
     if resp_status.status_code != 200:
         # This means something went wrong, possibly rate-limiting.
-        raise Exception(
-            f"GET {url_status} {resp_status.status_code} {resp_status.headers}"
-        )
+        msg = f"GET {url_status} {resp_status.status_code} {resp_status.headers} {resp_status.text}"
+        raise Exception(msg)
     state = resp_status.json()["state"]
     result: bool = state == "success"
     return result
 
 
-def parent(sha: str) -> Optional[str]:
-    "Return the SHA of the first parent of the given SHA.  Return None if this is the root."
-    getParentResult = subprocess.run(
-        ["git", "rev-parse", sha + "^"], capture_output=True
-    )
-    if getParentResult.returncode != 0:
+def parent(sha: str) -> str | None:
+    """Return the SHA of the first parent of the given SHA.  Return None if this is the root.
+
+    Returns:
+        the SHA of the first parent of the given SHA, or None.
+    """
+    get_parent_result = subprocess.run(["git", "rev-parse", sha + "^"], capture_output=True)
+    if get_parent_result.returncode != 0:
         return None
-    return getParentResult.stdout.rstrip().decode("utf-8")
+    return get_parent_result.stdout.rstrip().decode("utf-8")
 
 
 commit = commit_arg
@@ -83,8 +86,8 @@ while True:
         sys.exit(0)
     the_parent = parent(commit)
     if the_parent is None:
-        print(f"{parent(commit_arg)}")
-        sys.exit(0)
+        print(f"No successful CI job found at or before {commit_arg}", file=sys.stderr)
+        sys.exit(1)
     commit = the_parent
 
 sys.exit(1)
