@@ -45,7 +45,7 @@ showvars::
 
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
-PYTHON_FILES:=$(wildcard **/*.py) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python')
+PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS} '^') $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python')
 python-style-fix:
 ifneq (${PYTHON_FILES},)
 #	@uvx ruff --version
