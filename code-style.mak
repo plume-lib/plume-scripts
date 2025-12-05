@@ -1,4 +1,10 @@
-# This Makefile fragment defines `style-fix` and `style-check` targets.
+# -*- makefile -*-
+
+# This Makefile fragment defines targets:
+# * style-fix
+# * style-check
+# * plume-lib-update
+#
 # To use it, add to another Makefile (after the default target is defined):
 #
 # ifeq (,$(wildcard .plume-scripts))
@@ -82,4 +88,3 @@ showvars::
 
 plume-scripts-update:
 	@.plume-scripts-update git -q -C .plume-scripts pull --ff-only
-
