@@ -134,9 +134,7 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
     index = start_index + 1
     if index == num_lines:
         return None
-    while not (
-        lines[index].startswith("|||||||") or lines[index].startswith("=======")
-    ):
+    while not (lines[index].startswith("|||||||") or lines[index].startswith("=======")):
         parent1.append(lines[index])
         index = index + 1
         if index == num_lines:
@@ -157,10 +155,7 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
             index = index + 1
             if index == num_lines:
                 debug_print(
-                    "Starting at line "
-                    + str(start_index)
-                    + ", did not find ======= in "
-                    + filename
+                    "Starting at line " + str(start_index) + ", did not find ======= in " + filename
                 )
                 return None
     assert lines[index].startswith("=======")
@@ -173,10 +168,7 @@ def looking_at_conflict(  # pylint: disable=too-many-return-statements
         index = index + 1
         if index == num_lines:
             debug_print(
-                "Starting at line "
-                + str(start_index)
-                + ", did not find >>>>>>> in "
-                + filename
+                "Starting at line " + str(start_index) + ", did not find >>>>>>> in " + filename
             )
             return None
     index = index + 1
@@ -214,11 +206,7 @@ def merge(  # pylint: disable=too-many-arguments
             return blank_line_merge
 
     if java_imports:
-        if (
-            all_import_lines(base)
-            and all_import_lines(parent1)
-            and all_import_lines(parent2)
-        ):
+        if all_import_lines(base) and all_import_lines(parent1) and all_import_lines(parent2):
             # A simplistic merge that retains all import lines in either parent.
             result = list(set(parent1 + parent2))
             result.sort()
@@ -246,9 +234,7 @@ def merge_edits_on_different_lines(
     result: Optional[list[str]] = None
     if base_len == len(parent1) and base_len == len(parent2):
         result = []
-        for base_line, parent1_line, parent2_line in itertools.zip_longest(
-            base, parent1, parent2
-        ):
+        for base_line, parent1_line, parent2_line in itertools.zip_longest(base, parent1, parent2):
             debug_print("Considering line:", base_line, parent1_line, parent2_line)
             if parent1_line == parent2_line:
                 result.append(parent1_line)

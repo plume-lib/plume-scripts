@@ -33,9 +33,7 @@ repo = sys.argv[2]
 if len(sys.argv) == 4:
     commit_arg = sys.argv[3]
 else:
-    gitRevParseResult = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True
-    )
+    gitRevParseResult = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True)
     if gitRevParseResult.returncode == 0:
         commit_arg = gitRevParseResult.stdout.rstrip().decode("utf-8")
     else:
@@ -56,9 +54,7 @@ def successful(sha: str) -> bool:
     resp_status = requests.get(url_status)
     if resp_status.status_code != 200:
         # This means something went wrong, possibly rate-limiting.
-        raise Exception(
-            f"GET {url_status} {resp_status.status_code} {resp_status.headers}"
-        )
+        raise Exception(f"GET {url_status} {resp_status.status_code} {resp_status.headers}")
     state = resp_status.json()["state"]
     result: bool = state == "success"
     return result
@@ -66,9 +62,7 @@ def successful(sha: str) -> bool:
 
 def parent(sha: str) -> Optional[str]:
     "Return the SHA of the first parent of the given SHA.  Return None if this is the root."
-    getParentResult = subprocess.run(
-        ["git", "rev-parse", sha + "^"], capture_output=True
-    )
+    getParentResult = subprocess.run(["git", "rev-parse", sha + "^"], capture_output=True)
     if getParentResult.returncode != 0:
         return None
     return getParentResult.stdout.rstrip().decode("utf-8")
