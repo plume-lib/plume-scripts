@@ -29,7 +29,8 @@ CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.p
 
 style-fix: perl-style-fix
 style-check: perl-style-check
-PERL_FILES   := $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' | grep -v addrfilter | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
+# Any file ending with ".pl" or ".pm" or containing a Python shebang line.
+PERL_FILES   := $(shell grep -r -l --include='*.py' --include='*.pm' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^') $(shell grep -r -l --include='*.py' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl')
 perl-style-fix:
 ifneq (${PERL_FILES},)
 	@rm -rf *.tdy
@@ -45,7 +46,8 @@ showvars::
 
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
-PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS} '^') $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python')
+# Any file ending with ".py" or containing a Python shebang line.
+PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^') $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python')
 python-style-fix:
 ifneq (${PYTHON_FILES},)
 #	@uvx ruff --version
@@ -67,8 +69,10 @@ showvars::
 
 style-fix: shell-style-fix
 style-check: shell-style-check
-SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' | grep -v addrfilter | grep -v conda-initialize.sh | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
-BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' | grep -v addrfilter | grep -v conda-initialize.sh | grep -v cronic-orig | grep -v mail-stackoverflow.sh)
+# Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
+SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh')
+# Any file ending with ".bash" or containing a Python shebang line.
+BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^') $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash')
 shell-style-fix:
 ifneq ($(SH_SCRIPTS)$(BASH_SCRIPTS),)
 	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_SCRIPTS} ${BASH_SCRIPTS}
