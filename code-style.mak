@@ -34,7 +34,7 @@ PERL_FILES   := $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYL
 perl-style-fix:
 ifneq (${PERL_FILES},)
 	@rm -rf *.tdy
-	@perltidy -b -gnu ${PERL_FILES}
+	@perltidy -bext='/' -gnu ${PERL_FILES}
 endif
 perl-style-check:
 ifneq (${PERL_FILES},)
