@@ -3,8 +3,7 @@ all: style-check test
 # Code style; defines `style-check` and `style-fix`.
 CODE_STYLE_EXCLUSIONS_USER:= --exclude=cronic-orig --exclude=checkbashisms
 ifeq (,$(wildcard .plume-scripts))
-# TODO: Remove --branch
-dummy != git clone -q --branch code-style-mak https://github.com/plume-lib/plume-scripts.git .plume-scripts
+dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
 endif
 include .plume-scripts/code-style.mak
 
