@@ -91,4 +91,4 @@ showvars::
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
 
 plume-scripts-update:
-	@.plume-scripts-update git -q -C .plume-scripts pull --ff-only
+	@.plume-scripts/cronic git -q -C .plume-scripts pull --ff-only
