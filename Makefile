@@ -4,7 +4,7 @@ all: style-check test
 CODE_STYLE_EXCLUSIONS_USER:= --exclude=cronic-orig --exclude=checkbashisms
 ifeq (,$(wildcard .plume-scripts))
 # TODO: Remove --branch
-dummy != $(shell git clone -q --branch code-style-mak https://github.com/plume-lib/plume-scripts.git .plume-scripts)
+dummy != git clone -q --branch code-style-mak https://github.com/plume-lib/plume-scripts.git .plume-scripts
 endif
 include .plume-scripts/code-style.mak
 

@@ -37,7 +37,7 @@ else:
     if git_rev_parse_result.returncode == 0:
         commit_arg = git_rev_parse_result.stdout.rstrip().decode("utf-8")
     else:
-        raise Exception(git_rev_parse_result)
+        raise Exception(git_rev_parse_result.stderr.decode("utf-8", errors="replace"))
 
 if DEBUG:
     print(f"commit_arg: {commit_arg}")

@@ -50,10 +50,9 @@ import os
 import pathlib
 import re
 import sys
-from pathlib import Path
 from typing import Any
 
-PROGRAM = Path(__file__).name
+PROGRAM = pathlib.Path(__file__).name
 
 DEBUG = False
 
