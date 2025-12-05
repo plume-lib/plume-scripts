@@ -50,7 +50,7 @@ style-check: python-style-check python-typecheck
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 python-style-fix:
 ifneq (${PYTHON_FILES},)
-# The first `uvx ruff` command outputs "Downloading ruff (13.4MiB) ...
+# The first `uvx ruff` command may output "Downloading ruff (13.4MiB) ...
 # Downloaded ruff", which we don't want to see.
 	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format ${PYTHON_FILES}
@@ -58,7 +58,7 @@ ifneq (${PYTHON_FILES},)
 endif
 python-style-check:
 ifneq (${PYTHON_FILES},)
-# The first `uvx ruff` command outputs "Downloading ruff (13.4MiB) ...
+# The first `uvx ruff` command may output "Downloading ruff (13.4MiB) ...
 # Downloaded ruff", which we don't want to see.
 	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format --check ${PYTHON_FILES}
@@ -66,6 +66,9 @@ ifneq (${PYTHON_FILES},)
 endif
 python-typecheck:
 ifneq (${PYTHON_FILES},)
+# The first `uv run ty check` command may output "Using CPython 3.14.1 ...
+# ... Installed 6 packages in 4ms", which we don't want to see.
+	@uv run ty check -h > /dev/null 2>&1
 	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress
 endif
 showvars::
