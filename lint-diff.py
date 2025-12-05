@@ -47,9 +47,9 @@
 
 import argparse
 import os
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
 PROGRAM = Path(__file__).name
