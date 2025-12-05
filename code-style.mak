@@ -12,7 +12,7 @@
 # endif
 # include .plume-scripts/code-style.mak
 #
-# You can also define variables such as:
+# BEFORE the above, you can also define variables such as:
 #
 # SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
 # BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
