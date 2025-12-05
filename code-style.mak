@@ -50,8 +50,7 @@ style-check: perl-style-check
 PERL_FILES   := $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .)
 perl-style-fix:
 ifneq (${PERL_FILES},)
-	@rm -rf *.tdy
-	@perltidy -bext='/' -gnu ${PERL_FILES}
+	@perltidy -bext='/' -gnu ${PERL_FILES} && find . -name '*.tdy' -type f -delete
 endif
 perl-style-check:
 ifneq (${PERL_FILES},)
