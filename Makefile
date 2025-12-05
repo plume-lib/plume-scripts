@@ -6,7 +6,7 @@ dummy != $(shell git clone -q --branch code-style-mak https://github.com/plume-l
 endif
 include .plume-scripts/code-style.mak
 
-# `checkbashisms` is not included by source because it uses the GPL.
+# `checkbashisms` is not included by source because it is licensed under the GPL.
 ifeq (,$(wildcard checkbashisms))
 dummy2 != wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms
 endif
