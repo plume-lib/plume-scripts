@@ -27,6 +27,23 @@ endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
+style-fix: html-style-fix
+style-check: html-style-check
+# Any file ending with ".html".
+HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+html-style-fix:
+ifneq (${HTML_FILES},)
+	:
+endif
+html-style-check:
+ifneq (${HTML_FILES},)
+# The first `uv run html5validator` command may output "Downloading html5validator ...", which we don't want to see.
+	@uv run html5validator --version > /dev/null 2>&1
+	@.plume-scripts/cronic uv run html5validator ${HTML_FILES}
+endif
+showvars::
+	@echo "HTML_FILES=${HTML_FILES}"
+
 style-fix: perl-style-fix
 style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
