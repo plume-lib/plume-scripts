@@ -3,7 +3,7 @@
 # This Makefile fragment defines targets:
 # * style-fix
 # * style-check
-# * plume-lib-update
+# * plume-scripts-update
 #
 # To use it, add to another Makefile (after the default target is defined):
 #
