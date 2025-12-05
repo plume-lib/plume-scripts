@@ -7,16 +7,16 @@
 #
 # To use it, add to another Makefile (after the default target is defined):
 #
+# # Code style
+# SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
+# BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
+# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter
 # ifeq (,$(wildcard .plume-scripts))
 # dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
 # endif
 # include .plume-scripts/code-style.mak
 #
-# BEFORE the above, you can also define variables such as:
-#
-# SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
-# BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
-# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew
+# The variable definitions are optional.
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
@@ -86,7 +86,8 @@ ifneq (${PYTHON_FILES},)
 # The first `uv run ty check` command may output "Using CPython 3.14.1 ...
 # ... Installed 6 packages in 4ms", which we don't want to see.
 	@uv run ty check -h > /dev/null 2>&1
-	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress
+# Problem: `ty` ignores files passed on the command line that do not end with `.py`.
+	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress ${PYTHON_FILES}
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
