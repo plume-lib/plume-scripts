@@ -5,7 +5,9 @@
 # * style-check
 # * plume-scripts-update
 #
-# To use it, add to another Makefile (after the default target is defined):
+# To use it, add to another Makefile:
+# (Add this after the default target is defined.)
+# (The variable definitions are optional.)
 #
 # # Code style
 # SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
@@ -15,8 +17,6 @@
 # dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
 # endif
 # include .plume-scripts/code-style.mak
-#
-# The variable definitions are optional.
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
@@ -24,9 +24,16 @@ dummy2 != (cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
+# `checkbashisms` is not included to avoid code duplication.
+ifeq (,$(wildcard .ruff.toml))
+dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
+endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
+.PHONY: style-fix style-check
+
+.PHONY: html-style-fix html-style-check
 style-fix: html-style-fix
 style-check: html-style-check
 # Any file ending with ".html".
@@ -44,6 +51,7 @@ endif
 showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
 
+.PHONY: perl-style-fix perl-style-check
 style-fix: perl-style-fix
 style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
@@ -63,6 +71,7 @@ endif
 showvars::
 	@echo "PERL_FILES=${PERL_FILES}"
 
+.PHONY: python-style-fix python-style-check python-typecheck
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
@@ -94,6 +103,7 @@ endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
 
+.PHONY: shell-style-fix shell-style-check
 style-fix: shell-style-fix
 style-check: shell-style-check
 # Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
