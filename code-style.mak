@@ -29,7 +29,7 @@ ifeq (,$(wildcard .ruff.toml))
 dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
 endif
 
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
 .PHONY: style-fix style-check
 
