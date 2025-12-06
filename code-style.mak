@@ -96,21 +96,21 @@ PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CO
 python-style-fix:
 ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uvx ruff` may output "Downloading ruff ...".
-	@uvx ruff --version > /dev/null 2>&1
+	@.plume-scripts/cronic uvx ruff --version
 	@.plume-scripts/cronic uvx ruff format ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES} --fix
 endif
 python-style-check:
 ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uvx ruff` may output "Downloading ruff ...".
-	@uvx ruff --version > /dev/null 2>&1
+	@.plume-scripts/cronic uvx ruff --version
 	@.plume-scripts/cronic uvx ruff format --check ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES}
 endif
 python-typecheck:
 ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uv run ty check` may output "Using CPython ...".
-	@uv run ty check -h > /dev/null 2>&1
+	@.plume-scripts/cronic uv run ty check -h
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
 	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress ${PYTHON_FILES}
 endif
