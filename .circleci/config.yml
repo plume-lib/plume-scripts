@@ -21,10 +21,16 @@ jobs:
           paths:
             - ".git"
 
-      - run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
       - run: sudo apt update
-      - run: sudo apt -y install shfmt shellcheck devscripts
+      - run:
+          name: Install dependencies via apt
+          command: sudo apt -y install shfmt shellcheck devscripts
+      - run:
+          name: Install markdownlint
+          command: npm install markdownlint-cli2 --global
+      - run:
+          name: Install uv
+          command: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - run: make
 
