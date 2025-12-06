@@ -112,16 +112,16 @@ SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} $
 BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .)
 SH_AND_BASH_SCRIPTS := ${SH_SCRIPTS} ${BASH_SCRIPTS}
 shell-style-fix:
-ifneq ($(strip $(SH_AND_BASH_SCRIPTS)),)
+ifneq ($(strip ${SH_AND_BASH_SCRIPTS}),)
 	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS}
-	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=diff {SH_AND_BASH_SCRIPTS} | patch -p1
+	@shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1
 endif
 shell-style-check:
-ifneq ($(strip $(SH_AND_BASH_SCRIPTS)),)
+ifneq ($(strip ${SH_AND_BASH_SCRIPTS}),)
 	@.plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_SCRIPTS} ${BASH_SCRIPTS}
-	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc {SH_AND_BASH_SCRIPTS}
+	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS}
 endif
-ifneq ($(SH_SCRIPTS),)
+ifneq (${SH_SCRIPTS},)
 	@.plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
