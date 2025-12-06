@@ -46,7 +46,7 @@ endif
 html-style-check:
 ifneq ($(strip ${HTML_FILES}),)
 # The first `uv run html5validator` command may output "Downloading html5validator ...", which we don't want to see.
-	@uv run html5validator --version > /dev/null 2>&1
+	@.plume-scripts/cronic uv run html5validator --version
 	@.plume-scripts/cronic uv run html5validator ${HTML_FILES}
 endif
 showvars::
