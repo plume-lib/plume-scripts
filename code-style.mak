@@ -33,6 +33,7 @@ CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.p
 
 .PHONY: style-fix style-check
 
+
 .PHONY: html-style-fix html-style-check
 style-fix: html-style-fix
 style-check: html-style-check
@@ -50,6 +51,21 @@ ifneq (${HTML_FILES},)
 endif
 showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
+
+
+.PHONY: markdownlint-fix markdownlint-check
+style-fix: markdownlint-fix
+style-check: markdownlint-check
+MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+markdownlint-fix:
+ifneq (${MARKDOWN_FILES},)
+	markdownlint-cli2 --fix ${MARKDOWN_FILES} "#node_modules"
+endif
+markdownlint-check:
+ifneq (${MARKDOWN_FILES},)
+	markdownlint-cli2 ${MARKDOWN_FILES} "#node_modules"
+endif
+
 
 .PHONY: perl-style-fix perl-style-check
 style-fix: perl-style-fix
@@ -70,6 +86,7 @@ ifneq (${PERL_FILES},)
 endif
 showvars::
 	@echo "PERL_FILES=${PERL_FILES}"
+
 
 .PHONY: python-style-fix python-style-check python-typecheck
 style-fix: python-style-fix
@@ -103,6 +120,7 @@ endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
 
+
 .PHONY: shell-style-fix shell-style-check
 style-fix: shell-style-fix
 style-check: shell-style-check
@@ -127,6 +145,7 @@ endif
 showvars::
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
+
 
 plume-scripts-update:
 	@.plume-scripts/cronic git -q -C .plume-scripts pull --ff-only
