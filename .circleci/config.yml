@@ -24,7 +24,7 @@ jobs:
       - run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - run: sudo apt update
-      - run: sudo apt -y install shfmt shellcheck devscripts perltidy
+      - run: sudo apt -y install shfmt shellcheck devscripts
 
       - run: make
 
