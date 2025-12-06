@@ -1,3 +1,5 @@
+.PHONY: all test clean
+
 all: style-check test
 
 # Code style; defines `style-check` and `style-fix`.

@@ -9,7 +9,7 @@
 # (Add this after the default target is defined.)
 # (The variable definitions are optional.)
 #
-# # Code style
+# # Code style; defines `style-check` and `style-fix`.
 # SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
 # BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
 # CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter
@@ -95,24 +95,21 @@ style-check: python-style-check python-typecheck
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 python-style-fix:
 ifneq (${PYTHON_FILES},)
-# The first `uvx ruff` command may output "Downloading ruff (13.4MiB) ...
-# Downloaded ruff", which we don't want to see.
+# The first run of `uvx ruff` may output "Downloading ruff ...".
 	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES} --fix
 endif
 python-style-check:
 ifneq (${PYTHON_FILES},)
-# The first `uvx ruff` command may output "Downloading ruff (13.4MiB) ...
-# Downloaded ruff", which we don't want to see.
+# The first run of `uvx ruff` may output "Downloading ruff ...".
 	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format --check ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES}
 endif
 python-typecheck:
 ifneq (${PYTHON_FILES},)
-# The first `uv run ty check` command may output "Using CPython 3.14.1 ...
-# ... Installed 6 packages in 4ms", which we don't want to see.
+# The first run of `uv run ty check` may output "Using CPython ...".
 	@uv run ty check -h > /dev/null 2>&1
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
 	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress ${PYTHON_FILES}
