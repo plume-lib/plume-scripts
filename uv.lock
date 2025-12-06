@@ -115,7 +115,6 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "requests" },
-    { name = "ty" },
 ]
 
 [package.dev-dependencies]
@@ -124,10 +123,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "requests", specifier = ">=2.32.5" },
-    { name = "ty", specifier = ">=0.0.1a31" },
-]
+requires-dist = [{ name = "requests", specifier = ">=2.32.5" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ty", specifier = ">=0.0.1a31" }]
