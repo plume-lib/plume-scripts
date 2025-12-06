@@ -40,11 +40,11 @@ style-check: html-style-check
 # Any file ending with ".html".
 HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 html-style-fix:
-ifneq (${HTML_FILES},)
+ifneq ($(strip ${HTML_FILES}),)
 	:
 endif
 html-style-check:
-ifneq (${HTML_FILES},)
+ifneq ($(strip ${HTML_FILES}),)
 # The first `uv run html5validator` command may output "Downloading html5validator ...", which we don't want to see.
 	@uv run html5validator --version > /dev/null 2>&1
 	@.plume-scripts/cronic uv run html5validator ${HTML_FILES}
@@ -58,12 +58,12 @@ style-fix: markdownlint-fix
 style-check: markdownlint-check
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 markdownlint-fix:
-ifneq (${MARKDOWN_FILES},)
-	markdownlint-cli2 --fix ${MARKDOWN_FILES} "#node_modules"
+ifneq ($(strip ${MARKDOWN_FILES}),)
+	@.plume-scripts/cronic markdownlint-cli2 --fix ${MARKDOWN_FILES} "#node_modules"
 endif
 markdownlint-check:
-ifneq (${MARKDOWN_FILES},)
-	markdownlint-cli2 ${MARKDOWN_FILES} "#node_modules"
+ifneq ($(strip ${MARKDOWN_FILES}),)
+	@.plume-scripts/cronic markdownlint-cli2 ${MARKDOWN_FILES} "#node_modules"
 endif
 
 
@@ -73,13 +73,13 @@ style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
 PERL_FILES   := $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .)
 perl-style-fix:
-ifneq (${PERL_FILES},)
+ifneq ($(strip ${PERL_FILES}),)
 # I don't think that perltidy is an improvement.
 #	@perltidy -w -b -bext='/' -gnu ${PERL_FILES}
 #	@find . -name '*.tdy' -type f -delete
 endif
 perl-style-check:
-ifneq (${PERL_FILES},)
+ifneq ($(strip ${PERL_FILES}),)
 # I don't think that perltidy is an improvement.
 #	@perltidy -w ${PERL_FILES}
 #	@find . -name '*.tdy' -type f -delete
@@ -94,21 +94,21 @@ style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 python-style-fix:
-ifneq (${PYTHON_FILES},)
+ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uvx ruff` may output "Downloading ruff ...".
 	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES} --fix
 endif
 python-style-check:
-ifneq (${PYTHON_FILES},)
+ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uvx ruff` may output "Downloading ruff ...".
 	@uvx ruff --version > /dev/null 2>&1
 	@.plume-scripts/cronic uvx ruff format --check ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES}
 endif
 python-typecheck:
-ifneq (${PYTHON_FILES},)
+ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uv run ty check` may output "Using CPython ...".
 	@uv run ty check -h > /dev/null 2>&1
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
@@ -133,10 +133,10 @@ ifneq ($(strip ${SH_AND_BASH_SCRIPTS}),)
 endif
 shell-style-check:
 ifneq ($(strip ${SH_AND_BASH_SCRIPTS}),)
-	@.plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_SCRIPTS} ${BASH_SCRIPTS}
+	@.plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS}
 	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS}
 endif
-ifneq (${SH_SCRIPTS},)
+ifneq ($(strip ${SH_SCRIPTS}),)
 	@.plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
