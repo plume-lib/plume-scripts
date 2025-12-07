@@ -31,7 +31,7 @@ from argparse import ArgumentParser
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Sequence  # noqa: TC004
 
 T = TypeVar("T")  # Type variable for use in type hints
 

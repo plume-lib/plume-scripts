@@ -60,28 +60,34 @@ style-fix: markdown-style-fix
 style-check: markdown-style-check
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq ($(strip ${MARKDOWN_FILES}),)
-PYMARKDOWNLNT_EXISTS != if uv run pymarkdownlnt > /dev/null 2>&1`; then echo "yes"; else echo "no"; fi
-ifdef PYMARKDOWNLNT
-MARKDOWN_STYLE_FIX := uv run pymarkdownlnt
-MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt
-else
-MARKDOWNLINT_CLI2 != command -v markdownlint-cli2 2> /dev/null
+# Markdown linters are listed in order of increasing precedence.
+PYMARKDOWNLNT_EXISTS := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYMARKDOWNLNT_EXISTS
+MARKDOWN_STYLE_FIX := uv run pymarkdownlnt fix
+MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt scan
+endif
+MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 2> /dev/null)
 ifdef MARKDOWNLINT_CLI2
-MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "#node_modules"
-MARKDOWN_STYLE_CHECK := markdownlint-cli2 "#node_modules"
-else
+MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "\#node_modules"
+MARKDOWN_STYLE_CHECK := markdownlint-cli2 "\#node_modules"
+endif
+ifndef MARKDOWN_STYLE_FIX
 $(error "Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'")
-endif
-endif
 endif
 markdown-style-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
+	.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
 endif
 markdown-style-check:
 ifneq ($(strip ${MARKDOWN_FILES}),)
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES}
+	.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES}
 endif
+showvars::
+	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
+	@echo "PYMARKDOWNLNT_EXISTS=${PYMARKDOWNLNT_EXISTS}"
+	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
+	@echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
+	@echo "MARKDOWNLINT_CLI2=${MARKDOWNLINT_CLI2}"
 
 
 ## Perl
