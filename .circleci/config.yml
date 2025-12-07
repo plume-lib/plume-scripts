@@ -28,11 +28,16 @@ jobs:
       - run:
           name: Install markdownlint
           command: |
+            echo "Install markdownlint"
             curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            which nvm
+            nvm -v
             nvm install node
+            which node
             node -v
+            which npm
             npm -v
             npm -y install markdownlint-cli2 --global
       - run:
