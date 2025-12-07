@@ -34,6 +34,7 @@ jobs:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
 
+      - run: make showvars
       - run: make
 
 workflows:
