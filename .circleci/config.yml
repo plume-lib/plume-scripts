@@ -27,7 +27,9 @@ jobs:
           command: sudo apt -y install shfmt shellcheck devscripts
       - run:
           name: Install markdownlint
-          command: sudo npm install markdownlint-cli2 --global
+          command: |
+            sudo apt -y install npm
+            sudo npm install markdownlint-cli2 --global
       - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
