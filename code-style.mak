@@ -71,9 +71,9 @@ MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "#node_modules"
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 "#node_modules"
 else
 $(error "Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'")
-fi
-fi
-fi
+endif
+endif
+endif
 markdown-style-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
