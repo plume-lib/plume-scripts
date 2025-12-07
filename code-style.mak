@@ -34,6 +34,7 @@ CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.p
 .PHONY: style-fix style-check
 
 
+## HTML
 .PHONY: html-style-fix html-style-check
 style-fix: html-style-fix
 style-check: html-style-check
@@ -53,20 +54,44 @@ showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
 
 
-.PHONY: markdownlint-fix markdownlint-check
-style-fix: markdownlint-fix
-style-check: markdownlint-check
+## Markdown
+.PHONY: markdown-style-fix markdown-style-check
+style-fix: markdown-style-fix
+style-check: markdown-style-check
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
-markdownlint-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
-	@.plume-scripts/cronic markdownlint-cli2 --fix ${MARKDOWN_FILES} "#node_modules"
+# Markdown linters are listed in order of increasing precedence.
+PYMARKDOWNLNT_EXISTS := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYMARKDOWNLNT_EXISTS
+MARKDOWN_STYLE_FIX := uv run pymarkdownlnt fix
+MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt scan
 endif
-markdownlint-check:
+MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 2> /dev/null)
+ifdef MARKDOWNLINT_CLI2
+MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "\#node_modules"
+MARKDOWN_STYLE_CHECK := markdownlint-cli2 "\#node_modules"
+endif
+ifndef MARKDOWN_STYLE_FIX
+$(error "Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'")
+endif
+endif # ifneq ($(strip ${MARKDOWN_FILES}),)
+markdown-style-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
-	@.plume-scripts/cronic markdownlint-cli2 ${MARKDOWN_FILES} "#node_modules"
+	.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
 endif
+markdown-style-check:
+ifneq ($(strip ${MARKDOWN_FILES}),)
+	.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES}
+endif
+showvars::
+	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
+	@echo "PYMARKDOWNLNT_EXISTS=${PYMARKDOWNLNT_EXISTS}"
+	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
+	@echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
+	@echo "MARKDOWNLINT_CLI2=${MARKDOWNLINT_CLI2}"
 
 
+## Perl
 .PHONY: perl-style-fix perl-style-check
 style-fix: perl-style-fix
 style-check: perl-style-check
@@ -88,6 +113,7 @@ showvars::
 	@echo "PERL_FILES=${PERL_FILES}"
 
 
+## Python
 .PHONY: python-style-fix python-style-check python-typecheck
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
@@ -118,6 +144,7 @@ showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
 
 
+## Shell
 .PHONY: shell-style-fix shell-style-check
 style-fix: shell-style-fix
 style-check: shell-style-check
