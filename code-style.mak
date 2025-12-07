@@ -45,8 +45,8 @@ ifneq ($(strip ${HTML_FILES}),)
 endif
 html-style-check:
 ifneq ($(strip ${HTML_FILES}),)
-# The first `uv run html5validator` command may output "Downloading html5validator ...", which we don't want to see.
-	@.plume-scripts/cronic uv run html5validator --version
+# The first run of `uv run html5validator` may output "Downloading html5validator ..." to standard error.
+	@uv run html5validator --version > /dev/null 2>&1 || uv run html5validator --version
 	@.plume-scripts/cronic uv run html5validator ${HTML_FILES}
 endif
 showvars::
@@ -95,22 +95,22 @@ style-check: python-style-check python-typecheck
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 python-style-fix:
 ifneq ($(strip ${PYTHON_FILES}),)
-# The first run of `uvx ruff` may output "Downloading ruff ...".
-	@.plume-scripts/cronic uvx ruff --version
+# The first run of `uvx ruff` may output "Downloading ruff ..." to standard error.
+	@uvx ruff --version > /dev/null 2>&1 || uvx ruff --version
 	@.plume-scripts/cronic uvx ruff format ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES} --fix
 endif
 python-style-check:
 ifneq ($(strip ${PYTHON_FILES}),)
-# The first run of `uvx ruff` may output "Downloading ruff ...".
-	@.plume-scripts/cronic uvx ruff --version
+# The first run of `uvx ruff` may output "Downloading ruff ..." to standard error.
+	@uvx ruff --version > /dev/null 2>&1 || uvx ruff --version
 	@.plume-scripts/cronic uvx ruff format --check ${PYTHON_FILES}
 	@.plume-scripts/cronic uvx ruff check ${PYTHON_FILES}
 endif
 python-typecheck:
 ifneq ($(strip ${PYTHON_FILES}),)
-# The first run of `uv run ty check` may output "Using CPython ...".
-	@.plume-scripts/cronic uv run ty check -h
+# The first run of `uv run ty check` may output "Using CPython ..." to standard error.
+	@uv run ty check -h > /dev/null 2>&1 || uv run ty check -h
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
 	@.plume-scripts/cronic uv run ty check --error-on-warning --no-progress ${PYTHON_FILES}
 endif
