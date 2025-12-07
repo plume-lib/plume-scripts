@@ -28,8 +28,12 @@ jobs:
       - run:
           name: Install markdownlint
           command: |
-            sudo apt -y install npm
-            sudo npm install markdownlint-cli2 --global
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+            source ~/.bashrc
+            nvm install node
+            node -v
+            npm -v
+            npm -y install markdownlint-cli2 --global
       - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
