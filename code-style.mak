@@ -74,6 +74,7 @@ endif
 ifndef MARKDOWN_STYLE_FIX
 $(error "Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'")
 endif
+endif # ifneq ($(strip ${MARKDOWN_FILES}),)
 markdown-style-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
 	.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
