@@ -6,7 +6,7 @@ all: style-check test
 CODE_STYLE_EXCLUSIONS_USER:= --exclude=cronic-orig --exclude=checkbashisms
 ifeq (,$(wildcard .plume-scripts))
 # dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
-dummy != git clone -q --branch pymarkdownlint https://github.com/mernst/plume-scripts.git .plume-scripts
+dummy != git clone -q --branch pymarkdownlint https://github.com/plume-scripts/plume-scripts.git .plume-scripts
 endif
 include .plume-scripts/code-style.mak
 
