@@ -34,6 +34,7 @@ CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.p
 .PHONY: style-fix style-check
 
 
+## HTML
 .PHONY: html-style-fix html-style-check
 style-fix: html-style-fix
 style-check: html-style-check
@@ -53,20 +54,37 @@ showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
 
 
-.PHONY: markdownlint-fix markdownlint-check
-style-fix: markdownlint-fix
-style-check: markdownlint-check
+## Markdown
+.PHONY: markdown-style-fix markdown-style-check
+style-fix: markdown-style-fix
+style-check: markdown-style-check
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
-markdownlint-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
-	@.plume-scripts/cronic markdownlint-cli2 --fix ${MARKDOWN_FILES} "#node_modules"
+PYMARKDOWNLNT_EXISTS != if uv run pymarkdownlnt > /dev/null 2>&1`; then echo "yes"; else echo "no"; fi
+ifdef PYMARKDOWNLNT
+MARKDOWN_STYLE_FIX := uv run pymarkdownlnt
+MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt
+else
+MARKDOWNLINT_CLI2 != command -v markdownlint-cli2 2> /dev/null
+ifdef MARKDOWNLINT_CLI2
+MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "#node_modules"
+MARKDOWN_STYLE_CHECK := markdownlint-cli2 "#node_modules"
+else
+$(error "Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'")
+fi
+fi
+fi
+markdown-style-fix:
+ifneq ($(strip ${MARKDOWN_FILES}),)
+	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
 endif
-markdownlint-check:
+markdown-style-check:
 ifneq ($(strip ${MARKDOWN_FILES}),)
-	@.plume-scripts/cronic markdownlint-cli2 ${MARKDOWN_FILES} "#node_modules"
+	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES}
 endif
 
 
+## Perl
 .PHONY: perl-style-fix perl-style-check
 style-fix: perl-style-fix
 style-check: perl-style-check
@@ -88,6 +106,7 @@ showvars::
 	@echo "PERL_FILES=${PERL_FILES}"
 
 
+## Python
 .PHONY: python-style-fix python-style-check python-typecheck
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
@@ -118,6 +137,7 @@ showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
 
 
+## Shell
 .PHONY: shell-style-fix shell-style-check
 style-fix: shell-style-fix
 style-check: shell-style-check
