@@ -72,7 +72,9 @@ MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "\#node_modules"
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 "\#node_modules"
 endif
 ifndef MARKDOWN_STYLE_FIX
-$(error Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2')
+dummy4 := $(shell uv run pymarkdownlnt version)
+dummy5 := $(shell command -v markdownlint-cli2)
+$(error Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2' in $(shell pwd))
 endif
 endif # ifneq ($(strip ${MARKDOWN_FILES}),)
 markdown-style-fix:
