@@ -28,6 +28,9 @@ endif
 ifeq (,$(wildcard .ruff.toml))
 dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
 endif
+ifeq (,$(wildcard .pymarkdown))
+dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
+endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.git --exclude-dir=.venv --exclude-dir=.plume-scripts --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
