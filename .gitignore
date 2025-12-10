@@ -1,5 +1,6 @@
 *.tdy
 .plume-scripts
+.pymarkdown
 checkbashisms
 tests/lint-diff-test/guessstrip-lint-pruned.txt
 tests/lint-diff-test/reldir-lint-pruned.txt
