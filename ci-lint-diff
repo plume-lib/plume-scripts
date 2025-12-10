@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Given a file of warnings, reports only those that are in the diff for the
 # current pull request.  Works for Azure Pipelines, CircleCI, GitHub Actions,
@@ -56,12 +56,21 @@ SCRIPT_NAME="$(basename -- "$0")"
 
 eval "$("${SCRIPT_DIR}"/ci-info)"
 
+if [ -z "$CI_COMMIT_RANGE" ]; then
+  CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE is not set.\n"
+fi
+if [ -z "$CI_COMMIT_RANGE_START" ]; then
+  CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE_START is not set.\n"
+fi
+if [ -z "$CI_COMMIT_RANGE_END" ]; then
+  CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE_END is not set.\n"
+fi
 # Ensure the commits mentioned in $CI_COMMIT_RANGE are available.
 if ! git cat-file -e "${CI_COMMIT_RANGE_START}^{commit}"; then
-  CI_LINT_DIFF_ERROR="Commit CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START not found; clone more deeply."
+  CI_LINT_DIFF_ERROR+="Commit CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START not found; clone more deeply.\n"
 fi
 if ! git cat-file -e "${CI_COMMIT_RANGE_END}^{commit}"; then
-  CI_LINT_DIFF_ERROR="Commit CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END not found; clone more deeply."
+  CI_LINT_DIFF_ERROR+="Commit CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END not found; clone more deeply.\n"
 fi
 
 set +e
@@ -70,16 +79,16 @@ echo "echo ${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file"
 git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2>&1
 git_status=$?
 if [ $git_status -gt 1 ]; then
-  CI_LINT_DIFF_ERROR="git diff exited with status $git_status"
+  CI_LINT_DIFF_ERROR+="git diff exited with status $git_status"
   sed -e 's/^/echo /' "$diff_file"
   git --no-pager diff --exit-code "$CI_COMMIT_RANGE" | sed -e 's/^/echo /'
   git --no-pager branch -a | sed -e 's/^/echo /'
   git --no-pager diff "$CI_COMMIT_RANGE" | sed -e 's/^/echo /'
 elif [ ! -r "$diff_file" ]; then
-  CI_LINT_DIFF_ERROR="$diff_file does not exist"
+  CI_LINT_DIFF_ERROR+="$diff_file does not exist"
 fi
 if [ ! -s "$diff_file" ]; then
-  CI_LINT_DIFF_ERROR="ERROR: Empty diff for $CI_COMMIT_RANGE.
+  CI_LINT_DIFF_ERROR+="ERROR: Empty diff for $CI_COMMIT_RANGE.
 Try pulling base branch (often main or master) into compare branch (often your feature branch).
 Other causes of an empty diff include:
   * The commit range is a no-op, such as a commit and its revert.
@@ -91,6 +100,7 @@ fi
 if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo
   echo "*****"
+  echo "${SCRIPT_NAME} error:"
   echo "$CI_LINT_DIFF_ERROR"
   echo "*****"
   echo
@@ -160,6 +170,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   env | sort
   echo
   echo "*****"
+  echo "${SCRIPT_NAME} error:"
   echo "$CI_LINT_DIFF_ERROR"
   echo "*****"
   exit 2
