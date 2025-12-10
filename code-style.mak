@@ -12,7 +12,7 @@
 # # Code style; defines `style-check` and `style-fix`.
 # SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
 # BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
-# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter
+# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
 # ifeq (,$(wildcard .plume-scripts))
 # dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
 # endif
@@ -78,22 +78,22 @@ endif # ifneq ($(strip ${MARKDOWN_FILES}),)
 markdown-style-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
 ifndef MARKDOWN_STYLE_FIX
-	echo Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	@echo Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
-	false
+	@false
 endif
-	.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
+	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES}
 endif
 markdown-style-check:
 ifneq ($(strip ${MARKDOWN_FILES}),)
 ifndef MARKDOWN_STYLE_CHECK
-	echo Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	@echo Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
-	false
+	@false
 endif
-	.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES}
+	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES}
 endif
 showvars::
 	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
