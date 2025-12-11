@@ -66,6 +66,9 @@ MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 2> /dev/null)
 ifdef MARKDOWNLINT_CLI2
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "\#node_modules"
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 "\#node_modules"
+ifeq (,$(wildcard .markdownlint-cli2.yaml))
+dummy5 != ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml
+endif
 endif
 endif # ifneq ($(strip ${MARKDOWN_FILES}),)
 markdown-style-fix:
@@ -130,9 +133,6 @@ dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
 endif
 ifeq (,$(wildcard .pymarkdown))
 dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
-endif
-ifeq (,$(wildcard .markdownlint-cli2.yaml))
-dummy5 != ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml
 endif
 endif
 python-style-fix:
