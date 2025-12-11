@@ -41,7 +41,7 @@ Documentation [at top of file](cronic) and at <http://habilis.net/cronic/>.
 
 ### lint-diff.py
 
-Filter the ouput of tools such as `lint`, to only show output for changed
+Filter the output of tools such as `lint`, to only show output for changed
 lines in a diff or pull request.
 [Documentation](lint-diff.py) at top of file.
 
