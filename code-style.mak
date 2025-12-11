@@ -24,12 +24,14 @@ dummy2 != (cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
-# `checkbashisms` is not included to avoid code duplication.
 ifeq (,$(wildcard .ruff.toml))
 dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
 endif
 ifeq (,$(wildcard .pymarkdown))
 dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
+endif
+ifeq (,$(wildcard .markdownlint-cli2.yaml))
+dummy5 != ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml
 endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
