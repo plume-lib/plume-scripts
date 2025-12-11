@@ -4,6 +4,7 @@
   },
   "plugins": {
     "line-length": {
+      "enabled": false,
       "line_length": 100
     }
   },
