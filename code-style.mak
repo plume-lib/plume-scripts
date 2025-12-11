@@ -24,15 +24,6 @@ dummy2 != (cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
-ifeq (,$(wildcard .ruff.toml))
-dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
-endif
-ifeq (,$(wildcard .pymarkdown))
-dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
-endif
-ifeq (,$(wildcard .markdownlint-cli2.yaml))
-dummy5 != ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml
-endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
@@ -133,6 +124,17 @@ style-fix: python-style-fix
 style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
+ifneq ($(strip ${PYTHON_FILES}),)
+ifeq (,$(wildcard .ruff.toml))
+dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
+endif
+ifeq (,$(wildcard .pymarkdown))
+dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
+endif
+ifeq (,$(wildcard .markdownlint-cli2.yaml))
+dummy5 != ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml
+endif
+endif
 python-style-fix:
 ifneq ($(strip ${PYTHON_FILES}),)
 # The first run of `uvx ruff` may output "Downloading ruff ..." to standard error.
