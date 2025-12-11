@@ -22,7 +22,7 @@
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
 dummy2 := $(shell (cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
-   && chmod +x checkbashisms)
+   && chmod +x checkbashisms))
 endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
