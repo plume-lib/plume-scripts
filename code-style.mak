@@ -14,7 +14,7 @@
 # BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
 # CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
 # ifeq (,$(wildcard .plume-scripts))
-# dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
+# dummy := $(shell git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
 # endif
 # include .plume-scripts/code-style.mak
 
@@ -26,9 +26,9 @@
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
-dummy2 != (cd .plume-scripts \
+dummy2 := $(shell (cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
-   && chmod +x checkbashisms)
+   && chmod +x checkbashisms))
 endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
@@ -71,12 +71,12 @@ ifeq (,$(wildcard .pymarkdown))
 dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
 endif
 endif
-MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 2> /dev/null)
+MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 > /dev/null 2>&1)
 ifdef MARKDOWNLINT_CLI2
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix "\#node_modules"
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 "\#node_modules"
 ifeq (,$(wildcard .markdownlint-cli2.yaml))
-dummy5 != ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml
+dummy5 := $(shell ln -s .plume-scripts/.markdownlint-cli2.yaml .markdownlint-cli2.yaml)
 endif
 endif
 endif # ifneq ($(strip ${MARKDOWN_FILES}),)
@@ -138,7 +138,10 @@ style-check: python-style-check python-typecheck
 PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
 ifneq ($(strip ${PYTHON_FILES}),)
 ifeq (,$(wildcard .ruff.toml))
-dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
+dummy3 := $(shell ln -s .plume-scripts/.ruff.toml .ruff.toml)
+endif
+ifeq (,$(wildcard .pymarkdown))
+dummy4 := $(shell ln -s .plume-scripts/.pymarkdown .pymarkdown)
 endif
 endif
 python-style-fix:
