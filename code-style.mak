@@ -4,7 +4,7 @@
 # * style-fix
 # * style-check
 # * plume-scripts-update
-#
+
 # To use it, add to another Makefile:
 # (Add this after the default target is defined.)
 # (The variable definitions are optional.)
@@ -17,6 +17,12 @@
 # dummy != git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts
 # endif
 # include .plume-scripts/code-style.mak
+
+# Your .gitignore file should contain:
+# .plume-scripts
+# .markdownlint-cli2.yaml
+# .pymarkdown
+# .ruff.toml
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
@@ -61,6 +67,9 @@ PYMARKDOWNLNT_EXISTS := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1
 ifdef PYMARKDOWNLNT_EXISTS
 MARKDOWN_STYLE_FIX := uv run pymarkdownlnt fix
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt scan
+ifeq (,$(wildcard .pymarkdown))
+dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
+endif
 endif
 MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 2> /dev/null)
 ifdef MARKDOWNLINT_CLI2
@@ -130,9 +139,6 @@ PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CO
 ifneq ($(strip ${PYTHON_FILES}),)
 ifeq (,$(wildcard .ruff.toml))
 dummy3 != ln -s .plume-scripts/.ruff.toml .ruff.toml
-endif
-ifeq (,$(wildcard .pymarkdown))
-dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
 endif
 endif
 python-style-fix:
