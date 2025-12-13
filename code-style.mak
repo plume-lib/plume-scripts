@@ -68,7 +68,7 @@ ifdef PYMARKDOWNLNT_EXISTS
 MARKDOWN_STYLE_FIX := uv run pymarkdownlnt fix
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt scan
 ifeq (,$(wildcard .pymarkdown))
-dummy4 != ln -s .plume-scripts/.pymarkdown .pymarkdown
+dummy4 := $(shell ln -s .plume-scripts/.pymarkdown .pymarkdown)
 endif
 endif
 MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 > /dev/null 2>&1)
