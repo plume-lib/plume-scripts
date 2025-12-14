@@ -196,5 +196,22 @@ showvars::
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
 
 
+## YAML
+.PHONY: yaml-style-fix yaml-style-check
+style-fix: yaml-style-fix
+style-check: yaml-style-check
+# Any file ending with ".yaml" or ".yml".
+YAML_FILES   := $(shell grep -r -l --include='*.yaml' --include='*.yml' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+yaml-style-fix:
+ifneq ($(strip ${YAML_FILES}),)
+endif
+yaml-style-check:
+ifneq ($(strip ${YAML_FILES}),)
+	@.plume-scripts/cronic yamllint ${YAML_FILES}
+endif
+showvars::
+	@echo "YAML_FILES=${YAML_FILES}"
+
+
 plume-scripts-update:
 	@.plume-scripts/cronic git -q -C .plume-scripts pull --ff-only
