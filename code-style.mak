@@ -97,10 +97,10 @@ ifdef PYMARKDOWNLNT_EXISTS_UV
 MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown fix
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown scan
 endif
-MARKDOWNLINT_CLI2 := $(shell command -v markdownlint-cli2 > /dev/null 2>&1)
+MARKDOWNLINT_CLI2 := $(shell if command -v markdownlint-cli2 > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2
-MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .markdownlint-cli2.yaml "\#node_modules"
-MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 endif
 endif # ifneq (,$(strip ${MARKDOWN_FILES}))
 markdown-style-fix:
@@ -170,7 +170,7 @@ RUFF_EXISTS_UV := $(shell if uv run ruff version > /dev/null 2>&1; then echo "ye
 ifdef RUFF_EXISTS_UV
 RUFF := uv run ruff
 endif
-RUFF_EXISTS_UVX := $(shell if uvx ty version > /dev/null 2>&1; then echo "yes"; fi)
+TY_EXISTS_UVX := $(shell if uvx ty version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef TY_EXISTS_UVX
 TY := uvx ty
 endif
@@ -181,22 +181,27 @@ endif
 endif # ifneq (,$(strip ${HTML_FILES}))
 python-style-fix:
 ifneq (,$(strip ${PYTHON_FILES}))
-	@.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} --version && false)
-	@.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} --version && false)
+	@.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	@.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 python-style-check:
 ifneq (,$(strip ${PYTHON_FILES}))
-	@.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} --version && false)
-	@.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} --version && false)
+	@.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	@.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 python-typecheck:
 ifneq (,$(strip ${PYTHON_FILES}))
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
-	@.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} --version && false)
+	@.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
-
+	@echo "RUFF=${RUFF}"
+	@echo "RUFF_EXISTS_UVX=${RUFF_EXISTS_UVX}"
+	@echo "RUFF_EXISTS_UV=${RUFF_EXISTS_UV}"
+	@echo "TY=${TY}"
+	@echo "TY_EXISTS_UVX=${TY_EXISTS_UVX}"
+	@echo "TY_EXISTS_UV=${TY_EXISTS_UV}"
 
 ## Shell
 .PHONY: shell-style-fix shell-style-check
@@ -236,7 +241,7 @@ ifneq (,$(strip ${YAML_FILES}))
 endif
 yaml-style-check:
 ifneq (,$(strip ${YAML_FILES}))
-	@.plume-scripts/cronic yamllint -c .plume-scripts/.yamllint.yaml ${YAML_FILES}
+	@.plume-scripts/cronic yamllint -c .plume-scripts/.yamllint.yaml --format parsable ${YAML_FILES}
 endif
 showvars::
 	@echo "YAML_FILES=${YAML_FILES}"
