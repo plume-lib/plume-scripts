@@ -115,7 +115,7 @@ ifndef MARKDOWN_STYLE_FIX
 	-command -v markdownlint-cli2
 	@false
 endif
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || ($(MARKDOWN_STYLE_VERSION} && false)
+	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
 markdown-style-check:
 ifneq (,$(strip ${MARKDOWN_FILES}))
@@ -126,7 +126,7 @@ ifndef MARKDOWN_STYLE_CHECK
 	-command -v markdownlint-cli2
 	@false
 endif
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || ($(MARKDOWN_STYLE_VERSION} && false)
+	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
 showvars::
 	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
