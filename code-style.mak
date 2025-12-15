@@ -63,8 +63,16 @@ style-check: markdown-style-check
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq ($(strip ${MARKDOWN_FILES}),)
 # Markdown linters are listed in order of increasing precedence.
-PYMARKDOWNLNT_EXISTS := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYMARKDOWNLNT_EXISTS
+PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYMARKDOWNLNT_EXISTS_UVX
+MARKDOWN_STYLE_FIX := uvx pymarkdownlnt fix
+MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt scan
+ifeq (,$(wildcard .pymarkdown))
+dummy4 := $(shell ln -s .plume-scripts/.pymarkdown .pymarkdown)
+endif
+endif
+PYMARKDOWNLNT_EXISTS_UV := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYMARKDOWNLNT_EXISTS_UV
 MARKDOWN_STYLE_FIX := uv run pymarkdownlnt fix
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt scan
 ifeq (,$(wildcard .pymarkdown))
@@ -83,7 +91,8 @@ endif # ifneq ($(strip ${MARKDOWN_FILES}),)
 markdown-style-fix:
 ifneq ($(strip ${MARKDOWN_FILES}),)
 ifndef MARKDOWN_STYLE_FIX
-	@echo Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
 	@false
@@ -93,7 +102,8 @@ endif
 markdown-style-check:
 ifneq ($(strip ${MARKDOWN_FILES}),)
 ifndef MARKDOWN_STYLE_CHECK
-	@echo Cannot find 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
 	@false
