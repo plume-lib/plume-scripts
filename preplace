@@ -106,7 +106,7 @@ sub collect {
     # print STDERR "-f $fullname = $result\n";
   }
   # Never consider version control directories.
-  # (This needs to be documented and customizable.)
+  # TODO: Document this and make it customizable.
   if ((-d $fullname)
       && ($_ =~ /^(\.bzr|CVS|\.git|\.gradle|\.hg|\.svn)$/)) {
     $File::Find::prune = 1;
@@ -151,6 +151,10 @@ if ($debug) {
 foreach my $file (@filelist) {
   if ($debug) {
     print STDERR "file: <<$file>>\n";
+  }
+  # TODO: Document this and make it customizable.
+  if ($file =~ /\.(class|pyc)$/) {
+    next;
   }
   if (! open(SEARCH, $file)) {
     print STDERR "Can't open file $file for read: $!\n";
