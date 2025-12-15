@@ -99,7 +99,7 @@ MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown f
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
 endif
-MARKDOWNLINT_CLI2 := $(shell if command -v markdownlint-cli2 > /dev/null 2>&1; then echo "yes"; fi)
+MARKDOWNLINT_CLI2 := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
@@ -112,7 +112,7 @@ ifndef MARKDOWN_STYLE_FIX
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
-	-command -v markdownlint-cli2
+	-markdownlint-cli2 --version
 	@false
 endif
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
