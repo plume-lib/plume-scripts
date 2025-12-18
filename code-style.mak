@@ -28,7 +28,7 @@ dummy := $(shell (cd .plume-scripts \
    && chmod +x checkbashisms))
 endif
 
-plume-scripts-update:
+plume-scripts-update update-plume-scripts:
 	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
 
 
@@ -39,8 +39,8 @@ CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclu
 
 ## HTML
 .PHONY: html-style-fix html-style-check
-style-fix: html-style-fix
-style-check: html-style-check
+style-fix fix-style: html-style-fix
+style-check check-style: html-style-check
 # Any file ending with ".html".
 HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq (,$(strip ${HTML_FILES}))
