@@ -29,7 +29,7 @@ dummy := $(shell (cd .plume-scripts \
 endif
 
 plume-scripts-update:
-	@.plume-scripts/cronic git -q -C .plume-scripts pull --ff-only
+	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
 
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
