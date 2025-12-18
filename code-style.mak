@@ -23,11 +23,14 @@
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
-dummy := $(shell (cd .plume-scripts \
+dummy := $(shell cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
-   && chmod +x checkbashisms))
+   && chmod +x checkbashisms)
 endif
-
+ifeq (,$(wildcard .git/hooks/pre-commit))
+dummy := $(shell cd .git/hooks \
+   && ln -s ../../.plume-scripts/code-style-pre-commit pre-commit)
+endif
 
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
