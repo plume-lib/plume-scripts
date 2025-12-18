@@ -27,8 +27,8 @@ config:
 # customRules:
 #   - markdownlint-rule-extended-ascii
 
-# Fix any fixable errors
-fix: true
+# Always fix any fixable errors; equivalent to passing `--fix`.
+fix: false
 
 # # Define a custom front matter pattern
 # frontMatter: "<head>[^]*<\/head>"
