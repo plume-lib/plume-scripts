@@ -199,6 +199,23 @@ format](https://www.gnu.org/prep/standards/html_node/Errors.html).  This is
 useful for compilers such as javac that process files in nondeterministic order.
 [Documentation](sort-compiler-output) at top of file.
 
+## Style checking (linting) and fixing
+
+### code-style.mak
+
+`code-style.mak` is a Makefile that defines targets `style-check` and
+`style-fix`.  You can include this Makefile within your own (see
+[documentation](code-style.mak)).  Then `make style-check` will run a linter on
+any files of these types that exist under the Makefile:
+HTML,
+Markdown,
+Python,
+Shell scripts,
+YAML.
+You can explicitly
+exclude files and directories from style checking.
+[Documentation](code-style.mak) at top of file.
+
 ## Java
 
 ### classfile_check_version

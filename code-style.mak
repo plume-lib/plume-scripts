@@ -1,9 +1,10 @@
 # -*- makefile -*-
 
 # This Makefile fragment defines targets:
-# * style-fix
-# * style-check
-# * plume-scripts-update
+# * style-check : runs a linter on all HTML, Markdown, Python, Shell, and YAML
+#   files in or under the current.
+# * style-fix : fixes linting problems, where possible.  Not all can be fixed.
+# * plume-scripts-update : updates the linting rules to the latest version.
 
 # To use it, add to another Makefile:
 # (Add this after the default target is defined.)
