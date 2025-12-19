@@ -259,13 +259,20 @@ ifneq (,$(strip ${PYTHON_FILES}))
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
-	${RUFF} version
+ifneq (,$(strip ${PYTHON_FILES}))
 	@echo "RUFF_EXISTS_UVX=${RUFF_EXISTS_UVX}"
 	@echo "RUFF_EXISTS_UV=${RUFF_EXISTS_UV}"
-	${TY} version
+	@echo "RUFF=${RUFF}"
+ifdef RUFF
+	${RUFF} version
+endif
 	@echo "TY_EXISTS_UVX=${TY_EXISTS_UVX}"
 	@echo "TY_EXISTS_UV=${TY_EXISTS_UV}"
-
+	@echo "TY=${TY}"
+ifdef TY
+	${TY} version
+endif
+endif
 
 ## Shell
 .PHONY: shell-style-fix shell-style-check
