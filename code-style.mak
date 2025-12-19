@@ -136,7 +136,9 @@ endif
 endif
 showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
+ifneq (,$(strip ${HTML_FILES}))
 	${HTML_STYLE_VERSION}
+endif
 
 
 ## Markdown
@@ -189,11 +191,13 @@ endif
 endif
 showvars::
 	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
+ifneq (,$(strip ${MARKDOWN_FILES}))
 	${MARKDOWN_STYLE_VERSION}
 	@echo "PYMARKDOWNLNT_EXISTS=${PYMARKDOWNLNT_EXISTS}"
 	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
 	@echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
 	@echo "MARKDOWNLINT_CLI2=${MARKDOWNLINT_CLI2}"
+endif
 
 
 ## Perl
@@ -283,6 +287,8 @@ SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} $
 # Any file ending with ".bash" or containing a bash shebang line.
 BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .)
 SH_AND_BASH_SCRIPTS := ${SH_SCRIPTS} ${BASH_SCRIPTS}
+SHFMT_EXISTS := $(shell if shfmt --version > /dev/null 2>&1; then echo "yes"; fi)
+SHELLCHECK_EXISTS := $(shell if shellcheck --version > /dev/null 2>&1; then echo "yes"; fi)
 shell-style-fix:
 ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
 	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
@@ -299,8 +305,16 @@ endif
 showvars::
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
+ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
+	@echo "SHFMT_EXISTS=${SHFMT_EXISTS}"
+ifneq (,${SHFMT_EXISTS})
 	shfmt --version
+endif
+	@echo "SHELLCHECK_EXISTS=${SHELLCHECK_EXISTS}"
+ifneq (,${SHELLCHECK_EXISTS})
 	shellcheck --version | head -2
+endif
+endif
 
 
 ## YAML
