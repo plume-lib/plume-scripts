@@ -65,6 +65,10 @@ Works for either space- or colon- delimiated paths.
 
 ## Continuous integration
 
+### is-ci.sh
+
+Prints "yes" if this process is running under CI.  Prints nothing otherwise.
+
 ### ci-info
 
 Obtains information about a CI (continuous integration) job, such as the
