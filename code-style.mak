@@ -111,7 +111,7 @@ HTML5VALIDATOR_EXISTS_UV := $(shell if uv run html5validator --version > /dev/nu
 ifdef HTML5VALIDATOR_EXISTS_UV
 HTML_STYLE_FIX := uv run html5validator fix
 HTML_STYLE_CHECK := uv run html5validator scan --show-warnings
-HTML_STYLE_VERSION := uv html5validator --version
+HTML_STYLE_VERSION := uv run html5validator --version
 endif
 endif # ifneq (,$(strip ${HTML_FILES}))
 html-style-fix:
