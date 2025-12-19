@@ -316,7 +316,7 @@ YAML_STYLE_VERSION := uvx yamllint --version
 endif
 PYYAMLLNT_EXISTS_UV := $(shell if uv run yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYYAMLLNT_EXISTS_UV
-YAML_STYLE_CHECK := uv yamllint -c .plume-scripts/.yamllint.yaml --format parsable
+YAML_STYLE_CHECK := uv run yamllint -c .plume-scripts/.yamllint.yaml --format parsable
 YAML_STYLE_VERSION := uv run yamllint --version
 endif
 endif # ifneq (,$(strip ${YAML_FILES}))
