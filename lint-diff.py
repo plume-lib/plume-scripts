@@ -412,11 +412,9 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
         result = True
         if DEBUG:
             eprint(f"lint-diff.py: diff file {args.diff_filename}:")
-            with Path(args.diff_filename).open(encoding="utf-8") as fin:
-                eprint("{}", fin.read())
+            eprint("{}", Path(args.diff_filename).read_text(encoding="utf-8"))
             eprint(f"lint-diff.py: lint file {args.warning_filename}:")
-            with Path(args.warning_filename).open(encoding="utf-8") as fin:
-                eprint("{}", fin.read())
+            eprint("{}", Path(args.warning_filename).read_text(encoding="utf-8"))
             eprint("lint-diff.py: end of input files.")
 
     return result
