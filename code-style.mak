@@ -86,10 +86,12 @@ dummy := $(shell cd .plume-scripts \
    && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
+# Install a git pre-commit hook if one doesn't already exist.
 ifeq (,$(wildcard .git/hooks/pre-commit))
 dummy := $(shell cd .git/hooks \
    && ln -s ../../.plume-scripts/code-style-pre-commit pre-commit)
 endif
+
 
 ## HTML
 .PHONY: html-style-fix html-style-check
@@ -99,39 +101,42 @@ style-check check-style: html-style-check
 HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq (,$(strip ${HTML_FILES}))
 # HTML linters are listed in order of increasing precedence.
-HTML5VALIDATOR_EXISTS_UVX := $(shell if uvx html5validator version > /dev/null 2>&1; then echo "yes"; fi)
+HTML5VALIDATOR_EXISTS_UVX := $(shell if uvx html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef HTML5VALIDATOR_EXISTS_UVX
 HTML_STYLE_FIX := uvx html5validator fix
 HTML_STYLE_CHECK := uvx html5validator scan --show-warnings
+HTML_STYLE_VERSION := uvx html5validator --version
 endif
-HTML5VALIDATOR_EXISTS_UV := $(shell if uv run html5validator version > /dev/null 2>&1; then echo "yes"; fi)
+HTML5VALIDATOR_EXISTS_UV := $(shell if uv run html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef HTML5VALIDATOR_EXISTS_UV
 HTML_STYLE_FIX := uv run html5validator fix
 HTML_STYLE_CHECK := uv run html5validator scan --show-warnings
+HTML_STYLE_VERSION := uv html5validator --version
 endif
 endif # ifneq (,$(strip ${HTML_FILES}))
 html-style-fix:
 ifneq (,$(strip ${HTML_FILES}))
 ifndef HTML_STYLE_FIX
 	@echo Cannot find 'uvx html5validator' or 'uv run html5validator'
-	-uvx html5validator version
-	-uv run html5validator version
+	-uvx html5validator --version
+	-uv run html5validator --version
 	@false
 endif
-	@.plume-scripts/cronic ${HTML_STYLE_FIX} ${HTML_FILES}
+	@.plume-scripts/cronic ${HTML_STYLE_FIX} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
 html-style-check:
 ifneq (,$(strip ${HTML_FILES}))
 ifndef HTML_STYLE_CHECK
 	@echo Cannot find 'uvx html5validator' or 'uv run html5validator'
-	-uvx html5validator version
-	-uv run html5validator version
+	-uvx html5validator --version
+	-uv run html5validator --version
 	@false
 endif
-	@.plume-scripts/cronic ${HTML_STYLE_CHECK} ${HTML_FILES}
+	@.plume-scripts/cronic ${HTML_STYLE_CHECK} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
 showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
+	${HTML_STYLE_VERSION}
 
 
 ## Markdown
@@ -157,7 +162,7 @@ MARKDOWNLINT_CLI2 := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; th
 ifdef MARKDOWNLINT_CLI2
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
-MARKDOWN_STYLE_VERSION := markdownlint-cli2 --version
+MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
 endif
 endif # ifneq (,$(strip ${MARKDOWN_FILES}))
 markdown-style-fix:
@@ -184,6 +189,7 @@ endif
 endif
 showvars::
 	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
+	${MARKDOWN_STYLE_VERSION}
 	@echo "PYMARKDOWNLNT_EXISTS=${PYMARKDOWNLNT_EXISTS}"
 	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
 	@echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
@@ -253,10 +259,10 @@ ifneq (,$(strip ${PYTHON_FILES}))
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
-	@echo "RUFF=${RUFF}"
+	${RUFF} version
 	@echo "RUFF_EXISTS_UVX=${RUFF_EXISTS_UVX}"
 	@echo "RUFF_EXISTS_UV=${RUFF_EXISTS_UV}"
-	@echo "TY=${TY}"
+	${TY} version
 	@echo "TY_EXISTS_UVX=${TY_EXISTS_UVX}"
 	@echo "TY_EXISTS_UV=${TY_EXISTS_UV}"
 
@@ -272,13 +278,13 @@ BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${COD
 SH_AND_BASH_SCRIPTS := ${SH_SCRIPTS} ${BASH_SCRIPTS}
 shell-style-fix:
 ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
-	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS}
-	@shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1
+	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
 endif
 shell-style-check:
 ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
-	@.plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS}
-	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS}
+	@.plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
 endif
 ifneq (,$(strip ${SH_SCRIPTS}))
 	@.plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
@@ -286,6 +292,8 @@ endif
 showvars::
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
+	shfmt --version
+	shellcheck --version | head -2
 
 
 ## YAML
@@ -321,6 +329,7 @@ ifneq (,$(strip ${YAML_FILES}))
 endif
 showvars::
 	@echo "YAML_FILES=${YAML_FILES}"
+	${YAML_STYLE_VERSION}
 	@echo "YAMLLINT_EXISTS=${YAMLLINT_EXISTS}"
 	@echo "YAML_STYLE_FIX=${YAML_STYLE_FIX}"
 	@echo "YAML_STYLE_CHECK=${YAML_STYLE_CHECK}"
