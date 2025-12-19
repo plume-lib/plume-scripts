@@ -1,37 +1,65 @@
 # -*- makefile -*-
 
+###########################################################################
+### Documentation
+###
+
 # This Makefile fragment defines targets:
 # * style-check : runs a linter on all HTML, Markdown, Python, Shell, and YAML
 #   files in or under the current.
 # * style-fix : fixes linting problems, where possible.  Not all can be fixed.
 # * plume-scripts-update : updates the linting rules to the latest version.
 
-# To use it, add to another Makefile:
-# (Add this after the default target is defined.)
-# (The variable definitions are optional.)
+# To use it, add these 5 lines to your Makefile:
 #
 # # Code style; defines `style-check` and `style-fix`.
-# SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
-# BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
-# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
 # ifeq (,$(wildcard .plume-scripts))
 # dummy := $(shell git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
 # endif
 # include .plume-scripts/code-style.mak
+#
+# Optionally, to add or remove files from style checking, define one
+# or more of these variables, before the above snippet:
+#
+# SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
+# BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
+# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
 
+# You can disable all style checking by setting environment variable
+# CODE_STYLE_DISABLE to a non-empty value.
+
+# Requirements/dependencies
+#
 # You need to install tools depending on what type of files your project contains:
-# * mest always be installed: `make`
+# * must always be installed: `make`
 # * for HTML checking: Python, uv
 # * for Markdown checking: either of these:
-#   * node, npm, markdownlint-cli2
+#   * npm, markdownlint-cli2
 #   * Python, uv
 # * for Perl checking: nothing (Perl checking is currently a no-op)
 # * for Python checking: Python, uv
 # * for Shell checking: shellcheck, shfmt
 # * for YAML checking: yamllint
+#
+# Instructions for installing these tools:
+# * Python is probably already installed on your system
+# * [uv](https://docs.astral.sh/uv/#installation)
+# * [shellcheck](https://github.com/koalaman/shellcheck?tab=readme-ov-file#installing)
+# * [shfmt](https://webinstall.dev/shfmt/)
+# * [shellcheck](https://github.com/koalaman/shellcheck#user-content-installing)
+# * [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2#install)
+# * [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+# * [yamllint](https://yamllint.readthedocs.io/en/stable/quickstart.html#installing-yamllint)
 
-# Your .gitignore file should contain:
+# Your `.gitignore` file should contain this line:
 # .plume-scripts
+
+###########################################################################
+### The code
+###
+
+# This "if" is closed at the very end of the file.
+ifneq ($(CODE_STYLE_DISABLE),)
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
@@ -264,3 +292,7 @@ showvars::
 
 plume-scripts-update update-plume-scripts:
 	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
+
+
+endif # ifneq ($(CODE_STYLE_DISABLE),)
+
