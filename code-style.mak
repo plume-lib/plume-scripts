@@ -61,7 +61,7 @@
 # Set the variables *before* your makefile includes `code-style.mak`.
 
 ifndef CODE_STYLE_EXCLUSIONS
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 endif
 
 
