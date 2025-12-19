@@ -18,6 +18,17 @@
 # endif
 # include .plume-scripts/code-style.mak
 
+# You need to install tools depending on what type of files your project contains:
+# * mest always be installed: `make`
+# * for HTML checking: Python, uv
+# * for Markdown checking: either of these:
+#   * node, npm, markdownlint-cli2
+#   * Python, uv
+# * for Perl checking: nothing (Perl checking is currently a no-op)
+# * for Python checking: Python, uv
+# * for Shell checking: shellcheck, shfmt
+# * for YAML checking: yamllint
+
 # Your .gitignore file should contain:
 # .plume-scripts
 
