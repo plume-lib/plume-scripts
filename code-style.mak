@@ -25,8 +25,8 @@
 # BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
 # CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
 
-# You can disable all style checking by setting environment variable
-# CODE_STYLE_DISABLE to a non-empty value.
+# You can disable all style checking by defining environment variable
+# CODE_STYLE_DISABLE to any value.
 
 # Requirements/dependencies
 #
@@ -39,7 +39,7 @@
 # * for Perl checking: nothing (Perl checking is currently a no-op)
 # * for Python checking: Python, uv
 # * for Shell checking: shellcheck, shfmt
-# * for YAML checking: yamllint
+# * for YAML checking: Python, uv
 #
 # Instructions for installing these tools:
 # * Python is probably already installed on your system
@@ -49,17 +49,36 @@
 # * [shellcheck](https://github.com/koalaman/shellcheck#user-content-installing)
 # * [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2#install)
 # * [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-# * [yamllint](https://yamllint.readthedocs.io/en/stable/quickstart.html#installing-yamllint)
 
 # Your `.gitignore` file should contain this line:
 # .plume-scripts
+
+
+###########################################################################
+### User-overridable variables
+###
+
+# Set the variables *before* your makefile includes `code-style.mak`.
+
+ifndef CODE_STYLE_EXCLUSIONS
+CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+endif
+
 
 ###########################################################################
 ### The code
 ###
 
-# This "if" is closed at the very end of the file.
-ifneq ($(CODE_STYLE_DISABLE),)
+.PHONY: style-fix style-check
+
+# This "if" is closed nearly at the end of the file.
+ifdef CODE_STYLE_DISABLE
+$(info CODE_STYLE_DISABLE is defined)
+style-check:
+	@echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-check` does nothing.'
+style-fix:
+	@echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-fix` does nothing.'
+else # This "else" is closed nearly at the end of the file.
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
@@ -71,11 +90,6 @@ ifeq (,$(wildcard .git/hooks/pre-commit))
 dummy := $(shell cd .git/hooks \
    && ln -s ../../.plume-scripts/code-style-pre-commit pre-commit)
 endif
-
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
-
-.PHONY: style-fix style-check
-
 
 ## HTML
 .PHONY: html-style-fix html-style-check
@@ -246,6 +260,7 @@ showvars::
 	@echo "TY_EXISTS_UVX=${TY_EXISTS_UVX}"
 	@echo "TY_EXISTS_UV=${TY_EXISTS_UV}"
 
+
 ## Shell
 .PHONY: shell-style-fix shell-style-check
 style-fix: shell-style-fix
@@ -279,20 +294,41 @@ style-fix: yaml-style-fix
 style-check: yaml-style-check
 # Any file ending with ".yaml" or ".yml".
 YAML_FILES   := $(shell grep -r -l --include='*.yaml' --include='*.yml' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+ifneq (,$(strip ${YAML_FILES}))
+# YAML linters are listed in order of increasing precedence.
+YAMLLINT := $(shell if yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef YAMLLINT
+YAML_STYLE_CHECK := yamllint -c .plume-scripts/.yamllint.yaml --format parsable
+YAML_STYLE_VERSION := yamllint --version
+endif
+PYYAMLLNT_EXISTS_UVX := $(shell if uvx yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYYAMLLNT_EXISTS_UVX
+YAML_STYLE_CHECK := uvx yamllint -c .plume-scripts/.yamllint.yaml --format parsable
+YAML_STYLE_VERSION := uvx yamllint --version
+endif
+PYYAMLLNT_EXISTS_UV := $(shell if uv run yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYYAMLLNT_EXISTS_UV
+YAML_STYLE_CHECK := uv yamllint -c .plume-scripts/.yamllint.yaml --format parsable
+YAML_STYLE_VERSION := uv run yamllint --version
+endif
+endif # ifneq (,$(strip ${YAML_FILES}))
 yaml-style-fix:
 ifneq (,$(strip ${YAML_FILES}))
 endif
 yaml-style-check:
 ifneq (,$(strip ${YAML_FILES}))
-	@.plume-scripts/cronic yamllint -c .plume-scripts/.yamllint.yaml --format parsable ${YAML_FILES}
+	@.plume-scripts/cronic ${YAML_STYLE_CHECK} ${YAML_FILES} || (${YAML_STYLE_VERSION} && false)
 endif
 showvars::
 	@echo "YAML_FILES=${YAML_FILES}"
-
-
-plume-scripts-update update-plume-scripts:
-	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
+	@echo "YAMLLINT_EXISTS=${YAMLLINT_EXISTS}"
+	@echo "YAML_STYLE_FIX=${YAML_STYLE_FIX}"
+	@echo "YAML_STYLE_CHECK=${YAML_STYLE_CHECK}"
+	@echo "YAMLLINT=${YAMLLINT}"
 
 
 endif # ifneq ($(CODE_STYLE_DISABLE),)
 
+
+plume-scripts-update update-plume-scripts:
+	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
