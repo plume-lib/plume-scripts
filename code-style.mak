@@ -141,6 +141,15 @@ ifneq (,$(strip ${HTML_FILES}))
 endif
 
 
+## Makefiles
+# I cannot find any decent Makefile linting tool, that handles
+# non-trivial Makefiles (like this one!).  Three inadequate tools
+# (best to worst) are:
+# https://github.com/EbodShojaei/bake
+# https://github.com/checkmake/checkmake
+# https://crates.io/crates/unmake
+
+
 ## Markdown
 .PHONY: markdown-style-fix markdown-style-check
 style-fix: markdown-style-fix
