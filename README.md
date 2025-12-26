@@ -228,6 +228,11 @@ Check that a class file's version is &leq; the specified version.
 This ensures that the class will run on a particular version of Java.
 Documentation [at top of file](classfile_check_version).
 
+### jacoco-coverage-rachet
+
+Check that the Jacoco coverage has not decreased for any class.
+Documentation [at top of file](jacoco-coverage-rachet).
+
 ## LaTeX
 
 ### latex-process-inputs
