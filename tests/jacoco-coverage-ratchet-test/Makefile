@@ -1,6 +1,6 @@
 PROGRAM=../../jacoco-coverage-ratchet
 
-.PHONY: test test12 test21 test13 test31
+.PHONY: clean test test12 test21 test13 test31
 test: test12 test21 test13 test31
 
 test12:

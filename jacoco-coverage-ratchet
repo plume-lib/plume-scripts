@@ -85,17 +85,5 @@ def check_coverage_ratio(
     return True
 
 
-def coverage_ratio(coverage_pair: tuple[str, str]) -> float:
-    """Return the coverage ratio for the given (missed, covered) tuple.
-
-    Returns:
-        the coverage ratio for the given (missed, covered) tuple.
-    """
-    missed = int(coverage_pair[0])
-    covered = int(coverage_pair[1])
-    ratio = covered / (covered + missed)
-    return ratio
-
-
 if __name__ == "__main__":
     main()
