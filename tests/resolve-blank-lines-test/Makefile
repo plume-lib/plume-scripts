@@ -1,5 +1,7 @@
 PROGRAM=../../resolve-blank-lines
 
+test: diff
+
 diff: MergedGoal.java Merged.java
 	diff -u $^
 

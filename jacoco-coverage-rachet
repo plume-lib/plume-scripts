@@ -1,4 +1,4 @@
-!/usr/bin/env python3
+#!/usr/bin/env python3
 """Exits with failure message if, for any single class, coverage goes down.
 
 Arguments: two Jacoco coverage reports (.csv files).
@@ -33,7 +33,12 @@ def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
     return result
 
 
-def assert_coverage_ratio(class_name, old_pair, new_pair) -> bool:
+def check_coverage_ratio(class_name, old_pair, new_pair) -> bool:
+    """Return false if the coverage decreased, true otherwise.
+
+    Returns:
+         false if the coverage decreased, true otherwise.
+    """
     old_missed = int(old_pair[0])
     old_covered = int(old_pair[1])
     old_denominator = old_covered + old_missed
@@ -44,7 +49,9 @@ def assert_coverage_ratio(class_name, old_pair, new_pair) -> bool:
     new_ratio = new_covered / new_denominator
     if new_ratio < old_ratio:
         print(
-            f"Coverage of {fq_classname} fell from {old_covered}/{old_denominator} to {new_covered}/{new_denominator}"
+            f"Coverage of {class_name} fell "
+            f"from {old_covered}/{old_denominator} "
+            f"to {new_covered}/{new_denominator}"
         )
         return False
     return True
@@ -79,7 +86,7 @@ for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
         print(fq_classname, old_instruction_cov, new_instruction_cov, file=sys.stderr)
     old_ratio = coverage_ratio(old_instruction_cov)
     new_ratio = coverage_ratio(new_instruction_cov)
-    if not assert_coverage_ratio(fq_classname, old_instruction_cov, new_instruction_cov):
+    if not check_coverage_ratio(fq_classname, old_instruction_cov, new_instruction_cov):
         failed = True
 
 if failed:

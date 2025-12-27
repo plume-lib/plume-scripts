@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # This is a helper script for `resolve-adjacent-conflicts` and
 # `resolve-import-conflicts`.
@@ -28,6 +28,7 @@ import shutil
 import sys
 import tempfile
 from argparse import ArgumentParser
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
