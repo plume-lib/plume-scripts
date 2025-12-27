@@ -1,7 +1,5 @@
 PROGRAM=../../resolve-blank-lines
 
-test: diff
-
 diff: MergedGoal.java Merged.java
 	diff -u $^
 
@@ -10,7 +8,7 @@ clean:
 
 .PHONY: Merged.java
 Merged.java: Parent1.java Base.java Parent2.java
-	-GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_NOGLOBAL=1 git -c merge.conflictstyle=diff3 merge-file -q -p $^ > $@
+	-git merge-file -q -p $^ > $@
 	-${PROGRAM} $@
 
 .PHONY: resolve
@@ -19,4 +17,4 @@ resolve:
 	-${PROGRAM} Merged.java
 
 MergedByGit.java: Parent1.java Base.java Parent2.java
-	-GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_NOGLOBAL=1 git -c merge.conflictstyle=diff3 merge-file -q  -p $^ > $@
+	-git merge-file -q  -p $^ > $@

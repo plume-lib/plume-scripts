@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 # This is a helper script for `resolve-adjacent-conflicts` and
 # `resolve-import-conflicts`.
@@ -28,8 +28,10 @@ import shutil
 import sys
 import tempfile
 from argparse import ArgumentParser
-from collections.abc import Sequence
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence  # noqa: TC004
 
 T = TypeVar("T")  # Type variable for use in type hints
 
