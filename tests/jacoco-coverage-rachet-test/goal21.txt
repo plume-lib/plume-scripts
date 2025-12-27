@@ -1,0 +1,1 @@
+Coverage of org.plumelib.utilEntryReader fell from 522/998 to 521/997

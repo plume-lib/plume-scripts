@@ -1,9 +1,23 @@
-test: clean test-words test-reldir test-guessstrip test-javaexception
+PROGRAM=../../jacoco-coverage-rachet
 
+test: test12 test21 test13 test31
 
-TODO:
-# TODO
-	echo "todo"
+test12:
+	${PROGRAM} jacocoTestReport1.csv jacocoTestReport2.csv > out12.txt
+	diff goal12.txt out12.txt
+
+test21:
+	${PROGRAM} jacocoTestReport2.csv jacocoTestReport1.csv > out21.txt
+	diff goal21.txt out21.txt
+
+test13:
+	${PROGRAM} jacocoTestReport1.csv jacocoTestReport3.csv > out13.txt
+	diff goal13.txt out13.txt
+
+test31:
+	${PROGRAM} jacocoTestReport3.csv jacocoTestReport1.csv > out31.txt
+	diff goal31.txt out31.txt
+
 
 
 # Miscellaneous targets

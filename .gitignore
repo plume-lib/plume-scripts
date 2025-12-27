@@ -13,3 +13,7 @@ tests/lint-diff-test/words2-lint-pruned.txt-nofilename
 tests/lint-diff-test/words2-lint.txt
 tests/lint-diff-test/words2.txt
 tests/sort-compiler-output-test/errors1-sorted.actual
+tests/jacoco-coverage-rachet-test/out12.txt
+tests/jacoco-coverage-rachet-test/out21.txt
+tests/jacoco-coverage-rachet-test/out13.txt
+tests/jacoco-coverage-rachet-test/out31.txt
