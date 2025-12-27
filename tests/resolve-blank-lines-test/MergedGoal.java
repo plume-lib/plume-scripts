@@ -36,17 +36,15 @@ import x.z;
 import x.a_;
 import x.b_;
 import x.c_;
+
 <<<<<<< Parent1.java
-
 import x.d_different1;
-
 ||||||| Base.java
 import x.d_;
 =======
-
 import x.d_different2;
-
 >>>>>>> Parent2.java
+
 import x.e_;
 import x.f_;
 import x.g_;
