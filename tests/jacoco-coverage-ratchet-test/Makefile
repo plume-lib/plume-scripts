@@ -8,11 +8,11 @@ test12:
 	diff goal12.txt out12.txt
 
 test21:
-	${PROGRAM} jacocoTestReport2.csv jacocoTestReport1.csv > out21.txt
+	if ${PROGRAM} jacocoTestReport2.csv jacocoTestReport1.csv > out21.txt; then echo "status 1 expected"; false ; fi
 	diff goal21.txt out21.txt
 
 test13:
-	${PROGRAM} jacocoTestReport1.csv jacocoTestReport3.csv > out13.txt
+	if ${PROGRAM} jacocoTestReport1.csv jacocoTestReport3.csv > out13.txt; then echo "status 1 expected"; false; fi
 	diff goal13.txt out13.txt
 
 test31:
@@ -23,7 +23,6 @@ test31:
 
 # Miscellaneous targets
 
-# It would be nicer to put all generated files in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt words12-diff.txt words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt
+	rm -f out12.txt out21.txt out13.txt out31.txt
 

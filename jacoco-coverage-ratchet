@@ -16,17 +16,16 @@ DEBUG = False
 
 def main():
     """Exit with failure message if, for any single class, coverage goes down."""
-    if len(sys.argv) != 3:
-        print(
-            PROGRAM + " received " + str(len(sys.argv) - 1) + "arguments, expected 2: " + sys.argv
-        )
+    num_args = len(sys.argv) - 1
+    if num_args != 2:
+        print(f"{PROGRAM} received {num_args} arguments, expected 2: {sys.argv[1:]}")
         sys.exit(2)
 
     old_coverage = read_jacoco_csv_to_map(sys.argv[1])
     new_coverage = read_jacoco_csv_to_map(sys.argv[2])
 
+    failed = False
     for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
-        failed = False
         if fq_classname not in old_coverage:
             continue
         old_instruction_cov = old_coverage[fq_classname]
@@ -52,24 +51,26 @@ def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
         dict_reader = csv.DictReader(csvfile)
         for row in dict_reader:
             fq_classname = row["PACKAGE"] + "." + row["CLASS"]
-            result[fq_classname] = (row["INSTRUCTION_MISSED"], row["INSTRUCTION_COVERED"])
+            result[fq_classname] = (int(row["INSTRUCTION_MISSED"]), int(row["INSTRUCTION_COVERED"]))
     return result
 
 
-def check_coverage_ratio(class_name, old_pair, new_pair) -> bool:
+def check_coverage_ratio(
+    class_name: str, old_pair: tuple[int, int], new_pair: tuple[int, int]
+) -> bool:
     """Return false if the coverage decreased, true otherwise.
 
     Returns:
          false if the coverage decreased, true otherwise.
     """
-    old_missed = int(old_pair[0])
-    old_covered = int(old_pair[1])
+    old_missed = old_pair[0]
+    old_covered = old_pair[1]
     old_denominator = old_covered + old_missed
     if old_denominator == 0:
         return True
     old_ratio = old_covered / old_denominator
-    new_missed = int(new_pair[0])
-    new_covered = int(new_pair[1])
+    new_missed = new_pair[0]
+    new_covered = new_pair[1]
     new_denominator = new_covered + new_missed
     if new_denominator == 0:
         return True
