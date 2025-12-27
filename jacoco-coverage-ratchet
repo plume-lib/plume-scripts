@@ -13,9 +13,32 @@ PROGRAM = Path(__file__).name
 
 DEBUG = False
 
-if len(sys.argv) != 3:
-    print(PROGRAM + "received " + (len(sys.argv) - 1) + "arguments, expected 2: " + sys.argv)
-    sys.exit(2)
+
+def main():
+    """Exit with failure message if, for any single class, coverage goes down."""
+    if len(sys.argv) != 3:
+        print(
+            PROGRAM + " received " + str(len(sys.argv) - 1) + "arguments, expected 2: " + sys.argv
+        )
+        sys.exit(2)
+
+    old_coverage = read_jacoco_csv_to_map(sys.argv[1])
+    new_coverage = read_jacoco_csv_to_map(sys.argv[2])
+
+    for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
+        failed = False
+        if fq_classname not in old_coverage:
+            continue
+        old_instruction_cov = old_coverage[fq_classname]
+        if old_instruction_cov == new_instruction_cov:
+            continue
+        if DEBUG:
+            print(fq_classname, old_instruction_cov, new_instruction_cov, file=sys.stderr)
+        if not check_coverage_ratio(fq_classname, old_instruction_cov, new_instruction_cov):
+            failed = True
+
+    if failed:
+        sys.exit(1)
 
 
 def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
@@ -28,7 +51,7 @@ def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
     with Path.open(filename) as csvfile:
         dict_reader = csv.DictReader(csvfile)
         for row in dict_reader:
-            fq_classname = row["PACKAGE"] + row["CLASS"]
+            fq_classname = row["PACKAGE"] + "." + row["CLASS"]
             result[fq_classname] = (row["INSTRUCTION_MISSED"], row["INSTRUCTION_COVERED"])
     return result
 
@@ -42,10 +65,14 @@ def check_coverage_ratio(class_name, old_pair, new_pair) -> bool:
     old_missed = int(old_pair[0])
     old_covered = int(old_pair[1])
     old_denominator = old_covered + old_missed
+    if old_denominator == 0:
+        return True
     old_ratio = old_covered / old_denominator
     new_missed = int(new_pair[0])
     new_covered = int(new_pair[1])
     new_denominator = new_covered + new_missed
+    if new_denominator == 0:
+        return True
     new_ratio = new_covered / new_denominator
     if new_ratio < old_ratio:
         print(
@@ -69,25 +96,5 @@ def coverage_ratio(coverage_pair: tuple[str, str]) -> float:
     return ratio
 
 
-# Example usage (assuming a file named 'data.csv' exists with headers)
-# read_csv_as_dicts('data.csv')
-
-old_coverage = read_jacoco_csv_to_map(sys.argv[1])
-new_coverage = read_jacoco_csv_to_map(sys.argv[2])
-
-for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
-    failed = False
-    if fq_classname not in old_coverage:
-        continue
-    old_instruction_cov = old_coverage[fq_classname]
-    if old_instruction_cov == new_instruction_cov:
-        continue
-    if DEBUG:
-        print(fq_classname, old_instruction_cov, new_instruction_cov, file=sys.stderr)
-    old_ratio = coverage_ratio(old_instruction_cov)
-    new_ratio = coverage_ratio(new_instruction_cov)
-    if not check_coverage_ratio(fq_classname, old_instruction_cov, new_instruction_cov):
-        failed = True
-
-if failed:
-    sys.exit(1)
+if __name__ == "__main__":
+    main()

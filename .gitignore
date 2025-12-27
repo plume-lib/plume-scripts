@@ -1,10 +1,10 @@
 *.tdy
 .plume-scripts
 checkbashisms
-tests/jacoco-coverage-rachet-test/out12.txt
-tests/jacoco-coverage-rachet-test/out13.txt
-tests/jacoco-coverage-rachet-test/out21.txt
-tests/jacoco-coverage-rachet-test/out31.txt
+tests/jacoco-coverage-ratchet-test/out12.txt
+tests/jacoco-coverage-ratchet-test/out13.txt
+tests/jacoco-coverage-ratchet-test/out21.txt
+tests/jacoco-coverage-ratchet-test/out31.txt
 tests/lint-diff-test/guessstrip-lint-pruned.txt
 tests/lint-diff-test/javaexception-lint-pruned.txt
 tests/lint-diff-test/reldir-lint-pruned.txt

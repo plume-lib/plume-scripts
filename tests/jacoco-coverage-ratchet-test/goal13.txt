@@ -1,0 +1,2 @@
+Coverage of org.plumelib.util.ArrayMap.Values fell from 21/98 to 21/99
+Coverage of org.plumelib.util.EntryReader fell from 521/997 to 520/996
