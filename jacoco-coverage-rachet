@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+!/usr/bin/env python3
 """Exits with failure message if, for any single class, coverage goes down.
 
 Arguments: two Jacoco coverage reports (.csv files).
@@ -18,29 +18,46 @@ if len(sys.argv) != 3:
     sys.exit(2)
 
 
-def read_jacoco_csv_to_map(filename: str) -> map[str, tuple[int, int]]:
+def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
     """Read a Jacoco file.
 
     Returns:
-        a map from class name to (line_missed, line_covered).
+        a map from class name to (instruction_missed, instruction_covered).
     """
     result = {}
     with Path.open(filename) as csvfile:
         dict_reader = csv.DictReader(csvfile)
         for row in dict_reader:
             fq_classname = row["PACKAGE"] + row["CLASS"]
-            result[fq_classname] = (row["LINE_MISSED"], row["LINE_COVERED"])
+            result[fq_classname] = (row["INSTRUCTION_MISSED"], row["INSTRUCTION_COVERED"])
     return result
 
 
-def coverage_ratio(coverage_pair: tuple[int, int]) -> float:
+def assert_coverage_ratio(class_name, old_pair, new_pair) -> bool:
+    old_missed = int(old_pair[0])
+    old_covered = int(old_pair[1])
+    old_denominator = old_covered + old_missed
+    old_ratio = old_covered / old_denominator
+    new_missed = int(new_pair[0])
+    new_covered = int(new_pair[1])
+    new_denominator = new_covered + new_missed
+    new_ratio = new_covered / new_denominator
+    if new_ratio < old_ratio:
+        print(
+            f"Coverage of {fq_classname} fell from {old_covered}/{old_denominator} to {new_covered}/{new_denominator}"
+        )
+        return False
+    return True
+
+
+def coverage_ratio(coverage_pair: tuple[str, str]) -> float:
     """Return the coverage ratio for the given (missed, covered) tuple.
 
     Returns:
         the coverage ratio for the given (missed, covered) tuple.
     """
-    missed = coverage_pair[0]
-    covered = coverage_pair[1]
+    missed = int(coverage_pair[0])
+    covered = int(coverage_pair[1])
     ratio = covered / (covered + missed)
     return ratio
 
@@ -51,16 +68,19 @@ def coverage_ratio(coverage_pair: tuple[int, int]) -> float:
 old_coverage = read_jacoco_csv_to_map(sys.argv[1])
 new_coverage = read_jacoco_csv_to_map(sys.argv[2])
 
-for fq_classname, new_line_cov in sorted(new_coverage.items()):
+for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
     failed = False
-    old_line_cov = new_coverage[fq_classname]
-    if old_line_cov is None:
+    if fq_classname not in old_coverage:
         continue
-    old_ratio = coverage_ratio(old_line_cov)
-    new_ratio = coverage_ratio(new_line_cov)
-    if new_ratio < old_ratio:
+    old_instruction_cov = old_coverage[fq_classname]
+    if old_instruction_cov == new_instruction_cov:
+        continue
+    if DEBUG:
+        print(fq_classname, old_instruction_cov, new_instruction_cov, file=sys.stderr)
+    old_ratio = coverage_ratio(old_instruction_cov)
+    new_ratio = coverage_ratio(new_instruction_cov)
+    if not assert_coverage_ratio(fq_classname, old_instruction_cov, new_instruction_cov):
         failed = True
-        print("Coverage of", fq_classname, "fell from", old_ratio, "to", new_ratio)
 
 if failed:
     sys.exit(1)
