@@ -1,3 +1,0 @@
-Exception in thread "main" java.lang.Error: null package for /home/mernst/research/types/checker-framework-branch-master/checker-qual/src/main/java/module-info.java
-	at org.plumelib.javadoc.RequireJavadoc$RequireJavadocVisitor.visitTopLevel(RequireJavadoc.java:744)
-	at org.plumelib.javadoc.RequireJavadoc.main(RequireJavadoc.java:202)
