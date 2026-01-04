@@ -92,6 +92,7 @@ dummy := $(shell cd .git/hooks \
    && ln -s ../../.plume-scripts/code-style-pre-commit pre-commit)
 endif
 
+BKT_EXISTS := $(shell if command -v bkt > /dev/null 2>&1; then echo "yes"; fi)
 
 ## HTML
 .PHONY: html-style-fix html-style-check
@@ -296,20 +297,23 @@ SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} $
 # Any file ending with ".bash" or containing a bash shebang line.
 BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .)
 SH_AND_BASH_SCRIPTS := ${SH_SCRIPTS} ${BASH_SCRIPTS}
+ifneq (,${BKT_EXISTS})
+SHELL_BKT_COMMAND := bkt --cwd $(patsubst %,--modtime %,${SH_AND_BASH_SCRIPTS}) --ttl 1month --
+endif
 SHFMT_EXISTS := $(shell if shfmt --version > /dev/null 2>&1; then echo "yes"; fi)
 SHELLCHECK_EXISTS := $(shell if shellcheck --version > /dev/null 2>&1; then echo "yes"; fi)
 shell-style-fix:
 ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
-	@.plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
-	@shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
+	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@${SHELL_BKT_COMMAND} shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
 endif
 shell-style-check:
 ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
-	@.plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
-	@.plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
+	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
 endif
 ifneq (,$(strip ${SH_SCRIPTS}))
-	@.plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
+	@${SHELL_BKT_COMMAND} .plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
@@ -318,6 +322,11 @@ ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
 	@echo "SHFMT_EXISTS=${SHFMT_EXISTS}"
 ifneq (,${SHFMT_EXISTS})
 	shfmt --version
+endif
+	@echo "BKT_EXISTS=${BKT_EXISTS}"
+ifneq (,${BKT_EXISTS})
+	bkt --version
+	@echo "SHELL_BKT_COMMAND=${SHELL_BKT_COMMAND}"
 endif
 	@echo "SHELLCHECK_EXISTS=${SHELLCHECK_EXISTS}"
 ifneq (,${SHELLCHECK_EXISTS})
