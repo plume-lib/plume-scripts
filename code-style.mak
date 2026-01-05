@@ -39,16 +39,18 @@
 # * for Perl checking: nothing (Perl checking is currently a no-op)
 # * for Python checking: Python, uv
 # * for Shell checking: shellcheck, shfmt
+#   * to speed up Shell checking, also: bkt
 # * for YAML checking: Python, uv
-#
+
 # Instructions for installing these tools:
 # * Python is probably already installed on your system
 # * [uv](https://docs.astral.sh/uv/#installation)
-# * [shellcheck](https://github.com/koalaman/shellcheck?tab=readme-ov-file#installing)
+# * [shellcheck](https://github.com/koalaman/shellcheck#installing)
 # * [shfmt](https://webinstall.dev/shfmt/)
 # * [shellcheck](https://github.com/koalaman/shellcheck#user-content-installing)
 # * [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2#install)
 # * [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+# * [bkt](https://github.com/dimo414/bkt#installation)
 
 # Your `.gitignore` file should contain this line:
 # .plume-scripts
