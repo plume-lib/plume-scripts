@@ -75,7 +75,6 @@ endif
 
 # This "if" is closed nearly at the end of the file.
 ifdef CODE_STYLE_DISABLE
-$(info CODE_STYLE_DISABLE is defined)
 style-check:
 	@echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-check` does nothing.'
 style-fix:
