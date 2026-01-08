@@ -97,8 +97,10 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
         echo "echo ${SCRIPT_NAME} error: bad output for wget https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}:"
+        echo "echo ---- start of wget output ----"
         wget_output="$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" 2>&1)"
         echo "echo ${wget_output}"
+        echo "echo ---- end of wget output ----"
         exit 2
       fi
     fi
@@ -124,8 +126,13 @@ if [ "$CI_ORGANIZATION" = "" ]; then
 fi
 
 ## Default
-if [ "$CI_ORGANIZATION" = "" ]; then
+if [ -n "$CI_ORGANIZATION" ]; then
   CI_ORGANIZATION=$1
+fi
+
+if [ "$DEBUG" = "--debug" ]; then
+  echo "echo SLUG=${CI_ORGANIZATION}"
+  echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
 fi
 
 ### Other information (besides organization)
