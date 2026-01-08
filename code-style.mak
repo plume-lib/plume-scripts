@@ -391,36 +391,39 @@ style-check: yaml-style-check
 YAML_FILES   := $(shell grep -r -l --include='*.yaml' --include='*.yml' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq (,${YAML_FILES})
 # YAML linters are listed in order of increasing precedence.
-YAMLLINT := $(shell if yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef YAMLLINT
-YAML_STYLE_CHECK := yamllint -c .plume-scripts/.yamllint.yaml --format parsable
-YAML_STYLE_VERSION := yamllint --version
+YAMLLINT_EXISTS := $(shell if yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
+ifneq (,${YAMLLINT_EXISTS})
+YAMLLINT := yamllint
 endif
+ifneq (,${UV_EXISTS})
 PYYAMLLNT_EXISTS_UVX := $(shell if uvx yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYYAMLLNT_EXISTS_UVX
-YAML_STYLE_CHECK := uvx yamllint -c .plume-scripts/.yamllint.yaml --format parsable
-YAML_STYLE_VERSION := uvx yamllint --version
+YAMLLINT := uvx yamllint
 endif
 PYYAMLLNT_EXISTS_UV := $(shell if uv run yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYYAMLLNT_EXISTS_UV
-YAML_STYLE_CHECK := uv run yamllint -c .plume-scripts/.yamllint.yaml --format parsable
-YAML_STYLE_VERSION := uv run yamllint --version
+YAMLLINT := uv run yamllint
 endif
+endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${YAML_FILES})
 yaml-style-fix:
 ifneq (,${YAML_FILES})
 endif
 yaml-style-check:
 ifneq (,${YAML_FILES})
-	@.plume-scripts/cronic ${YAML_STYLE_CHECK} ${YAML_FILES} || (${YAML_STYLE_VERSION} && false)
+ifeq (,${YAMLLINT})
+	@echo "skipping yamllint because it is not installed"
+else
+	@.plume-scripts/cronic ${YAMLLINT} -c .plume-scripts/.yamllint.yaml --format parsable ${YAML_FILES} || (${YAMLLINT} --version && false)
+endif
 endif
 showvars::
 	@echo "YAML_FILES=${YAML_FILES}"
-	${YAML_STYLE_VERSION}
 	@echo "YAMLLINT_EXISTS=${YAMLLINT_EXISTS}"
-	@echo "YAML_STYLE_FIX=${YAML_STYLE_FIX}"
-	@echo "YAML_STYLE_CHECK=${YAML_STYLE_CHECK}"
+ifneq (,${YAMLLINT_EXISTS})
 	@echo "YAMLLINT=${YAMLLINT}"
+	${YAMLLINT} --version
+endif
 
 
 endif # ifneq ($(CODE_STYLE_DISABLE),)
