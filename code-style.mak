@@ -431,14 +431,13 @@ endif
 endif
 showvars::
 	@echo "YAML_FILES=${YAML_FILES}"
-	@echo "YAMLLINT_EXISTS=${YAMLLINT_EXISTS}"
-ifneq (,${YAMLLINT_EXISTS})
 	@echo "YAMLLINT=${YAMLLINT}"
+ifneq (,${YAMLLINT})
 	${YAMLLINT} --version
 endif
 
 
-endif # ifndef CODE_STYLE_DISABLE
+endif # ifdef CODE_STYLE_DISABLE
 
 
 plume-scripts-update update-plume-scripts:
