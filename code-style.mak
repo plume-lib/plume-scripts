@@ -302,7 +302,7 @@ endif
 endif
 python-typecheck:
 ifneq (,${PYTHON_FILES})
-ifeq (,${RUFF})
+ifeq (,${TY})
 	@echo Skipping ty because it is not installed.
 else
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
@@ -438,7 +438,7 @@ ifneq (,${YAMLLINT_EXISTS})
 endif
 
 
-endif # ifndef CODE_STYLE_EXCLUSIONS
+endif # ifndef CODE_STYLE_DISABLE
 
 
 plume-scripts-update update-plume-scripts:
