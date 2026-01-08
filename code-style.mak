@@ -195,9 +195,6 @@ endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-fix:
 ifneq (,${MARKDOWN_FILES})
-ifeq (,$(UV_EXISTS))
-	@echo Skipping pymarkdownlint because uv is not installed.
-else
 ifndef MARKDOWN_STYLE_FIX
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
@@ -206,7 +203,6 @@ ifndef MARKDOWN_STYLE_FIX
 else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
-endif # ifeq (,$(UV_EXISTS))
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-check:
 ifneq (,${MARKDOWN_FILES})
