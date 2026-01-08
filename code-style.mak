@@ -286,18 +286,30 @@ endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${PYTHON_FILES})
 python-style-fix:
 ifneq (,${PYTHON_FILES})
+ifeq (,${RUFF})
+	@echo Skipping ruff because it is not installed.
+else
 	@.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 	@.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
+endif
 python-style-check:
 ifneq (,${PYTHON_FILES})
+ifeq (,${RUFF})
+	@echo Skipping ruff because it is not installed.
+else
 	@.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 	@.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
+endif
 python-typecheck:
 ifneq (,${PYTHON_FILES})
+ifeq (,${RUFF})
+	@echo Skipping ty because it is not installed.
+else
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
 	@.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
+endif
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
