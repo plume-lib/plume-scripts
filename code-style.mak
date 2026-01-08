@@ -47,7 +47,6 @@
 # * [uv](https://docs.astral.sh/uv/#installation)
 # * [shellcheck](https://github.com/koalaman/shellcheck#installing)
 # * [shfmt](https://webinstall.dev/shfmt/)
-# * [shellcheck](https://github.com/koalaman/shellcheck#user-content-installing)
 # * [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2#install)
 # * [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
 # * [bkt](https://github.com/dimo414/bkt#installation)
@@ -94,14 +93,17 @@ dummy := $(shell cd .git/hooks \
 endif
 
 BKT_EXISTS := $(shell if command -v bkt > /dev/null 2>&1; then echo "yes"; fi)
+UV_EXISTS := $(shell if command -v uv > /dev/null 2>&1; then echo "yes"; fi)
+
 
 ## HTML
 .PHONY: html-style-fix html-style-check
 style-fix fix-style: html-style-fix
 style-check check-style: html-style-check
+ifneq (,${UV_EXISTS})
 # Any file ending with ".html".
 HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
-ifneq (,$(strip ${HTML_FILES}))
+ifneq (,${HTML_FILES})
 # HTML linters are listed in order of increasing precedence.
 HTML5VALIDATOR_EXISTS_UVX := $(shell if uvx html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef HTML5VALIDATOR_EXISTS_UVX
@@ -115,30 +117,41 @@ HTML_STYLE_FIX := uv run html5validator fix
 HTML_STYLE_CHECK := uv run html5validator scan --show-warnings
 HTML_STYLE_VERSION := uv run html5validator --version
 endif
-endif # ifneq (,$(strip ${HTML_FILES}))
+endif # ifneq (,${HTML_FILES})
+endif # ifneq (,${UV_EXISTS})
 html-style-fix:
-ifneq (,$(strip ${HTML_FILES}))
+ifneq (,${HTML_FILES})
+ifeq (,${UV_EXISTS})
+	@echo Skipping html5validator because uv is not installed.
+else
 ifndef HTML_STYLE_FIX
-	@echo Cannot find 'uvx html5validator' or 'uv run html5validator'
+	@echo Skipping html5validator because it is not installed.
 	-uvx html5validator --version
 	-uv run html5validator --version
 	@false
-endif
+else
 	@.plume-scripts/cronic ${HTML_STYLE_FIX} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
+endif
+endif # ifneq (,${HTML_FILES})
 html-style-check:
-ifneq (,$(strip ${HTML_FILES}))
+ifneq (,${HTML_FILES})
+ifeq (,${UV_EXISTS})
+	@echo Skipping html5validator because uv is not installed.
+else
 ifndef HTML_STYLE_CHECK
 	@echo Cannot find 'uvx html5validator' or 'uv run html5validator'
 	-uvx html5validator --version
 	-uv run html5validator --version
 	@false
-endif
+else
 	@.plume-scripts/cronic ${HTML_STYLE_CHECK} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
+endif
+endif # ifneq (,${HTML_FILES})
 showvars::
 	@echo "HTML_FILES=${HTML_FILES}"
-ifneq (,$(strip ${HTML_FILES}))
+ifneq (,${HTML_FILES})
 	${HTML_STYLE_VERSION}
 endif
 
@@ -156,8 +169,9 @@ endif
 .PHONY: markdown-style-fix markdown-style-check
 style-fix: markdown-style-fix
 style-check: markdown-style-check
+ifneq (,${UV_EXISTS})
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
-ifneq (,$(strip ${MARKDOWN_FILES}))
+ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
 PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYMARKDOWNLNT_EXISTS_UVX
@@ -177,32 +191,44 @@ MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownl
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
 endif
-endif # ifneq (,$(strip ${MARKDOWN_FILES}))
+endif # ifneq (,${MARKDOWN_FILES})
+endif # ifneq (,${UV_EXISTS})
 markdown-style-fix:
-ifneq (,$(strip ${MARKDOWN_FILES}))
+ifneq (,${MARKDOWN_FILES})
+ifeq (,$(UV_EXISTS))
+	@echo Skipping pymarkdownlint because uv is not installed.
+else
 ifndef MARKDOWN_STYLE_FIX
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-markdownlint-cli2 --version
 	@false
-endif
+else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
+endif
+endif
+endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-check:
-ifneq (,$(strip ${MARKDOWN_FILES}))
+ifneq (,${MARKDOWN_FILES})
+ifeq (,${UV_EXISTS})
+	@echo Skipping pymarkdownlint because uv is not installed.
+else
 ifndef MARKDOWN_STYLE_CHECK
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
 	@false
-endif
+else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
+endif
+endif # ifneq (,${MARKDOWN_FILES})
 showvars::
 	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
-ifneq (,$(strip ${MARKDOWN_FILES}))
+ifneq (,${MARKDOWN_FILES})
 	${MARKDOWN_STYLE_VERSION}
 	@echo "PYMARKDOWNLNT_EXISTS=${PYMARKDOWNLNT_EXISTS}"
 	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
@@ -216,15 +242,15 @@ endif
 style-fix: perl-style-fix
 style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
-PERL_FILES   := $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .)
+PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .))
 perl-style-fix:
-ifneq (,$(strip ${PERL_FILES}))
+ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
 #	@perltidy -w -b -bext='/' -gnu ${PERL_FILES}
 #	@find . -name '*.tdy' -type f -delete
 endif
 perl-style-check:
-ifneq (,$(strip ${PERL_FILES}))
+ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
 #	@perltidy -w ${PERL_FILES}
 #	@find . -name '*.tdy' -type f -delete
@@ -238,8 +264,8 @@ showvars::
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
-PYTHON_FILES:=$(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .)
-ifneq (,$(strip ${PYTHON_FILES}))
+PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .))
+ifneq (,${PYTHON_FILES})
 RUFF_EXISTS_UVX := $(shell if uvx ruff version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef RUFF_EXISTS_UVX
 RUFF := uvx ruff
@@ -256,25 +282,25 @@ TY_EXISTS_UV := $(shell if uv run ty version > /dev/null 2>&1; then echo "yes"; 
 ifdef TY_EXISTS_UV
 TY := uv run ty
 endif
-endif # ifneq (,$(strip ${HTML_FILES}))
+endif # ifneq (,${PYTHON_FILES})
 python-style-fix:
-ifneq (,$(strip ${PYTHON_FILES}))
+ifneq (,${PYTHON_FILES})
 	@.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 	@.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 python-style-check:
-ifneq (,$(strip ${PYTHON_FILES}))
+ifneq (,${PYTHON_FILES})
 	@.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 	@.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 python-typecheck:
-ifneq (,$(strip ${PYTHON_FILES}))
+ifneq (,${PYTHON_FILES})
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
 	@.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
 endif
 showvars::
 	@echo "PYTHON_FILES=${PYTHON_FILES}"
-ifneq (,$(strip ${PYTHON_FILES}))
+ifneq (,${PYTHON_FILES})
 	@echo "RUFF_EXISTS_UVX=${RUFF_EXISTS_UVX}"
 	@echo "RUFF_EXISTS_UV=${RUFF_EXISTS_UV}"
 	@echo "RUFF=${RUFF}"
@@ -294,35 +320,56 @@ endif
 style-fix: shell-style-fix
 style-check: shell-style-check
 # Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
-SH_SCRIPTS   := ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' .)
+SH_SCRIPTS   := $(strip ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' .))
 # Any file ending with ".bash" or containing a bash shebang line.
-BASH_SCRIPTS := ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .)
-SH_AND_BASH_SCRIPTS := ${SH_SCRIPTS} ${BASH_SCRIPTS}
+BASH_SCRIPTS := $(strip ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .))
+SH_AND_BASH_SCRIPTS := $(strip ${SH_SCRIPTS} ${BASH_SCRIPTS})
+ifneq (,${SH_AND_BASH_SCRIPTS})
 ifneq (,${BKT_EXISTS})
 SHELL_BKT_COMMAND := bkt --cwd $(patsubst %,--modtime %,${SH_AND_BASH_SCRIPTS}) --ttl 1month --
 endif
 SHFMT_EXISTS := $(shell if shfmt --version > /dev/null 2>&1; then echo "yes"; fi)
 SHELLCHECK_EXISTS := $(shell if shellcheck --version > /dev/null 2>&1; then echo "yes"; fi)
+endif # ifneq (,$SH_AND_BASH_SCRIPTS)
 shell-style-fix:
-ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
+ifneq (,${SH_AND_BASH_SCRIPTS})
+ifeq (,${SHFMT_EXISTS})
+	@echo "skipping shfmt because it is not installed"
+else
 	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+ifeq (,${SHELLCHECK_EXISTS})
+	@echo "skipping shellcheck because it is not installed"
+else
 	@${SHELL_BKT_COMMAND} shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
 endif
+endif
 shell-style-check:
-ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
+ifneq (,${SH_AND_BASH_SCRIPTS})
+ifeq (,${SHFMT_EXISTS})
+	@echo "skipping shfmt because it is not installed"
+else
 	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+endif
+ifeq (,${SHELLCHECK_EXISTS})
+	@echo "skipping shellcheck because it is not installed"
+else
 	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
 endif
-ifneq (,$(strip ${SH_SCRIPTS}))
+endif
+ifneq (,${SH_SCRIPTS})
 	@${SHELL_BKT_COMMAND} .plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
 	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
-ifneq (,$(strip ${SH_AND_BASH_SCRIPTS}))
+ifneq (,${SH_AND_BASH_SCRIPTS})
 	@echo "SHFMT_EXISTS=${SHFMT_EXISTS}"
 ifneq (,${SHFMT_EXISTS})
 	shfmt --version
+endif
+	@echo "UV_EXISTS=${UV_EXISTS}"
+ifneq (,${UV_EXISTS})
+	uv --version
 endif
 	@echo "BKT_EXISTS=${BKT_EXISTS}"
 ifneq (,${BKT_EXISTS})
@@ -342,7 +389,7 @@ style-fix: yaml-style-fix
 style-check: yaml-style-check
 # Any file ending with ".yaml" or ".yml".
 YAML_FILES   := $(shell grep -r -l --include='*.yaml' --include='*.yml' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
-ifneq (,$(strip ${YAML_FILES}))
+ifneq (,${YAML_FILES})
 # YAML linters are listed in order of increasing precedence.
 YAMLLINT := $(shell if yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef YAMLLINT
@@ -359,12 +406,12 @@ ifdef PYYAMLLNT_EXISTS_UV
 YAML_STYLE_CHECK := uv run yamllint -c .plume-scripts/.yamllint.yaml --format parsable
 YAML_STYLE_VERSION := uv run yamllint --version
 endif
-endif # ifneq (,$(strip ${YAML_FILES}))
+endif # ifneq (,${YAML_FILES})
 yaml-style-fix:
-ifneq (,$(strip ${YAML_FILES}))
+ifneq (,${YAML_FILES})
 endif
 yaml-style-check:
-ifneq (,$(strip ${YAML_FILES}))
+ifneq (,${YAML_FILES})
 	@.plume-scripts/cronic ${YAML_STYLE_CHECK} ${YAML_FILES} || (${YAML_STYLE_VERSION} && false)
 endif
 showvars::
