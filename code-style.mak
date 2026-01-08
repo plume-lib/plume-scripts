@@ -174,6 +174,7 @@ MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS}
 ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
 PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifneq (,${UV_EXISTS})
 ifdef PYMARKDOWNLNT_EXISTS_UVX
 MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown fix
 MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown scan
@@ -185,6 +186,7 @@ MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown f
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
 endif
+endif # ifneq (,${UV_EXISTS})
 MARKDOWNLINT_CLI2 := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
@@ -203,7 +205,6 @@ ifndef MARKDOWN_STYLE_FIX
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-markdownlint-cli2 --version
-	@false
 else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
