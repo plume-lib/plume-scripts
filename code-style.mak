@@ -169,12 +169,11 @@ endif
 .PHONY: markdown-style-fix markdown-style-check
 style-fix: markdown-style-fix
 style-check: markdown-style-check
-ifneq (,${UV_EXISTS})
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
-PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifneq (,${UV_EXISTS})
+PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYMARKDOWNLNT_EXISTS_UVX
 MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown fix
 MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown scan
@@ -194,7 +193,6 @@ MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-
 MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
 endif
 endif # ifneq (,${MARKDOWN_FILES})
-endif # ifneq (,${UV_EXISTS})
 markdown-style-fix:
 ifneq (,${MARKDOWN_FILES})
 ifeq (,$(UV_EXISTS))
@@ -208,8 +206,7 @@ ifndef MARKDOWN_STYLE_FIX
 else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
-endif
-endif
+endif # ifeq (,$(UV_EXISTS))
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-check:
 ifneq (,${MARKDOWN_FILES})
@@ -267,6 +264,7 @@ style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
 PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .))
 ifneq (,${PYTHON_FILES})
+ifneq (,${UV_EXISTS})
 RUFF_EXISTS_UVX := $(shell if uvx ruff version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef RUFF_EXISTS_UVX
 RUFF := uvx ruff
@@ -283,6 +281,7 @@ TY_EXISTS_UV := $(shell if uv run ty version > /dev/null 2>&1; then echo "yes"; 
 ifdef TY_EXISTS_UV
 TY := uv run ty
 endif
+endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${PYTHON_FILES})
 python-style-fix:
 ifneq (,${PYTHON_FILES})
@@ -338,12 +337,13 @@ ifeq (,${SHFMT_EXISTS})
 	@echo "skipping shfmt because it is not installed"
 else
 	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+endif
 ifeq (,${SHELLCHECK_EXISTS})
 	@echo "skipping shellcheck because it is not installed"
 else
 	@${SHELL_BKT_COMMAND} shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
 endif
-endif
+endif # ifneq (,${SH_AND_BASH_SCRIPTS})
 shell-style-check:
 ifneq (,${SH_AND_BASH_SCRIPTS})
 ifeq (,${SHFMT_EXISTS})
@@ -424,7 +424,7 @@ showvars::
 	@echo "YAMLLINT=${YAMLLINT}"
 
 
-endif # ifneq ($(CODE_STYLE_DISABLE),)
+endif # ifndef CODE_STYLE_EXCLUSIONS
 
 
 plume-scripts-update update-plume-scripts:
