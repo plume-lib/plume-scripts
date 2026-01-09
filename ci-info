@@ -97,8 +97,8 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
         echo "echo ${SCRIPT_NAME} error: bad output for wget -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+        wget_output="$(wget -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" 2>&1 || true)"
         echo "echo ---- start of wget output ----"
-        wget_output="$(wget -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" 2>&1)"
         echo "echo ${wget_output}"
         echo "echo ---- end of wget output ----"
         exit 2
