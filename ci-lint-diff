@@ -54,7 +54,17 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
 
-eval "$("${SCRIPT_DIR}"/ci-info)"
+ci_info_output="$("${SCRIPT_DIR}"/ci-info)"
+ci_info_status_code=$?
+if [ "$ci_info_status_code" -ne 0 ]; then
+  echo "ci-info failed with status $ci_info_status_code"
+  echo "---- ci-info output ----"
+  echo "$ci_info_output"
+  echo "---- end of ci-info output ----"
+  exit 2
+fi
+
+eval "$ci_info_output"
 
 if [ -z "$CI_COMMIT_RANGE" ]; then
   CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE is not set.\n"
