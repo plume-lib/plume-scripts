@@ -86,7 +86,7 @@ head1() {
 ## Continuous integration services
 if [ "$TRAVIS" = "true" ]; then
   CI_ORGANIZATION=${TRAVIS_PULL_REQUEST_SLUG%/*}
-  if [ "$CI_ORGANIZATION" = "" ]; then
+  if [ -z "$CI_ORGANIZATION" ]; then
     CI_ORGANIZATION=${TRAVIS_REPO_SLUG%/*}
   fi
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
@@ -115,7 +115,7 @@ elif [ -n "$CIRCLE_PR_USERNAME" ]; then
 fi
 
 ## Git clone
-if [ "$CI_ORGANIZATION" = "" ]; then
+if [ -z "$CI_ORGANIZATION" ]; then
   URL=$(git config --get remote.origin.url)
   # This handles two possible forms for a URL:
   #   https://github.com/mernst/annotation-tools
@@ -143,7 +143,7 @@ fi
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ]; then
   echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
-  if [ "${URL}" != "" ]; then
+  if [ -z "${URL}" ]; then
     echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | sed -e 's/^/echo /'
   fi
   echo "echo current branch: $(git branch --show-current)"
@@ -199,7 +199,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
     # fi
     # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
     #   CI_COMMIT_RANGE_START=$(${SCRIPT_DIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START})
-    #   if [ "$CI_COMMIT_RANGE_START" = "" ] ; then
+    #   if [ -z "$CI_COMMIT_RANGE_START" ] ; then
     #     echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
     #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
     #   elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
