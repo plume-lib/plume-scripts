@@ -59,10 +59,10 @@ SCRIPT_NAME="$(basename "$0")"
 if [ "$DEBUG" = "--debug" ]; then
   echo
   # shellcheck disable=SC2016
-  echo 'echo ---------------- start of `env`'
+  echo 'echo ---------------- start of \`env\`'
   env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
   # shellcheck disable=SC2016
-  echo 'echo ---------------- end of `env`'
+  echo 'echo ---------------- end of \`env\`'
   echo
   git --no-pager branch -a | sed -e 's/^/echo /'
   echo
