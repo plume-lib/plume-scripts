@@ -35,7 +35,7 @@
 #       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-SCRIPT_NAME="$(basename "$0")"
+SCRIPT_NAME="$(basename -- "$0")"
 
 DEBUG=""
 if [ "$1" = "--verbose" ]; then
@@ -127,7 +127,7 @@ if [ "$CI_ORGANIZATION" = "" ]; then
 fi
 
 ## Default
-if [ -n "$CI_ORGANIZATION" ]; then
+if [ -z "$CI_ORGANIZATION" ]; then
   CI_ORGANIZATION=$1
 fi
 
