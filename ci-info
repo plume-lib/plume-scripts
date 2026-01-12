@@ -47,7 +47,7 @@ if [ "$1" = "--debug" ]; then
 fi
 if [ "$#" -gt 1 ]; then
   usage="Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
-  echo "echo $usage;"
+  echo "echo \"$usage\";"
   echo "$usage" >&2
   echo "exit 2"
   exit 2
