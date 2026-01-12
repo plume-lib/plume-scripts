@@ -91,13 +91,14 @@ if [ "$TRAVIS" = "true" ]; then
   fi
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
-    SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
+    url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+    SLUG=$(wget -q -O - "${url}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
       sleep 5
-      SLUG=$(wget -q -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" | jq .head.label | sed 's/"//g')
+      SLUG=$(wget -q -O - "${url}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
-        echo "echo ${SCRIPT_NAME} error: bad output for wget -O - https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-        wget_output="$(wget -O - "https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}" 2>&1 || true)"
+        wget_output="$(wget -O - "${url}" 2>&1)" || true
+        echo "echo ${SCRIPT_NAME} error: bad output for wget -O - ${url}"
         echo "echo ---- start of wget output ----"
         echo "echo ${wget_output}"
         echo "echo ---- end of wget output ----"
