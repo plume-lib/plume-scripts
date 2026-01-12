@@ -46,8 +46,9 @@ if [ "$1" = "--debug" ]; then
   shift
 fi
 if [ "$#" -gt 1 ]; then
-  echo "echo Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION];"
-  echo "Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION]" >&2
+  usage="Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
+  echo "echo $usage;"
+  echo "$usage" >&2
   echo "exit 2"
   exit 2
 fi
@@ -58,10 +59,10 @@ SCRIPT_NAME="$(basename "$0")"
 if [ "$DEBUG" = "--debug" ]; then
   echo
   # shellcheck disable=SC2016
-  echo '---------------- start of `env`'
+  echo 'echo ---------------- start of `env`'
   env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
   # shellcheck disable=SC2016
-  echo '---------------- end of `env`'
+  echo 'echo ---------------- end of `env`'
   echo
   git --no-pager branch -a | sed -e 's/^/echo /'
   echo
@@ -362,6 +363,8 @@ if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
       CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
     fi
   fi
+  # The start and end commits could still be the same, if the current branch was cloned with
+  # --depth=1.
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 fi
 
