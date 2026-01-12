@@ -24,10 +24,13 @@
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+SCRIPT_NAME="$(basename -- "$0")"
+
 DEBUG=""
 
 if [ "$#" -eq 0 ]; then
-  echo "Usage: $0 [--debug] WARNINGS-FILE" >&2
+  echo "Usage: ${SCRIPT_NAME} [--debug] WARNINGS-FILE" >&2
   exit 2
 fi
 if [ "$1" = "--debug" ]; then
@@ -35,7 +38,7 @@ if [ "$1" = "--debug" ]; then
   shift
 fi
 if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 [--debug] WARNINGS-FILE" >&2
+  echo "Usage: ${SCRIPT_NAME} [--debug] WARNINGS-FILE" >&2
   exit 2
 fi
 if ! [ -f "$1" ]; then
@@ -50,9 +53,6 @@ if [ "$DEBUG" = "--debug" ]; then
   env | sort
   git log --graph | head --lines=10000
 fi
-
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-SCRIPT_NAME="$(basename -- "$0")"
 
 ci_info_output="$("${SCRIPT_DIR}"/ci-info)"
 ci_info_status_code=$?

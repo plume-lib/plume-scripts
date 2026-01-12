@@ -34,6 +34,9 @@
 #     environment:
 #       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
 
+# SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+SCRIPT_NAME="$(basename -- "$0")"
+
 DEBUG=""
 if [ "$1" = "--verbose" ]; then
   VERBOSE="--verbose"
@@ -46,14 +49,11 @@ if [ "$1" = "--debug" ]; then
   shift
 fi
 if [ "$#" -gt 1 ]; then
-  echo "echo Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION];"
-  echo "Usage: $0 [--verbose] [--debug] [DEFAULT-ORGANIZATION]" >&2
+  echo "echo Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION];"
+  echo "Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]" >&2
   echo "exit 2"
   exit 2
 fi
-
-# SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-SCRIPT_NAME="$(basename "$0")"
 
 if [ "$DEBUG" = "--debug" ]; then
   echo
