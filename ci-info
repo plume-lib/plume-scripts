@@ -98,10 +98,11 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       sleep 5
       SLUG=$(wget -q -O - "${url}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
-        wget_output="$(wget -O - "${url}" 2>&1)" || true
+        wget_output="$(wget -O - "${url}" 2>&1 | sed -e 's/^/echo /')" || true
         echo "echo ${SCRIPT_NAME} error: bad output for wget -O - ${url}"
         echo "echo ---- start of wget output ----"
-        echo "echo ${wget_output}"
+        # Each line of `wget_output` is already prefixed by "echo".
+        echo "${wget_output}"
         echo "echo ---- end of wget output ----"
         exit 2
       fi
