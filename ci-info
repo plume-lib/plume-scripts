@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+# bash because this script uses arrays
 
 # Outputs information about a CI job, when run under Azure Pipelines,
 # CircleCI, GitHub Actions, or Travis CI.  (See note below about CircleCI v1.)
@@ -22,9 +23,13 @@
 # CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID.
 # CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID.
 #
-# For example use, see comments in file `lint-diff.py` in this directory.
+# For example use, see comments in file `ci-lint-diff` in this directory.
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
+#
+# If environment variable GITHUB_PAT is set when this script is called, it is
+# used as GitHub Personal Access Token when making GitHub API calls.  This can
+# avoid "403 rate limit exceeded" failures.
 #
 # On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
 # for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
@@ -82,6 +87,13 @@ head1() {
   fi
 }
 
+### Variables
+
+# "GITHUB_PAT" is a GitHub Personal Access Token.
+if [ -n "$GITHUB_PAT" ]; then
+  auth_header_option=(--header="Authorization: token ${GITHUB_PAT}")
+fi
+
 ### Organization
 
 ## Continuous integration services
@@ -93,12 +105,12 @@ if [ "$TRAVIS" = "true" ]; then
 elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-    SLUG=$(wget -q -O - "${url}" | jq .head.label | sed 's/"//g')
+    SLUG=$(wget -q "${auth_header_option[@]}" -O - "${url}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
       sleep 5
-      SLUG=$(wget -q -O - "${url}" | jq .head.label | sed 's/"//g')
+      SLUG=$(wget -q "${auth_header_option[@]}" -O - "${url}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
-        wget_output="$(wget -O - "${url}" 2>&1 | sed -e 's/^/echo /')" || true
+        wget_output="$(wget "${auth_header_option[@]}" -O - "${url}" 2>&1 | sed -e 's/^/echo /')" || true
         echo "echo ${SCRIPT_NAME} error: bad output for wget -O - ${url}"
         echo "echo ---- start of wget output ----"
         # Each line of `wget_output` is already prefixed by "echo".
@@ -263,7 +275,7 @@ elif [ -n "$CIRCLE_COMPARE_URL" ]; then
   # CIRCLE_BRANCH may be "pull/327"
   case "$CIRCLE_BRANCH" in
     pull/*)
-      CI_BRANCH_NAME=$(curl -s "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref')
+      CI_BRANCH_NAME=$(curl -s "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref')
       ;;
     *)
       CI_BRANCH_NAME=$CIRCLE_BRANCH
