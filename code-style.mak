@@ -172,12 +172,6 @@ style-check: markdown-style-check
 MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
-MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef MARKDOWNLINT_CLI2_EXISTS
-MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
-MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
-MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
-endif
 ifneq (,${UV_EXISTS})
 PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYMARKDOWNLNT_EXISTS_UVX
@@ -192,6 +186,19 @@ MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown
 MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
 endif
 endif # ifneq (,${UV_EXISTS})
+DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef DOCKER_EXISTS
+DMDL := docker run -w /myfolder -v $$PWD:/myfolder davidanson/markdownlint-cli2:v0.20.0
+MARKDOWN_STYLE_FIX := ${DMDL} --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_CHECK := ${DMDL} --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
+endif
+MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef MARKDOWNLINT_CLI2_EXISTS
+MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
+endif
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-fix:
 ifneq (,${MARKDOWN_FILES})
