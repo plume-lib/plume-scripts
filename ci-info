@@ -112,6 +112,9 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       if [ -z "$SLUG" ]; then
         wget_output="$(wget "${auth_header_option[@]}" -O - "${url}" 2>&1 | sed -e 's/^/echo /')" || true
         echo "echo ${SCRIPT_NAME} error: bad output for wget -O - ${url}"
+        if [ -n "${auth_header_option[*]}" ]; then
+          echo "echo auth_header_option is set."
+        fi
         echo "echo ---- start of wget output ----"
         # Each line of `wget_output` is already prefixed by "echo".
         echo "${wget_output}"
