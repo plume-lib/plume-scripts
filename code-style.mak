@@ -87,9 +87,11 @@ dummy := $(shell cd .plume-scripts \
    && chmod +x checkbashisms)
 endif
 # Install a git pre-commit hook if one doesn't already exist.
+ifneq (,$(wildcard .git/hooks))
 ifeq (,$(wildcard .git/hooks/pre-commit))
 dummy := $(shell cd .git/hooks \
    && ln -s ../../.plume-scripts/code-style-pre-commit pre-commit)
+endif
 endif
 
 BKT_EXISTS := $(shell if command -v bkt > /dev/null 2>&1; then echo "yes"; fi)
