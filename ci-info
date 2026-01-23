@@ -110,14 +110,14 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       sleep 5
       SLUG=$(wget -q "${auth_header_option[@]}" -O - "${url}" | jq .head.label | sed 's/"//g')
       if [ -z "$SLUG" ]; then
-        wget_output="$(wget "${auth_header_option[@]}" -O - "${url}" 2>&1 | sed -e 's/^/echo /')" || true
+        wget_output="$(wget "${auth_header_option[@]}" -O - "${url}" 2>&1)" || true
         echo "echo ${SCRIPT_NAME} error: bad output for wget -O - ${url}"
         if [ -n "${auth_header_option[*]}" ]; then
           echo "echo auth_header_option is set."
         fi
         echo "echo ---- start of wget output ----"
-        # Each line of `wget_output` is already prefixed by "echo".
-        echo "${wget_output}"
+        # shellcheck disable=SC2001
+        echo "${wget_output}" | sed -e 's/^/echo /'
         echo "echo ---- end of wget output ----"
         exit 2
       fi
