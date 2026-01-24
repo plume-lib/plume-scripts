@@ -198,6 +198,9 @@ DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scri
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
+$(info About to ls directories)
+$(info $(shell ${DMDL} ls -al /myfolder))
+$(info $(shell ${DMDL} ls -al /plume-scripts))
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2_EXISTS
