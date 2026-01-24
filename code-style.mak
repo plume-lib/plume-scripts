@@ -200,10 +200,10 @@ MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml 
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
 # docker run --entrypoint /bin/sh davidanson/markdownlint-cli2:v0.20.0 -c "echo 'hello world'"
 $(info About to ls directories)
-$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 pwd))
-$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 ls -al /))
-$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 ls -al /workdir))
-$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 ls -al /plume-scripts))
+$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd))
+$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /))
+$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /workdir))
+$(info $(shell docker run --entrypoint /bin/sh -v $$PWD:/workdir -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts))
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2_EXISTS
