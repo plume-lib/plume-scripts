@@ -201,6 +201,7 @@ MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
 # docker run --entrypoint /bin/sh davidanson/markdownlint-cli2:v0.20.0 -c "echo 'hello world'"
 $(info About to ls directories)
 $(info $(shell docker run --entrypoint /bin/sh -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd))
+$(info $(shell docker run --entrypoint /bin/sh -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al))
 $(info $(shell docker run --entrypoint /bin/sh -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /))
 $(info $(shell docker run --entrypoint /bin/sh -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /myfolder))
 $(info $(shell docker run --entrypoint /bin/sh -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts))
