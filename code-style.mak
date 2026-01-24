@@ -194,9 +194,9 @@ ifdef DOCKER_EXISTS
 DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
 endif
 ifdef DOCKER_RUNNING
-DMDL := docker run -w /myfolder -v $$PWD:/myfolder davidanson/markdownlint-cli2:v0.20.0
-MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /myfolder/.markdownlint-cli2.yaml "\#node_modules"
-MARKDOWN_STYLE_CHECK := ${DMDL} --config /myfolder/.markdownlint-cli2.yaml "\#node_modules"
+DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
+MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
