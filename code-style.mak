@@ -194,15 +194,13 @@ ifdef DOCKER_EXISTS
 DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
 endif
 ifdef DOCKER_RUNNING
-DMDL := docker run -w /myfolder --volume $$PWD:/myfolder --volume $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
+DMDL := docker run -w /myfolder --volume $PWD:/myfolder --volume $(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
 $(info DMDL=${DMDL})
-$(info DMDL=$${DMDL})
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
 # docker run --entrypoint /bin/sh davidanson/markdownlint-cli2:v0.20.0 -c "echo 'hello world'"
 $(info PWD=${PWD})
-$(info PWD=$${PWD})
 $(info About to ls directories)
 $(info docker run --entrypoint /bin/sh -w /myfolder --volume $${PWD}:/myfolder --volume $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd)
 $(info $(shell docker run --entrypoint /bin/sh -w /myfolder --volume $${PWD}:/myfolder --volume $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd))
