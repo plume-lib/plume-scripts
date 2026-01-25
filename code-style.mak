@@ -201,8 +201,8 @@ MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml 
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
 # docker run --entrypoint /bin/sh davidanson/markdownlint-cli2:v0.20.0 -c "echo 'hello world'"
 $(info PWD=${PWD})
-$(info About to ls local directories)
 $(info $(shell pwd))
+$(info About to ls local directories)
 $(info $(shell ls -al))
 $(info About to ls directories)
 $(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd)
@@ -252,7 +252,9 @@ ifneq (,${MARKDOWN_FILES})
 	${MARKDOWN_STYLE_VERSION}
 	@echo "DOCKER_EXISTS=${DOCKER_EXISTS}"
 ifeq (yes,${DOCKER_EXISTS})
+	which docker
 	docker --version
+	docker version
 	@echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
 endif
 	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
