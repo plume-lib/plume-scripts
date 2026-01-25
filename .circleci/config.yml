@@ -21,13 +21,13 @@ jobs:
           paths:
             - ".git"
 
-      - run: sudo apt update
-      - run:
-          name: Install dependencies via apt
-          command: sudo apt -y install devscripts shellcheck shfmt yamllint
       - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - run: apt update
+      - run:
+          name: Install dependencies via apt
+          command: apt -y install devscripts shellcheck shfmt yamllint
 
       - run: make showvars
       - run: make
