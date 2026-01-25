@@ -29,8 +29,8 @@ jobs:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
       - run:
-          name: Install dependencies via apt
-          command: apk add devscripts shellcheck shfmt yamllint
+          name: Install dependencies via apk
+          command: apk add shellcheck shfmt yamllint
 
       - run: make showvars
       - run: make
