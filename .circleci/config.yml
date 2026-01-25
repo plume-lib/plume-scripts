@@ -21,6 +21,7 @@ jobs:
           paths:
             - ".git"
 
+      - run: cat /etc/os-release
       - run: apt update
       - run:
           name: Install uv prerequisites
