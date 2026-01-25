@@ -22,16 +22,15 @@ jobs:
             - ".git"
 
       - run: cat /etc/os-release
-      - run: apt update
       - run:
           name: Install uv prerequisites
-          command: apt -y install curl
+          command: apk add curl
       - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
       - run:
           name: Install dependencies via apt
-          command: apt -y install devscripts shellcheck shfmt yamllint
+          command: apk add devscripts shellcheck shfmt yamllint
 
       - run: make showvars
       - run: make
