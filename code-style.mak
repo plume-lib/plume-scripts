@@ -304,7 +304,7 @@ style-fix: python-style-fix
 style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
 $(info point 11)
-PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .))
+PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .))
 $(info point 12)
 ifneq (,${PYTHON_FILES})
 ifneq (,${UV_EXISTS})
@@ -376,10 +376,10 @@ style-fix: shell-style-fix
 style-check: shell-style-check
 # Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
 $(info point 13)
-SH_SCRIPTS   := $(strip ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' .))
+SH_SCRIPTS   := $(strip ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^#! \?\(/bin/\|/usr/bin/env \)sh' .))
 $(info point 14)
 # Any file ending with ".bash" or containing a bash shebang line.
-BASH_SCRIPTS := $(strip ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .))
+BASH_SCRIPTS := $(strip ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^#! \?\(/bin/\|/usr/bin/env \)bash' .))
 $(info point 15)
 SH_AND_BASH_SCRIPTS := $(strip ${SH_SCRIPTS} ${BASH_SCRIPTS})
 ifneq (,${SH_AND_BASH_SCRIPTS})
