@@ -36,7 +36,7 @@ jobs:
       - run: PATH=${HOME}/.local/bin:${PATH} which uv
       - run:
           name: Install dependencies for "make style-check"
-          command: apk add grep make shellcheck shfmt yamllint
+          command: apk add coreutils grep make shellcheck shfmt yamllint
 
       - run: PATH=${HOME}/.local/bin:${PATH} make showvars
       - run: PATH=${HOME}/.local/bin:${PATH} make
