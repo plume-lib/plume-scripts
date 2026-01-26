@@ -31,7 +31,7 @@
 # Requirements/dependencies
 #
 # You need to install tools depending on what type of files your project contains:
-# * must always be installed: `make`
+# * must always be installed: make, GNU grep (for `--include` command-line argument)
 # * for HTML checking: Python, uv
 # * for Markdown checking: either of these:
 #   * npm, markdownlint-cli2
@@ -83,7 +83,7 @@ else # This "else" is closed nearly at the end of the file.
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard .plume-scripts/checkbashisms))
 dummy := $(shell cd .plume-scripts \
-   && wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms \
+   && wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
 # Install a git pre-commit hook if one doesn't already exist.
@@ -229,6 +229,12 @@ showvars::
 	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
 ifneq (,${MARKDOWN_FILES})
 	${MARKDOWN_STYLE_VERSION}
+	@echo "DOCKER_EXISTS=${DOCKER_EXISTS}"
+ifeq (yes,${DOCKER_EXISTS})
+	which docker
+	docker --version
+	docker version
+endif
 	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
 	@echo "PYMARKDOWNLNT_EXISTS_UV=${PYMARKDOWNLNT_EXISTS_UV}"
 	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
