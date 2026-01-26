@@ -30,6 +30,8 @@ jobs:
           command: |
             curl -LsSf https://astral.sh/uv/install.sh | sh
             source $HOME/.local/bin/env
+            which uv
+      - run: which uv
       - run:
           name: Install dependencies for "make style-check"
           command: apk add grep make shellcheck shfmt yamllint
