@@ -1,4 +1,11 @@
 version: 2.1
+
+machine:
+  services:
+    - docker
+  pre:
+    - docker --version
+
 jobs:
   build:
 
