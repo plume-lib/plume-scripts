@@ -38,8 +38,6 @@ jobs:
           name: Install dependencies for "make style-check"
           command: apk add grep make shellcheck shfmt yamllint
 
-      - run: PATH=${HOME}/.local/bin:${PATH} uv pip install pyjson5
-
       - run: PATH=${HOME}/.local/bin:${PATH} make showvars
       - run: PATH=${HOME}/.local/bin:${PATH} make
 

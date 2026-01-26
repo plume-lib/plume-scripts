@@ -181,8 +181,10 @@ MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS}
 ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
 ifneq (,${UV_EXISTS})
-PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYMARKDOWNLNT_EXISTS_UVX
+PYMARKDOWNLNT_EXISTS_UVX := $(shell uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifeq (yes,${PYMARKDOWNLNT_EXISTS_UVX})
+$(info PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX})
+$(info $(shell uvx pymarkdownlnt version))
 MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown fix
 MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uvx pymarkdownlnt version
