@@ -33,13 +33,13 @@ jobs:
             echo ${PATH}
             which uv
             export PATH=${HOME}/.local/bin:${PATH}
-      - run: which uv
+      - run: PATH=${HOME}/.local/bin:${PATH} which uv
       - run:
           name: Install dependencies for "make style-check"
           command: apk add grep make shellcheck shfmt yamllint
 
-      - run: make showvars
-      - run: make
+      - run: PATH=${HOME}/.local/bin:${PATH} make showvars
+      - run: PATH=${HOME}/.local/bin:${PATH} make
 
 workflows:
   build:
