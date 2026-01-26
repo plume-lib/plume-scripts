@@ -43,6 +43,7 @@ jobs:
           name: Install dependencies for "make style-check"
           command: apt install -qy make shellcheck shfmt wget yamllint
 
+      - run: uv pip install pyjson5
       - run: make showvars
       - run: make
 
