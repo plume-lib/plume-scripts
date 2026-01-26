@@ -32,7 +32,7 @@ jobs:
             source $HOME/.local/bin/env
             echo ${PATH}
             which uv
-            export PATH=${HOME}/.local/bin:${PATH}
+            export PATH
       - run: which uv
       - run:
           name: Install dependencies for "make style-check"
