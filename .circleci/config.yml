@@ -27,7 +27,9 @@ jobs:
           command: apk add curl
       - run:
           name: Install uv
-          command: curl -LsSf https://astral.sh/uv/install.sh | sh
+          command: |
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            source $HOME/.local/bin/env
       - run:
           name: Install dependencies for "make style-check"
           command: apk add grep make shellcheck shfmt yamllint
