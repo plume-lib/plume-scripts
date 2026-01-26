@@ -35,7 +35,7 @@ jobs:
           name: Install docker
           command: |
             curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
+            sh get-docker.sh
             which docker
             docker --version
             docker version
