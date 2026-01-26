@@ -34,7 +34,7 @@ jobs:
             sh get-docker.sh
       - run:
           name: Install dependencies for "make style-check"
-          command: apt install -qy make shellcheck shfmt yamllint
+          command: apt install -qy make shellcheck shfmt wget yamllint
 
       - run: make showvars
       - run: make
