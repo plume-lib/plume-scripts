@@ -30,7 +30,9 @@ jobs:
           command: |
             curl -LsSf https://astral.sh/uv/install.sh | sh
             source $HOME/.local/bin/env
+            echo ${PATH}
             which uv
+            export PATH=${HOME}/.local/bin:${PATH}
       - run: which uv
       - run:
           name: Install dependencies for "make style-check"
