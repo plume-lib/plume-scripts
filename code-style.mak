@@ -280,7 +280,7 @@ style-fix: perl-style-fix
 style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
 $(info point 9)
-PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .))
+PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .))
 $(info point 10)
 perl-style-fix:
 ifneq (,${PERL_FILES})
