@@ -3,7 +3,7 @@ jobs:
   build:
 
     docker:
-      - image: cimg/python:3.14
+      - image: docker:dind
 
     environment:
       TERM: dumb
@@ -21,13 +21,16 @@ jobs:
           paths:
             - ".git"
 
-      - run: sudo apt update
+      - run: cat /etc/os-release
       - run:
-          name: Install dependencies via apt
-          command: sudo apt -y install devscripts shellcheck shfmt yamllint
+          name: Install uv prerequisites
+          command: apk add curl
       - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - run:
+          name: Install dependencies for "make style-check"
+          command: apk add grep make shellcheck shfmt yamllint
 
       - run: make showvars
       - run: make
