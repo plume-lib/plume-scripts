@@ -34,9 +34,10 @@
 # * must always be installed:
 #   * make
 #   * wget
+#   On distributions that use busybox to provide standard Unix commands:
 #   * GNU grep (for `--include` command-line argument)
 #   * realpath (for `--` command-line argument)
-#   The latter two are an issue on distributions, such as Alpine Linux, that use busybox to provide standard Unix command.
+#   For example, on Alpine Linux, run: `apk add coreutils grep`
 # * for HTML checking: Python, uv
 # * for Markdown checking: either of these:
 #   * npm, markdownlint-cli2
@@ -243,7 +244,10 @@ ifndef MARKDOWN_STYLE_FIX
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
+	-command -v markdownlint-cli2
 	-markdownlint-cli2 --version
+	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'.
+	@echo See diagnostics above.
 else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
@@ -255,6 +259,7 @@ ifndef MARKDOWN_STYLE_CHECK
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
+	-markdownlint-cli2 --version
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'.
 	@echo See diagnostics above.
 	@false
