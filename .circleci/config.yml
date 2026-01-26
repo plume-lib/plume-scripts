@@ -26,7 +26,10 @@ jobs:
       - run: apt install -qy curl
       - run:
           name: Install uv
-          command: curl -LsSf https://astral.sh/uv/install.sh | sh
+          command: |
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            which uv
+            uv --version
       - run:
           name: Install docker
           command: |
