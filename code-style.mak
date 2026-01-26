@@ -31,7 +31,12 @@
 # Requirements/dependencies
 #
 # You need to install tools depending on what type of files your project contains:
-# * must always be installed: make, wget, GNU grep (for `--include` command-line argument)
+# * must always be installed:
+#   * make
+#   * wget
+#   * GNU grep (for `--include` command-line argument)
+#   * realpath (for `--` command-line argument)
+#   The latter two are an issue on distributions, such as Alpine Linux, that use busybox to provide standard Unix command.
 # * for HTML checking: Python, uv
 # * for Markdown checking: either of these:
 #   * npm, markdownlint-cli2
