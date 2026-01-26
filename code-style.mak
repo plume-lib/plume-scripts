@@ -31,7 +31,7 @@
 # Requirements/dependencies
 #
 # You need to install tools depending on what type of files your project contains:
-# * must always be installed: `make`
+# * must always be installed: make, wget, GNU grep (for `--include` command-line argument)
 # * for HTML checking: Python, uv
 # * for Markdown checking: either of these:
 #   * npm, markdownlint-cli2
@@ -190,7 +190,6 @@ endif
 endif # ifneq (,${UV_EXISTS})
 DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef DOCKER_EXISTS
-# DOCKER_RUNNING := $(shell if curl -s --unix-socket /var/run/docker.sock http/_ping 2>&1 >/dev/null; then echo "yes"; fi)
 DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
 endif
 ifdef DOCKER_RUNNING
@@ -199,7 +198,6 @@ $(info DMDL=${DMDL})
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
-# docker run --entrypoint /bin/sh davidanson/markdownlint-cli2:v0.20.0 -c "echo 'hello world'"
 $(info PWD=${PWD})
 $(info $(shell pwd))
 $(info About to ls local directories)
@@ -254,8 +252,10 @@ ifneq (,${MARKDOWN_FILES})
 ifeq (yes,${DOCKER_EXISTS})
 	which docker
 	docker --version
-	docker version
 	@echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
+ifeq (yes,${DOCKER_RUNNING})
+	docker version
+endif
 endif
 	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
 	@echo "PYMARKDOWNLNT_EXISTS_UV=${PYMARKDOWNLNT_EXISTS_UV}"
