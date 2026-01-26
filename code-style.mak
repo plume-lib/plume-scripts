@@ -242,10 +242,13 @@ markdown-style-fix:
 ifneq (,${MARKDOWN_FILES})
 ifndef MARKDOWN_STYLE_FIX
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	@echo See diagnostics below.
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
 	-markdownlint-cli2 --version
+	-docker --version
+	-docker version
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'.
 	@echo See diagnostics above.
 else
@@ -256,10 +259,13 @@ markdown-style-check:
 ifneq (,${MARKDOWN_FILES})
 ifndef MARKDOWN_STYLE_CHECK
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	@echo See diagnostics below.
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
 	-markdownlint-cli2 --version
+	-docker --version
+	-docker version
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'.
 	@echo See diagnostics above.
 	@false
