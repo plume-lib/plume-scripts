@@ -35,6 +35,9 @@ jobs:
           command: |
             curl -fsSL https://get.docker.com -o get-docker.sh
             sh get-docker.sh
+            which docker
+            docker --version
+            docker version
       - run:
           name: Install dependencies for "make style-check"
           command: apt install -qy make shellcheck shfmt wget yamllint
