@@ -114,13 +114,13 @@ HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} $
 ifneq (,${HTML_FILES})
 # HTML linters are listed in order of increasing precedence.
 HTML5VALIDATOR_EXISTS_UVX := $(shell if uvx html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef HTML5VALIDATOR_EXISTS_UVX
+ifeq (yes,${HTML5VALIDATOR_EXISTS_UVX})
 HTML_STYLE_FIX := uvx html5validator fix
 HTML_STYLE_CHECK := uvx html5validator scan --show-warnings
 HTML_STYLE_VERSION := uvx html5validator --version
 endif
 HTML5VALIDATOR_EXISTS_UV := $(shell if uv run html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef HTML5VALIDATOR_EXISTS_UV
+ifeq (yes,${HTML5VALIDATOR_EXISTS_UV})
 HTML_STYLE_FIX := uv run html5validator fix
 HTML_STYLE_CHECK := uv run html5validator scan --show-warnings
 HTML_STYLE_VERSION := uv run html5validator --version
@@ -190,17 +190,17 @@ MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown sc
 MARKDOWN_STYLE_VERSION := uvx pymarkdownlnt version
 endif
 PYMARKDOWNLNT_EXISTS_UV := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYMARKDOWNLNT_EXISTS_UV
+ifeq (yes,${PYMARKDOWNLNT_EXISTS_UV})
 MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown fix
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
 endif
 endif # ifneq (,${UV_EXISTS})
 DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef DOCKER_EXISTS
+ifeq (yes,${DOCKER_EXISTS})
 DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
 endif
-ifdef DOCKER_RUNNING
+ifeq (yes,${DOCKER_RUNNING})
 DMDL := docker run -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f $$(pwd)/.plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0
 $(info DMDL=${DMDL})
 $(info point 1)
@@ -227,7 +227,7 @@ $(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD}
 $(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts))
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef MARKDOWNLINT_CLI2_EXISTS
+ifeq (yes,${MARKDOWNLINT_CLI2_EXISTS})
 $(info point 5)
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 $(info point 6)
@@ -255,6 +255,8 @@ ifndef MARKDOWN_STYLE_CHECK
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
+	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'.
+	@echo See diagnostics above.
 	@false
 else
 	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
@@ -316,19 +318,19 @@ $(info point 12)
 ifneq (,${PYTHON_FILES})
 ifneq (,${UV_EXISTS})
 RUFF_EXISTS_UVX := $(shell if uvx ruff version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef RUFF_EXISTS_UVX
+ifeq (yes,${RUFF_EXISTS_UVX})
 RUFF := uvx ruff
 endif
 RUFF_EXISTS_UV := $(shell if uv run ruff version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef RUFF_EXISTS_UV
+ifeq (yes,${RUFF_EXISTS_UV})
 RUFF := uv run ruff
 endif
 TY_EXISTS_UVX := $(shell if uvx ty version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef TY_EXISTS_UVX
+ifeq (yes,${TY_EXISTS_UVX})
 TY := uvx ty
 endif
 TY_EXISTS_UV := $(shell if uv run ty version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef TY_EXISTS_UV
+ifeq (yes,${TY_EXISTS_UV})
 TY := uv run ty
 endif
 endif # ifneq (,${UV_EXISTS})
@@ -463,11 +465,11 @@ YAMLLINT := yamllint
 endif
 ifneq (,${UV_EXISTS})
 PYYAMLLNT_EXISTS_UVX := $(shell if uvx yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYYAMLLNT_EXISTS_UVX
+ifeq (yes,${PYYAMLLNT_EXISTS_UVX})
 YAMLLINT := uvx yamllint
 endif
 PYYAMLLNT_EXISTS_UV := $(shell if uv run yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYYAMLLNT_EXISTS_UV
+ifeq (yes,${PYYAMLLNT_EXISTS_UV})
 YAMLLINT := uv run yamllint
 endif
 endif # ifneq (,${UV_EXISTS})
