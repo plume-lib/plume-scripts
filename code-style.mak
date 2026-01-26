@@ -61,6 +61,7 @@
 
 # Set the variables *before* your makefile includes `code-style.mak`.
 
+# Removing `\` before `#` here makes things worse.
 ifndef CODE_STYLE_EXCLUSIONS
 CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 endif
@@ -195,9 +196,13 @@ endif
 ifdef DOCKER_RUNNING
 DMDL := docker run -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f $$(pwd)/.plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0
 $(info DMDL=${DMDL})
+$(info point 1)
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+$(info point 2)
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+$(info point 3)
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
+$(info point 4)
 $(info PWD=${PWD})
 $(info $(shell pwd))
 $(info About to ls local directories)
@@ -216,9 +221,13 @@ $(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,sr
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2_EXISTS
+$(info point 5)
 MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+$(info point 6)
 MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+$(info point 7)
 MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
+$(info point 8)
 endif
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-fix:
@@ -270,7 +279,9 @@ endif
 style-fix: perl-style-fix
 style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
+$(info point 9)
 PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .))
+$(info point 10)
 perl-style-fix:
 ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
@@ -292,7 +303,9 @@ showvars::
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
+$(info point 11)
 PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' .))
+$(info point 12)
 ifneq (,${PYTHON_FILES})
 ifneq (,${UV_EXISTS})
 RUFF_EXISTS_UVX := $(shell if uvx ruff version > /dev/null 2>&1; then echo "yes"; fi)
@@ -362,9 +375,12 @@ endif
 style-fix: shell-style-fix
 style-check: shell-style-check
 # Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
+$(info point 13)
 SH_SCRIPTS   := $(strip ${SH_SCRIPTS_USER} $(shell grep -r -l ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' .))
+$(info point 14)
 # Any file ending with ".bash" or containing a bash shebang line.
 BASH_SCRIPTS := $(strip ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' .))
+$(info point 15)
 SH_AND_BASH_SCRIPTS := $(strip ${SH_SCRIPTS} ${BASH_SCRIPTS})
 ifneq (,${SH_AND_BASH_SCRIPTS})
 ifneq (,${BKT_EXISTS})
