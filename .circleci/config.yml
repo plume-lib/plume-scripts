@@ -22,7 +22,7 @@ jobs:
             - ".git"
 
       - run: cat /etc/os-release
-      - run: sudo apt update
+      - run: apt update
       - run: apt install -qy curl
       - run:
           name: Install uv
@@ -32,7 +32,6 @@ jobs:
           command: |
             curl -fsSL https://get.docker.com -o get-docker.sh
             sh get-docker.sh
-      - run: sudo apt update
       - run:
           name: Install dependencies for "make style-check"
           command: apt install -qy make shellcheck shfmt yamllint
