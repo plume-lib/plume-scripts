@@ -22,6 +22,8 @@ jobs:
             - ".git"
 
       - run: cat /etc/os-release
+      - run: sudo apt update
+      - run: apt install -qy curl
       - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -33,7 +35,7 @@ jobs:
       - run: sudo apt update
       - run:
           name: Install dependencies for "make style-check"
-          command: apk add grep make shellcheck shfmt yamllint
+          command: apt install -qy make shellcheck shfmt yamllint
 
       - run: make showvars
       - run: make

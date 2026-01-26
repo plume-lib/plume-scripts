@@ -190,6 +190,9 @@ endif
 endif # ifneq (,${UV_EXISTS})
 DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef DOCKER_EXISTS
+DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
+endif
+ifdef DOCKER_RUNNING
 DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
@@ -233,6 +236,9 @@ ifneq (,${MARKDOWN_FILES})
 ifeq (yes,${DOCKER_EXISTS})
 	which docker
 	docker --version
+	@echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
+endif
+ifeq (yes,${DOCKER_RUNNING})
 	docker version
 endif
 	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
