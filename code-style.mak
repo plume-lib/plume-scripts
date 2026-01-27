@@ -194,25 +194,9 @@ DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; f
 endif
 ifeq (yes,${DOCKER_RUNNING})
 DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
-$(info DMDL=${DMDL})
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
-$(info PWD=${PWD})
-$(info $(shell pwd))
-$(info About to ls local directories)
-$(info $(shell ls -al))
-$(info About to ls directories)
-$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd)
-$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd))
-$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al)
-$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al))
-$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /)
-$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /))
-$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /myfolder)
-$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /myfolder))
-$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts)
-$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts))
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2_EXISTS
@@ -255,13 +239,14 @@ ifeq (yes,${DOCKER_EXISTS})
 	@echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
 ifeq (yes,${DOCKER_RUNNING})
 	docker version
+	echo "DMDL=${DMDL}"
 endif
 endif
 	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
 	@echo "PYMARKDOWNLNT_EXISTS_UV=${PYMARKDOWNLNT_EXISTS_UV}"
+	@echo "MARKDOWNLINT_CLI2_EXISTS=${MARKDOWNLINT_CLI2_EXISTS}"
 	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
 	@echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
-	@echo "MARKDOWNLINT_CLI2_EXISTS=${MARKDOWNLINT_CLI2_EXISTS}"
 endif
 
 
