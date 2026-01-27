@@ -189,7 +189,7 @@ MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
 endif
 endif # ifneq (,${UV_EXISTS})
 DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef DOCKER_EXISTS
+ifeq (yes,${DOCKER_EXISTS})
 DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
