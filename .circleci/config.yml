@@ -38,6 +38,7 @@ jobs:
             sh get-docker.sh
             which docker
             docker --version
+            systemctl start docker
             docker version
       - run:
           name: Install dependencies for "make style-check"
