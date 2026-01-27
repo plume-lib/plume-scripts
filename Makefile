@@ -11,7 +11,7 @@ include .plume-scripts/code-style.mak
 
 # `checkbashisms` is not included by source because it is licensed under the GPL.
 ifeq (,$(wildcard checkbashisms))
-dummy2 := $(shell wget -q -N https://homes.cs.washington.edu/~mernst/software/checkbashisms)
+dummy := $(shell wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms)
 endif
 
 test:
