@@ -31,7 +31,7 @@
 # Requirements/dependencies
 #
 # You need to install tools depending on what type of files your project contains:
-# * must always be installed: make, GNU grep (for `--include` command-line argument)
+# * must always be installed: make, wget, GNU grep (for `--include` command-line argument)
 # * for HTML checking: Python, uv
 # * for Markdown checking: either of these:
 #   * npm, markdownlint-cli2
@@ -62,7 +62,7 @@
 # Set the variables *before* your makefile includes `code-style.mak`.
 
 ifndef CODE_STYLE_EXCLUSIONS
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 endif
 
 
@@ -190,10 +190,29 @@ endif
 endif # ifneq (,${UV_EXISTS})
 DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef DOCKER_EXISTS
+DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
+endif
+ifdef DOCKER_RUNNING
 DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
+$(info DMDL=${DMDL})
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
+$(info PWD=${PWD})
+$(info $(shell pwd))
+$(info About to ls local directories)
+$(info $(shell ls -al))
+$(info About to ls directories)
+$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd)
+$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c pwd))
+$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al)
+$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al))
+$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /)
+$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /))
+$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /myfolder)
+$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /myfolder))
+$(info docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts)
+$(info $(shell docker run --entrypoint /bin/sh -w /myfolder --mount type=bind,src=${PWD},dst=/myfolder --mount type=bind,src=$(readlink -f .plume-scripts),dst=/plume-scripts davidanson/markdownlint-cli2:v0.20.0 -c ls -al /plume-scripts))
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2_EXISTS
@@ -233,7 +252,10 @@ ifneq (,${MARKDOWN_FILES})
 ifeq (yes,${DOCKER_EXISTS})
 	which docker
 	docker --version
+	@echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
+ifeq (yes,${DOCKER_RUNNING})
 	docker version
+endif
 endif
 	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
 	@echo "PYMARKDOWNLNT_EXISTS_UV=${PYMARKDOWNLNT_EXISTS_UV}"
