@@ -11,6 +11,7 @@
 #   so jobs can be run with execution tracing to aid forensic
 #   debugging. Cronic has no options, it simply executes its arguments.
 # Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
+# --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
