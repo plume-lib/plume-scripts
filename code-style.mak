@@ -14,7 +14,7 @@
 #
 # # Code style; defines `style-check` and `style-fix`.
 # ifeq (,$(wildcard .plume-scripts))
-# dummy := $(shell git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
+# dummy := $(shell git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
 # endif
 # include .plume-scripts/code-style.mak
 #
@@ -27,6 +27,9 @@
 
 # You can disable all style checking by defining environment variable
 # CODE_STYLE_DISABLE to any value.
+
+# To use it in CI, copy file code-style-github-workflow.yml to
+# .github/workflows/code-style.yml in your repository.
 
 # Requirements/dependencies
 #
