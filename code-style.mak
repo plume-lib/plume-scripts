@@ -14,7 +14,7 @@
 #
 # # Code style; defines `style-check` and `style-fix`.
 # ifeq (,$(wildcard .plume-scripts))
-# dummy := $(shell git clone -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
+# dummy := $(shell git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
 # endif
 # include .plume-scripts/code-style.mak
 #
@@ -27,6 +27,9 @@
 
 # You can disable all style checking by defining environment variable
 # CODE_STYLE_DISABLE to any value.
+
+# To use it in CI, copy file code-style-github-workflow.yml to
+# .github/workflows/code-style.yml in your repository.
 
 # Requirements/dependencies
 #
@@ -80,9 +83,9 @@ endif
 # This "if" is closed nearly at the end of the file.
 ifdef CODE_STYLE_DISABLE
 style-check:
-	@echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-check` does nothing.'
+	echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-check` does nothing.'
 style-fix:
-	@echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-fix` does nothing.'
+	echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-fix` does nothing.'
 else # This "else" is closed nearly at the end of the file.
 
 # `checkbashisms` is not included by source because it uses the GPL.
@@ -129,35 +132,35 @@ endif # ifneq (,${UV_EXISTS})
 html-style-fix:
 ifneq (,${HTML_FILES})
 ifeq (,${UV_EXISTS})
-	@echo Skipping html5validator because uv is not installed.
+	echo Skipping html5validator because uv is not installed.
 else
 ifndef HTML_STYLE_FIX
-	@echo Skipping html5validator because it is not installed.
+	echo Skipping html5validator because it is not installed.
 	-uvx html5validator --version
 	-uv run html5validator --version
-	@false
+	false
 else
-	@.plume-scripts/cronic ${HTML_STYLE_FIX} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
+	.plume-scripts/cronic ${HTML_STYLE_FIX} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
 endif
 endif # ifneq (,${HTML_FILES})
 html-style-check:
 ifneq (,${HTML_FILES})
 ifeq (,${UV_EXISTS})
-	@echo Skipping html5validator because uv is not installed.
+	echo Skipping html5validator because uv is not installed.
 else
 ifndef HTML_STYLE_CHECK
-	@echo Cannot find 'uvx html5validator' or 'uv run html5validator'
+	echo Cannot find 'uvx html5validator' or 'uv run html5validator'
 	-uvx html5validator --version
 	-uv run html5validator --version
-	@false
+	false
 else
-	@.plume-scripts/cronic ${HTML_STYLE_CHECK} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
+	.plume-scripts/cronic ${HTML_STYLE_CHECK} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
 endif
 endif # ifneq (,${HTML_FILES})
 showvars::
-	@echo "HTML_FILES=${HTML_FILES}"
+	echo "HTML_FILES=${HTML_FILES}"
 ifneq (,${HTML_FILES})
 	${HTML_STYLE_VERSION}
 endif
@@ -213,45 +216,45 @@ endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-fix:
 ifneq (,${MARKDOWN_FILES})
 ifndef MARKDOWN_STYLE_FIX
-	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-markdownlint-cli2 --version
 else
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
+	.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-check:
 ifneq (,${MARKDOWN_FILES})
 ifndef MARKDOWN_STYLE_CHECK
-	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
+	echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
 	-uvx pymarkdownlnt version
 	-uv run pymarkdownlnt version
 	-command -v markdownlint-cli2
-	@false
+	false
 else
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
+	.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
 endif # ifneq (,${MARKDOWN_FILES})
 showvars::
-	@echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
+	echo "MARKDOWN_FILES=${MARKDOWN_FILES}"
 ifneq (,${MARKDOWN_FILES})
 	${MARKDOWN_STYLE_VERSION}
-	@echo "DOCKER_EXISTS=${DOCKER_EXISTS}"
+	echo "DOCKER_EXISTS=${DOCKER_EXISTS}"
 ifeq (yes,${DOCKER_EXISTS})
 	which docker
 	docker --version
-	@echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
+	echo "DOCKER_RUNNING=${DOCKER_RUNNING}"
 ifeq (yes,${DOCKER_RUNNING})
 	docker version
 	echo "DMDL=${DMDL}"
 endif
 endif
-	@echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
-	@echo "PYMARKDOWNLNT_EXISTS_UV=${PYMARKDOWNLNT_EXISTS_UV}"
-	@echo "MARKDOWNLINT_CLI2_EXISTS=${MARKDOWNLINT_CLI2_EXISTS}"
-	@echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
-	@echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
+	echo "PYMARKDOWNLNT_EXISTS_UVX=${PYMARKDOWNLNT_EXISTS_UVX}"
+	echo "PYMARKDOWNLNT_EXISTS_UV=${PYMARKDOWNLNT_EXISTS_UV}"
+	echo "MARKDOWNLINT_CLI2_EXISTS=${MARKDOWNLINT_CLI2_EXISTS}"
+	echo "MARKDOWN_STYLE_FIX=${MARKDOWN_STYLE_FIX}"
+	echo "MARKDOWN_STYLE_CHECK=${MARKDOWN_STYLE_CHECK}"
 endif
 
 
@@ -264,17 +267,17 @@ PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${C
 perl-style-fix:
 ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
-#	@perltidy -w -b -bext='/' -gnu ${PERL_FILES}
-#	@find . -name '*.tdy' -type f -delete
+#	perltidy -w -b -bext='/' -gnu ${PERL_FILES}
+#	find . -name '*.tdy' -type f -delete
 endif
 perl-style-check:
 ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
-#	@perltidy -w ${PERL_FILES}
-#	@find . -name '*.tdy' -type f -delete
+#	perltidy -w ${PERL_FILES}
+#	find . -name '*.tdy' -type f -delete
 endif
 showvars::
-	@echo "PERL_FILES=${PERL_FILES}"
+	echo "PERL_FILES=${PERL_FILES}"
 
 
 ## Python
@@ -306,42 +309,42 @@ endif # ifneq (,${PYTHON_FILES})
 python-style-fix:
 ifneq (,${PYTHON_FILES})
 ifeq (,${RUFF})
-	@echo Skipping ruff because it is not installed.
+	echo Skipping ruff because it is not installed.
 else
-	@.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
-	@.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 endif
 python-style-check:
 ifneq (,${PYTHON_FILES})
 ifeq (,${RUFF})
-	@echo Skipping ruff because it is not installed.
+	echo Skipping ruff because it is not installed.
 else
-	@.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
-	@.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 endif
 python-typecheck:
 ifneq (,${PYTHON_FILES})
 ifeq (,${TY})
-	@echo Skipping ty because it is not installed.
+	echo Skipping ty because it is not installed.
 else
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
-	@.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
+	.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
 endif
 endif
 showvars::
-	@echo "PYTHON_FILES=${PYTHON_FILES}"
+	echo "PYTHON_FILES=${PYTHON_FILES}"
 ifneq (,${PYTHON_FILES})
-	@echo "RUFF_EXISTS_UVX=${RUFF_EXISTS_UVX}"
-	@echo "RUFF_EXISTS_UV=${RUFF_EXISTS_UV}"
-	@echo "RUFF=${RUFF}"
+	echo "RUFF_EXISTS_UVX=${RUFF_EXISTS_UVX}"
+	echo "RUFF_EXISTS_UV=${RUFF_EXISTS_UV}"
+	echo "RUFF=${RUFF}"
 ifdef RUFF
 	${RUFF} version
 endif
-	@echo "TY_EXISTS_UVX=${TY_EXISTS_UVX}"
-	@echo "TY_EXISTS_UV=${TY_EXISTS_UV}"
-	@echo "TY=${TY}"
+	echo "TY_EXISTS_UVX=${TY_EXISTS_UVX}"
+	echo "TY_EXISTS_UV=${TY_EXISTS_UV}"
+	echo "TY=${TY}"
 ifdef TY
 	${TY} version
 endif
@@ -366,50 +369,50 @@ endif # ifneq (,$SH_AND_BASH_SCRIPTS)
 shell-style-fix:
 ifneq (,${SH_AND_BASH_SCRIPTS})
 ifeq (,${SHFMT_EXISTS})
-	@echo "skipping shfmt because it is not installed"
+	echo "skipping shfmt because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
 endif
 ifeq (,${SHELLCHECK_EXISTS})
-	@echo "skipping shellcheck because it is not installed"
+	echo "skipping shellcheck because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
+	${SHELL_BKT_COMMAND} shellcheck -x -P SCRIPTDIR --format=diff ${SH_AND_BASH_SCRIPTS} | patch -p1 || (shellcheck --version && false)
 endif
 endif # ifneq (,${SH_AND_BASH_SCRIPTS})
 shell-style-check:
 ifneq (,${SH_AND_BASH_SCRIPTS})
 ifeq (,${SHFMT_EXISTS})
-	@echo "skipping shfmt because it is not installed"
+	echo "skipping shfmt because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
 endif
 ifeq (,${SHELLCHECK_EXISTS})
-	@echo "skipping shellcheck because it is not installed"
+	echo "skipping shellcheck because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
+	${SHELL_BKT_COMMAND} .plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
 endif
 endif
 ifneq (,${SH_SCRIPTS})
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
+	${SHELL_BKT_COMMAND} .plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
-	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
-	@echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
+	echo "SH_SCRIPTS=${SH_SCRIPTS}"
+	echo "BASH_SCRIPTS=${BASH_SCRIPTS}"
 ifneq (,${SH_AND_BASH_SCRIPTS})
-	@echo "SHFMT_EXISTS=${SHFMT_EXISTS}"
+	echo "SHFMT_EXISTS=${SHFMT_EXISTS}"
 ifneq (,${SHFMT_EXISTS})
 	shfmt --version
 endif
-	@echo "UV_EXISTS=${UV_EXISTS}"
+	echo "UV_EXISTS=${UV_EXISTS}"
 ifneq (,${UV_EXISTS})
 	uv --version
 endif
-	@echo "BKT_EXISTS=${BKT_EXISTS}"
+	echo "BKT_EXISTS=${BKT_EXISTS}"
 ifneq (,${BKT_EXISTS})
 	bkt --version
-	@echo "SHELL_BKT_COMMAND=${SHELL_BKT_COMMAND}"
+	echo "SHELL_BKT_COMMAND=${SHELL_BKT_COMMAND}"
 endif
-	@echo "SHELLCHECK_EXISTS=${SHELLCHECK_EXISTS}"
+	echo "SHELLCHECK_EXISTS=${SHELLCHECK_EXISTS}"
 ifneq (,${SHELLCHECK_EXISTS})
 	shellcheck --version | head -2
 endif
@@ -445,14 +448,14 @@ endif
 yaml-style-check:
 ifneq (,${YAML_FILES})
 ifeq (,${YAMLLINT})
-	@echo "skipping yamllint because it is not installed"
+	echo "skipping yamllint because it is not installed"
 else
-	@.plume-scripts/cronic ${YAMLLINT} -c .plume-scripts/.yamllint.yaml --format parsable ${YAML_FILES} || (${YAMLLINT} --version && false)
+	.plume-scripts/cronic ${YAMLLINT} -c .plume-scripts/.yamllint.yaml --format parsable ${YAML_FILES} || (${YAMLLINT} --version && false)
 endif
 endif
 showvars::
-	@echo "YAML_FILES=${YAML_FILES}"
-	@echo "YAMLLINT=${YAMLLINT}"
+	echo "YAML_FILES=${YAML_FILES}"
+	echo "YAMLLINT=${YAMLLINT}"
 ifneq (,${YAMLLINT})
 	${YAMLLINT} --version
 endif
@@ -462,4 +465,4 @@ endif # ifdef CODE_STYLE_DISABLE
 
 
 plume-scripts-update update-plume-scripts:
-	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
+	.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
