@@ -131,7 +131,7 @@ endif # ifneq (,${HTML_FILES})
 endif # ifneq (,${UV_EXISTS})
 html-style-fix:
 ifeq (,${HTML_FILES})
-	:
+	@:
 else
 ifeq (,${UV_EXISTS})
 	@echo Skipping html5validator because uv is not installed.
@@ -148,7 +148,7 @@ endif
 endif # ifneq (,${HTML_FILES})
 html-style-check:
 ifeq (,${HTML_FILES})
-	:
+	@:
 else
 ifeq (,${UV_EXISTS})
 	@echo Skipping html5validator because uv is not installed.
@@ -219,7 +219,7 @@ endif
 endif # ifneq (,${MARKDOWN_FILES})
 markdown-style-fix:
 ifeq (,${MARKDOWN_FILES})
-	:
+	@:
 else
 ifndef MARKDOWN_STYLE_FIX
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
@@ -232,7 +232,7 @@ endif
 endif # ifeq (,${MARKDOWN_FILES})
 markdown-style-check:
 ifeq (,${MARKDOWN_FILES})
-	:
+	@:
 else
 ifndef MARKDOWN_STYLE_CHECK
 	@echo Cannot find 'uvx pymarkdownlnt' or 'uv run pymarkdownlnt' or 'markdownlint-cli2'
@@ -273,14 +273,14 @@ style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
 PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -l --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' .))
 perl-style-fix:
-	:
+	@:
 ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
 #	@perltidy -w -b -bext='/' -gnu ${PERL_FILES}
 #	@find . -name '*.tdy' -type f -delete
 endif
 perl-style-check:
-	:
+	@:
 ifneq (,${PERL_FILES})
 # I don't think that perltidy is an improvement.
 #	@perltidy -w ${PERL_FILES}
@@ -318,7 +318,7 @@ endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${PYTHON_FILES})
 python-style-fix:
 ifeq (,${PYTHON_FILES})
-	:
+	@:
 else
 ifeq (,${RUFF})
 	@echo Skipping ruff because it is not installed.
@@ -329,7 +329,7 @@ endif
 endif
 python-style-check:
 ifeq (,${PYTHON_FILES})
-	:
+	@:
 else
 ifeq (,${RUFF})
 	@echo Skipping ruff because it is not installed.
@@ -340,7 +340,7 @@ endif
 endif
 python-typecheck:
 ifeq (,${PYTHON_FILES})
-	:
+	@:
 else
 ifeq (,${TY})
 	@echo Skipping ty because it is not installed.
@@ -384,7 +384,7 @@ SHELLCHECK_EXISTS := $(shell if shellcheck --version > /dev/null 2>&1; then echo
 endif # ifneq (,$SH_AND_BASH_SCRIPTS)
 shell-style-fix:
 ifeq (,${SH_AND_BASH_SCRIPTS})
-	:
+	@:
 else
 ifeq (,${SHFMT_EXISTS})
 	@echo "skipping shfmt because it is not installed"
@@ -399,7 +399,7 @@ endif
 endif # ifeq (,${SH_AND_BASH_SCRIPTS})
 shell-style-check:
 ifeq (,${SH_AND_BASH_SCRIPTS})
-	:
+	@:
 else
 ifeq (,${SHFMT_EXISTS})
 	@echo "skipping shfmt because it is not installed"
@@ -464,13 +464,13 @@ endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${YAML_FILES})
 yaml-style-fix:
 ifeq (,${YAML_FILES})
-	:
+	@:
 else
-	:
+	@:
 endif
 yaml-style-check:
 ifeq (,${YAML_FILES})
-	:
+	@:
 else
 ifeq (,${YAMLLINT})
 	@echo "skipping yamllint because it is not installed"
