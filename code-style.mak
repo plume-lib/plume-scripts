@@ -108,7 +108,7 @@ UV_EXISTS := $(shell if command -v uv > /dev/null 2>&1; then echo "yes"; fi)
 
 ## HTML
 .PHONY: html-style-fix html-style-check
-style-fix fix-style: html-style-fix
+style-fix: html-style-fix
 style-check: html-style-check
 ifneq (,${UV_EXISTS})
 # Any file ending with ".html".
