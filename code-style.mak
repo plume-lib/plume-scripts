@@ -17,16 +17,16 @@
 # dummy := $(shell git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git .plume-scripts)
 # endif
 # include .plume-scripts/code-style.mak
-#
-# Optionally, to add or remove files from style checking, define one
-# or more of these variables, before the above snippet:
-#
-# SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
-# BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
-# CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
 
-# You can disable all style checking by defining environment variable
-# CODE_STYLE_DISABLE to any value.
+# Environment variables (define them before the above snippet):
+# * To add or remove files from style checking:
+#   SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
+#   BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
+#   CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
+# * To disable all style checking:
+#   CODE_STYLE_DISABLE : set to any value.
+# * To change the location where to clone the plume-scripts repository:
+#   PLUME_SCRIPTS
 
 # To use it in CI, copy file code-style-github-workflow.yml to
 # .github/workflows/code-style.yml in your repository.
@@ -69,8 +69,12 @@
 
 # Set the variables *before* your makefile includes `code-style.mak`.
 
+ifndef PLUME_SCRIPTS
+PLUME_SCRIPTS := .plume-scripts
+endif
+
 ifndef CODE_STYLE_EXCLUSIONS
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=.plume-scripts --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=${PLUME_SCRIPTS} --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 endif
 
 
@@ -89,8 +93,8 @@ style-fix:
 else # This "else" is closed nearly at the end of the file.
 
 # `checkbashisms` is not included by source because it uses the GPL.
-ifeq (,$(wildcard .plume-scripts/checkbashisms))
-dummy := $(shell cd .plume-scripts \
+ifeq (,$(wildcard ${PLUME_SCRIPTS}/checkbashisms))
+dummy := $(shell cd ${PLUME_SCRIPTS} \
    && wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
@@ -98,7 +102,7 @@ endif
 ifneq (,$(wildcard .git/hooks))
 ifeq (,$(wildcard .git/hooks/pre-commit))
 dummy := $(shell cd .git/hooks \
-   && ln -s ../../.plume-scripts/code-style-pre-commit pre-commit)
+   && ln -s ../../${PLUME_SCRIPTS}/code-style-pre-commit pre-commit)
 endif
 endif
 
@@ -142,7 +146,7 @@ ifndef HTML_STYLE_FIX
 	-uv run html5validator --version
 	@false
 else
-	@.plume-scripts/cronic ${HTML_STYLE_FIX} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
+	@${PLUME_SCRIPTS}/cronic ${HTML_STYLE_FIX} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
 endif
 endif # ifneq (,${HTML_FILES})
@@ -159,7 +163,7 @@ ifndef HTML_STYLE_CHECK
 	-uv run html5validator --version
 	@false
 else
-	@.plume-scripts/cronic ${HTML_STYLE_CHECK} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
+	@${PLUME_SCRIPTS}/cronic ${HTML_STYLE_CHECK} ${HTML_FILES} || (${HTML_STYLE_VERSION} && false)
 endif
 endif
 endif # ifeq (,${HTML_FILES})
@@ -189,14 +193,14 @@ ifneq (,${MARKDOWN_FILES})
 ifneq (,${UV_EXISTS})
 PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYMARKDOWNLNT_EXISTS_UVX
-MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown fix
-MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config .plume-scripts/.pymarkdown scan
+MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown fix
+MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uvx pymarkdownlnt version
 endif
 PYMARKDOWNLNT_EXISTS_UV := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYMARKDOWNLNT_EXISTS_UV
-MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown fix
-MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config .plume-scripts/.pymarkdown scan
+MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown fix
+MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
 endif
 endif # ifneq (,${UV_EXISTS})
@@ -205,15 +209,15 @@ ifeq (yes,${DOCKER_EXISTS})
 DOCKER_RUNNING := $(shell if docker version > /dev/null 2>&1; then echo "yes"; fi)
 endif
 ifeq (yes,${DOCKER_RUNNING})
-DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f .plume-scripts):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
+DMDL := docker run -w /myfolder -v $$PWD:/myfolder -v $$(readlink -f ${PLUME_SCRIPTS}):/plume-scripts davidanson/markdownlint-cli2:v0.20.0
 MARKDOWN_STYLE_FIX := ${DMDL} --fix --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_CHECK := ${DMDL} --config /plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := ${DMDL} --help 2>&1 | head -1
 endif
 MARKDOWNLINT_CLI2_EXISTS := $(shell if markdownlint-cli2 --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef MARKDOWNLINT_CLI2_EXISTS
-MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
-MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config .plume-scripts/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_FIX := markdownlint-cli2 --fix --config ${PLUME_SCRIPTS}/.markdownlint-cli2.yaml "\#node_modules"
+MARKDOWN_STYLE_CHECK := markdownlint-cli2 --config ${PLUME_SCRIPTS}/.markdownlint-cli2.yaml "\#node_modules"
 MARKDOWN_STYLE_VERSION := markdownlint-cli2 --help | head -1
 endif
 endif # ifneq (,${MARKDOWN_FILES})
@@ -227,7 +231,7 @@ ifndef MARKDOWN_STYLE_FIX
 	-uv run pymarkdownlnt version
 	-markdownlint-cli2 --version
 else
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
+	@${PLUME_SCRIPTS}/cronic ${MARKDOWN_STYLE_FIX} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
 endif # ifeq (,${MARKDOWN_FILES})
 markdown-style-check:
@@ -241,7 +245,7 @@ ifndef MARKDOWN_STYLE_CHECK
 	-command -v markdownlint-cli2
 	@false
 else
-	@.plume-scripts/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
+	@${PLUME_SCRIPTS}/cronic ${MARKDOWN_STYLE_CHECK} ${MARKDOWN_FILES} || (${MARKDOWN_STYLE_VERSION} && false)
 endif
 endif # ifeq (,${MARKDOWN_FILES})
 showvars::
@@ -323,8 +327,8 @@ else
 ifeq (,${RUFF})
 	@echo Skipping ruff because it is not installed.
 else
-	@.plume-scripts/cronic ${RUFF} format --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
-	@.plume-scripts/cronic ${RUFF} check --fix --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	@${PLUME_SCRIPTS}/cronic ${RUFF} format --config ${PLUME_SCRIPTS}/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	@${PLUME_SCRIPTS}/cronic ${RUFF} check --fix --config ${PLUME_SCRIPTS}/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 endif
 python-style-check:
@@ -334,8 +338,8 @@ else
 ifeq (,${RUFF})
 	@echo Skipping ruff because it is not installed.
 else
-	@.plume-scripts/cronic ${RUFF} format --check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
-	@.plume-scripts/cronic ${RUFF} check --config .plume-scripts/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	@${PLUME_SCRIPTS}/cronic ${RUFF} format --check --config ${PLUME_SCRIPTS}/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
+	@${PLUME_SCRIPTS}/cronic ${RUFF} check --config ${PLUME_SCRIPTS}/.ruff.toml ${PYTHON_FILES} || (${RUFF} version && false)
 endif
 endif
 python-typecheck:
@@ -346,7 +350,7 @@ ifeq (,${TY})
 	@echo Skipping ty because it is not installed.
 else
 # Problem: `ty` ignores files passed on the command line that do not end with `.py`.
-	@.plume-scripts/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
+	@${PLUME_SCRIPTS}/cronic ${TY} check --error-on-warning --no-progress ${PYTHON_FILES} || (${TY} version && false)
 endif
 endif
 showvars::
@@ -389,7 +393,7 @@ else
 ifeq (,${SHFMT_EXISTS})
 	@echo "skipping shfmt because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
 endif
 ifeq (,${SHELLCHECK_EXISTS})
 	@echo "skipping shellcheck because it is not installed"
@@ -404,16 +408,16 @@ else
 ifeq (,${SHFMT_EXISTS})
 	@echo "skipping shfmt because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic shfmt -d -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
 endif
 ifeq (,${SHELLCHECK_EXISTS})
 	@echo "skipping shellcheck because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
+	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic shellcheck -x -P SCRIPTDIR --format=gcc ${SH_AND_BASH_SCRIPTS} || (shellcheck --version && false)
 endif
 endif # ifeq (,${SH_AND_BASH_SCRIPTS})
 ifneq (,${SH_SCRIPTS})
-	@${SHELL_BKT_COMMAND} .plume-scripts/cronic .plume-scripts/checkbashisms -l ${SH_SCRIPTS}
+	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic ${PLUME_SCRIPTS}/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
 	@echo "SH_SCRIPTS=${SH_SCRIPTS}"
@@ -475,7 +479,7 @@ else
 ifeq (,${YAMLLINT})
 	@echo "skipping yamllint because it is not installed"
 else
-	@.plume-scripts/cronic ${YAMLLINT} -c .plume-scripts/.yamllint.yaml --format parsable ${YAML_FILES} || (${YAMLLINT} --version && false)
+	@${PLUME_SCRIPTS}/cronic ${YAMLLINT} -c ${PLUME_SCRIPTS}/.yamllint.yaml --format parsable ${YAML_FILES} || (${YAMLLINT} --version && false)
 endif
 endif # ifeq (,${YAML_FILES})
 showvars::
@@ -490,4 +494,4 @@ endif # ifdef CODE_STYLE_DISABLE
 
 
 plume-scripts-update update-plume-scripts:
-	@.plume-scripts/cronic git -C .plume-scripts pull -q --ff-only
+	@${PLUME_SCRIPTS}/cronic git -C ${PLUME_SCRIPTS} pull -q --ff-only
