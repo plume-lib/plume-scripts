@@ -33,7 +33,9 @@ commit_arg = None
 if len(sys.argv) == 4:
     commit_arg = sys.argv[3]
 else:
-    git_rev_parse_result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True)
+    git_rev_parse_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, check=False
+    )
     if git_rev_parse_result.returncode == 0:
         commit_arg = git_rev_parse_result.stdout.rstrip().decode("utf-8")
     else:
@@ -71,7 +73,9 @@ def parent(sha: str) -> str | None:
     Returns:
         the SHA of the first parent of the given SHA, or None.
     """
-    get_parent_result = subprocess.run(["git", "rev-parse", sha + "^"], capture_output=True)
+    get_parent_result = subprocess.run(
+        ["git", "rev-parse", sha + "^"], capture_output=True, check=False
+    )
     if get_parent_result.returncode != 0:
         return None
     return get_parent_result.stdout.rstrip().decode("utf-8")
