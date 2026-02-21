@@ -422,8 +422,6 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
 
 def main() -> None:
     """Filter warnings output, to only show output for changed lines."""
-    global DEBUG
-
     args = parse_args()
 
     # A dictionary from file names to a set of ints (line numbers for changed lines).
