@@ -19,6 +19,7 @@ set -eu
 
 OUT=/tmp/cronic.out.$$
 ERR=/tmp/cronic.err.$$
+REDUCED_ERR=/tmp/cronic.err.reduced.$$
 TRACE=/tmp/cronic.trace.$$
 
 EXPECTED=0
@@ -50,7 +51,11 @@ else
   ERR=$TRACE
 fi
 
-if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$ERR" ]; }; then
+# Git sends output to stderr even when a command is successful!
+# TODO: Generalize this.
+grep -v "Everything up-to-date" $ERR > $REDUCED_ERR || true
+
+if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ERR" ]; }; then
   echo "Cronic detected failure or error output for the command:"
   echo "$@"
   echo
@@ -75,11 +80,14 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$ERR" ]; };
     echo "ERROR OUTPUT:"
     cat "$ERR"
   fi
+  echo
+  echo "END OF OUTPUT."
 fi
 
 rm -f "$OUT"
 if [ ! $ERR == /dev/null ]; then
   rm -f "$ERR"
 fi
+rm -f "$REDUCED_ERR"
 rm -f "$TRACE"
 exit $RESULT
