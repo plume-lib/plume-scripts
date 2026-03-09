@@ -17,6 +17,9 @@
 # as an error.
 set -eu
 
+DEBUG=false
+# DEBUG=true
+
 OUT=/tmp/cronic.out.$$
 ERR=/tmp/cronic.err.$$
 REDUCED_ERR=/tmp/cronic.err.reduced.$$
@@ -51,9 +54,14 @@ else
   ERR=$TRACE
 fi
 
-# Git sends output to stderr even when a command is successful!
-# TODO: Generalize this.
-grep -v "Everything up-to-date" $ERR > $REDUCED_ERR || true
+# Certain Unix programs send output to stderr even when a command is successful!
+# For example, git does this, and the POSIX standard requires it for make.
+# The full stderr output is shown, but file REDUCED_ERR is checked for emptiness below.
+# TODO: Expand this.
+cat $ERR \
+  | grep -v "^Everything up-to-date$" \
+  | grep -v '^make[\[0-9\]\+]: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
+    > $REDUCED_ERR || true
 
 if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ERR" ]; }; then
   echo "Cronic detected failure or error output for the command:"
@@ -68,6 +76,13 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ER
   echo "ERROR OUTPUT:"
   cat "$ERR"
   echo
+  if [ "$DEBUG" != "true" ]; then
+    if cmp --silent "$ERR" "$REDUCED_ERR"; then
+      echo "REDUCED ERROR OUTPUT:"
+      cat "$REDUCED_ERR"
+      echo
+    fi
+  fi
   echo "STANDARD OUTPUT:"
   cat "$OUT"
   if [ $TRACE != $ERR ]; then
@@ -81,13 +96,19 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ER
     cat "$ERR"
   fi
   echo
-  echo "END OF OUTPUT."
+  echo "END OF CRONIC OUTPUT."
 fi
 
-rm -f "$OUT"
-if [ ! $ERR == /dev/null ]; then
-  rm -f "$ERR"
+if [ "$DEBUG" == "true" ]; then
+  # Don't "echo" anything here because it gets appended to stderr.
+  :
+else
+  rm -f "$OUT"
+  if [ ! $ERR == /dev/null ]; then
+    rm -f "$ERR"
+  fi
+  rm -f "$REDUCED_ERR"
+  rm -f "$TRACE"
 fi
-rm -f "$REDUCED_ERR"
-rm -f "$TRACE"
+
 exit $RESULT
