@@ -46,6 +46,7 @@
 # suggests it has this same functionality, but my tests indicate it does not.
 
 import argparse
+import collections
 import os
 import re
 import sys
@@ -231,6 +232,22 @@ def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str,
             eprint(f"diff_files={diff_files}")
             eprint(f"warning_files={warning_files}")
     return result
+
+
+def commonpath(files: collections.abc.Iterable[str]) -> str:
+    """Return the common prefix of the given paths.
+
+    Argument is a set or list of paths.
+
+    Returns:
+         the common prefix of the given paths.
+    """
+    if not files:
+        return ""
+    try:
+        return os.path.commonpath(list(files))
+    except ValueError as err:
+        raise ValueError(str(files)) from err
 
 
 ### Main routine
