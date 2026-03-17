@@ -219,8 +219,8 @@ def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str,
     diff_files = diff_filenames(diff_file)
     warning_files = warning_filenames(warning_file)
     result = guess_strip_filenames(diff_files, warning_files)
-    diff_prefix = commonpath(list(diff_files))
-    warnings_prefix = commonpath(list(warning_files))
+    diff_prefix = commonpath(diff_files)
+    warnings_prefix = commonpath(warning_files)
     if result[0] > diff_prefix.count("/") or result[1] > warnings_prefix.count("/"):
         # This is not necessarily a problem.  It is possible that all the
         # diffs, or all the lint output, happens to be in one subdirectory.
