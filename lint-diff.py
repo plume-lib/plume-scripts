@@ -187,7 +187,10 @@ def warning_filenames(warning_filename: str) -> set[str]:
         for warning_line in warnings:
             match = FILENAME_LINENO_RE.match(warning_line)
             if match:
-                result.add(match.group(1))
+                # lstrip is necessary because after Gradle outputs all warnings,
+                # it prints "> Compilation failed; see the compiler output
+                # below." and then prints one warning, indented by two spaces.
+                result.add(match.group(1).lstrip())
     return result
 
 
@@ -225,7 +228,8 @@ def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str,
     except ValueError:
         with Path.open(Path(warning_file)) as file:
             for line in file:
-                eprint(line)
+                # rstrip is necessary because eprint adds a newline.
+                eprint(line.rstrip())
         raise
     if result[0] > diff_prefix.count("/") or result[1] > warnings_prefix.count("/"):
         # This is not necessarily a problem.  It is possible that all the
