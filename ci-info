@@ -134,7 +134,7 @@ fi
 ## Git clone
 if [ -z "$CI_ORGANIZATION" ]; then
   URL=$(git config --get remote.origin.url)
-  # This handles two possible forms for a URL:
+  # This removes the leading part of two possible forms for a URL:
   #   https://github.com/mernst/annotation-tools
   #   git@github.com:mernst/annotation-tools.git
   SLUG=${URL#https://github.com/}
