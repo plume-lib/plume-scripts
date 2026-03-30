@@ -47,7 +47,7 @@ def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
         a map from class name to (instruction_missed, instruction_covered).
     """
     result = {}
-    with Path.open(filename) as csvfile:
+    with Path.open(Path(filename)) as csvfile:
         dict_reader = csv.DictReader(csvfile)
         for row in dict_reader:
             fq_classname = row["PACKAGE"] + "." + row["CLASS"]

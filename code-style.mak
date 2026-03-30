@@ -119,17 +119,17 @@ ifneq (,${UV_EXISTS})
 HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
 ifneq (,${HTML_FILES})
 # HTML linters are listed in order of increasing precedence.
-HTML5VALIDATOR_EXISTS_UVX := $(shell if uvx html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef HTML5VALIDATOR_EXISTS_UVX
-HTML_STYLE_FIX := uvx html5validator fix
-HTML_STYLE_CHECK := uvx html5validator scan --show-warnings
-HTML_STYLE_VERSION := uvx html5validator --version
-endif
 HTML5VALIDATOR_EXISTS_UV := $(shell if uv run html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef HTML5VALIDATOR_EXISTS_UV
 HTML_STYLE_FIX := uv run html5validator fix
 HTML_STYLE_CHECK := uv run html5validator scan --show-warnings
 HTML_STYLE_VERSION := uv run html5validator --version
+endif
+HTML5VALIDATOR_EXISTS_UVX := $(shell if uvx html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef HTML5VALIDATOR_EXISTS_UVX
+HTML_STYLE_FIX := uvx html5validator fix
+HTML_STYLE_CHECK := uvx html5validator scan --show-warnings
+HTML_STYLE_VERSION := uvx html5validator --version
 endif
 endif # ifneq (,${HTML_FILES})
 endif # ifneq (,${UV_EXISTS})
@@ -191,17 +191,17 @@ MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS}
 ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
 ifneq (,${UV_EXISTS})
-PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYMARKDOWNLNT_EXISTS_UVX
-MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown fix
-MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown scan
-MARKDOWN_STYLE_VERSION := uvx pymarkdownlnt version
-endif
 PYMARKDOWNLNT_EXISTS_UV := $(shell if uv run pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYMARKDOWNLNT_EXISTS_UV
 MARKDOWN_STYLE_FIX := uv run pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown fix
 MARKDOWN_STYLE_CHECK := uv run pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown scan
 MARKDOWN_STYLE_VERSION := uv run pymarkdownlnt version
+endif
+PYMARKDOWNLNT_EXISTS_UVX := $(shell if uvx pymarkdownlnt version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYMARKDOWNLNT_EXISTS_UVX
+MARKDOWN_STYLE_FIX := uvx pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown fix
+MARKDOWN_STYLE_CHECK := uvx pymarkdownlnt --config ${PLUME_SCRIPTS}/.pymarkdown scan
+MARKDOWN_STYLE_VERSION := uvx pymarkdownlnt version
 endif
 endif # ifneq (,${UV_EXISTS})
 DOCKER_EXISTS := $(shell if docker --version > /dev/null 2>&1; then echo "yes"; fi)
@@ -302,21 +302,21 @@ style-check: python-style-check python-typecheck
 PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' . | grep ":1:" | sed "s/:1:.*//"))
 ifneq (,${PYTHON_FILES})
 ifneq (,${UV_EXISTS})
-RUFF_EXISTS_UVX := $(shell if uvx ruff version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef RUFF_EXISTS_UVX
-RUFF := uvx ruff
-endif
 RUFF_EXISTS_UV := $(shell if uv run ruff version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef RUFF_EXISTS_UV
 RUFF := uv run ruff
 endif
-TY_EXISTS_UVX := $(shell if uvx ty version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef TY_EXISTS_UVX
-TY := uvx ty
+RUFF_EXISTS_UVX := $(shell if uvx ruff version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef RUFF_EXISTS_UVX
+RUFF := uvx ruff
 endif
 TY_EXISTS_UV := $(shell if uv run ty version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef TY_EXISTS_UV
 TY := uv run ty
+endif
+TY_EXISTS_UVX := $(shell if uvx ty version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef TY_EXISTS_UVX
+TY := uvx ty
 endif
 endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${PYTHON_FILES})
@@ -456,13 +456,13 @@ ifneq (,${YAMLLINT_EXISTS})
 YAMLLINT := yamllint
 endif
 ifneq (,${UV_EXISTS})
-PYYAMLLNT_EXISTS_UVX := $(shell if uvx yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
-ifdef PYYAMLLNT_EXISTS_UVX
-YAMLLINT := uvx yamllint
-endif
 PYYAMLLNT_EXISTS_UV := $(shell if uv run yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
 ifdef PYYAMLLNT_EXISTS_UV
 YAMLLINT := uv run yamllint
+endif
+PYYAMLLNT_EXISTS_UVX := $(shell if uvx yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
+ifdef PYYAMLLNT_EXISTS_UVX
+YAMLLINT := uvx yamllint
 endif
 endif # ifneq (,${UV_EXISTS})
 endif # ifneq (,${YAML_FILES})
