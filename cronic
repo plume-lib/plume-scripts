@@ -77,7 +77,7 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ER
   cat "$ERR"
   echo
   if [ "$DEBUG" != "true" ]; then
-    if cmp --silent "$ERR" "$REDUCED_ERR"; then
+    if ! cmp --silent "$ERR" "$REDUCED_ERR"; then
       echo "REDUCED ERROR OUTPUT:"
       cat "$REDUCED_ERR"
       echo
