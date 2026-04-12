@@ -255,7 +255,9 @@ def commonpath(files: collections.abc.Iterable[str]) -> str:
     if not files:
         return ""
     try:
-        return os.path.commonpath(list(files))
+        # Remove leading null characters.
+        files_list = [file.lstrip("\0") for file in files]
+        return os.path.commonpath(files_list)
     except ValueError as err:
         raise ValueError(str(files)) from err
 
