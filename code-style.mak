@@ -79,6 +79,30 @@ endif
 
 
 ###########################################################################
+### To do
+###
+
+# Have a more consistent way of indicating which files to include/exclude,
+# which is used throughout.
+
+
+###########################################################################
+### Alternatives
+###
+
+# The complexity of this file is getting out of hand.
+# Consider using some other tool, such as:
+#
+# * megalinter
+#   jscpd needs: --ignore-pattern "^import.*"
+# * super-linter
+# * qlty
+# * codacy?
+#
+# However, each of them requires mucho setup and may not use the linters I like.
+
+
+###########################################################################
 ### The code
 ###
 
