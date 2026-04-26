@@ -33,15 +33,16 @@
 
 # Requirements/dependencies
 #
-# You need to install tools depending on what type of files your project contains:
-# * must always be installed:
-#   * make
-#   * wget
-#   * GNU grep (for `--include` command-line argument)
-#   * readline that supports `--` command-line argument
-#   The latter two are not provided by busybox (on distributions such as Alpine Linux).
+# These programs must be installed:
+# * make
+# * wget
+# * GNU grep (for `--include` command-line argument)
+# * readline that supports `--` command-line argument
+# The latter two are not provided by busybox (on distributions such as Alpine Linux).
+#
+# There are further requirements (usually just Python and uv) for specific languages or file types:
 # * for HTML checking: Python, uv
-# * for Markdown checking: either of these:
+# * for Markdown checking, either of these:
 #   * npm, markdownlint-cli2
 #   * Python, uv
 # * for Perl checking: nothing (Perl checking is currently a no-op)
@@ -50,7 +51,7 @@
 #   * to speed up Shell checking, also: bkt
 # * for YAML checking: Python, uv
 
-# Instructions for installing these tools:
+# Here are instructions for installing these tools:
 # * Python is probably already installed on your system
 # * [uv](https://docs.astral.sh/uv/#installation)
 # * [shellcheck](https://github.com/koalaman/shellcheck#installing)
