@@ -22,7 +22,10 @@
 # * To add or remove files from style checking:
 #   SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
 #   BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
+#   # CODE_STYLE_EXCLUSIONS_USER is in the form of arguments to `grep`.
 #   CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
+#   # CODE_STYLE_FILTER_OUT_USER is in the form of arguments to Make's `filter-out`.
+#   CODE_STYLE_FILTER_OUT_USER := %/doc/daikon/% %/doc/developer/%
 # * To disable all style checking:
 #   CODE_STYLE_DISABLE : set to any value.
 # * To change the location where to clone the plume-scripts repository:
@@ -109,6 +112,9 @@ endif
 
 .PHONY: style-fix style-check
 
+showvars::
+	@echo "CODE_STYLE_DISABLE=${CODE_STYLE_DISABLE}"
+
 # This "if" is closed nearly at the end of the file.
 ifdef CODE_STYLE_DISABLE
 style-check:
@@ -116,6 +122,11 @@ style-check:
 style-fix:
 	@echo 'Environment var CODE_STYLE_DISABLE is set, so `make style-fix` does nothing.'
 else # This "else" is closed nearly at the end of the file.
+
+showvars::
+	@echo "CODE_STYLE_EXCLUSIONS=${CODE_STYLE_EXCLUSIONS}"
+	@echo "CODE_STYLE_EXCLUSIONS_USER=${CODE_STYLE_EXCLUSIONS_USER}"
+	@echo "PLUME_SCRIPTS=${PLUME_SCRIPTS}"
 
 # `checkbashisms` is not included by source because it uses the GPL.
 ifeq (,$(wildcard ${PLUME_SCRIPTS}/checkbashisms))
@@ -141,7 +152,7 @@ style-fix: html-style-fix
 style-check: html-style-check
 ifneq (,${UV_EXISTS})
 # Any file ending with ".html".
-HTML_FILES   := $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+HTML_FILES   := $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -l --include='*.html' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .))
 ifneq (,${HTML_FILES})
 # HTML linters are listed in order of increasing precedence.
 HTML5VALIDATOR_EXISTS_UV := $(shell if uv run html5validator --version > /dev/null 2>&1; then echo "yes"; fi)
@@ -212,7 +223,7 @@ endif
 .PHONY: markdown-style-fix markdown-style-check
 style-fix: markdown-style-fix
 style-check: markdown-style-check
-MARKDOWN_FILES   := $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+MARKDOWN_FILES   := $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -l --include='*.md' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .))
 ifneq (,${MARKDOWN_FILES})
 # Markdown linters are listed in order of increasing precedence.
 ifneq (,${UV_EXISTS})
@@ -300,7 +311,7 @@ endif
 style-fix: perl-style-fix
 style-check: perl-style-check
 # Any file ending with ".pl" or ".pm" or containing a Perl shebang line.
-PERL_FILES   := $(strip $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' . | grep ":1:" | sed "s/:1:.*//"))
+PERL_FILES   := $(strip $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -l --include='*.pl' --include='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.pl' --exclude='*.pm' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)perl' . | grep ":1:" | sed "s/:1:.*//")))
 perl-style-fix:
 	@:
 ifneq (,${PERL_FILES})
@@ -324,7 +335,7 @@ showvars::
 style-fix: python-style-fix
 style-check: python-style-check python-typecheck
 # Any file ending with ".py" or containing a Python shebang line.
-PYTHON_FILES:=$(strip $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' . | grep ":1:" | sed "s/:1:.*//"))
+PYTHON_FILES:=$(strip $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -l --include='*.py' ${CODE_STYLE_EXCLUSIONS}  ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.py' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/\|/usr/bin/env \)python' . | grep ":1:" | sed "s/:1:.*//")))
 ifneq (,${PYTHON_FILES})
 ifneq (,${UV_EXISTS})
 RUFF_EXISTS_UV := $(shell if uv run ruff version > /dev/null 2>&1; then echo "yes"; fi)
@@ -400,9 +411,9 @@ endif
 style-fix: shell-style-fix
 style-check: shell-style-check
 # Files ending with ".sh" might be bash or Posix sh, so don't make any assumption about them.
-SH_SCRIPTS   := $(strip ${SH_SCRIPTS_USER} $(shell grep -r -n ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' . | grep ":1:" | sed "s/:1:.*//"))
+SH_SCRIPTS   := $(strip ${SH_SCRIPTS_USER} $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -n ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)sh' . | grep ":1:" | sed "s/:1:.*//")))
 # Any file ending with ".bash" or containing a bash shebang line.
-BASH_SCRIPTS := $(strip ${BASH_SCRIPTS_USER} $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' . | grep ":1:" | sed "s/:1:.*//"))
+BASH_SCRIPTS := $(strip ${BASH_SCRIPTS_USER} $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -l --include='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .) $(shell grep -r -n --exclude='*.bash' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^\#! \?\(/bin/\|/usr/bin/env \)bash' . | grep ":1:" | sed "s/:1:.*//")))
 SH_AND_BASH_SCRIPTS := $(strip ${SH_SCRIPTS} ${BASH_SCRIPTS})
 ifneq (,${SH_AND_BASH_SCRIPTS})
 ifneq (,${BKT_EXISTS})
@@ -473,7 +484,7 @@ endif
 style-fix: yaml-style-fix
 style-check: yaml-style-check
 # Any file ending with ".yaml" or ".yml".
-YAML_FILES   := $(shell grep -r -l --include='*.yaml' --include='*.yml' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .)
+YAML_FILES   := $(filter-out ${CODE_STYLE_FILTER_OUT} ${CODE_STYLE_FILTER_OUT_USER}, $(shell grep -r -l --include='*.yaml' --include='*.yml' ${CODE_STYLE_EXCLUSIONS} ${CODE_STYLE_EXCLUSIONS_USER} '^' .))
 ifneq (,${YAML_FILES})
 # YAML linters are listed in order of increasing precedence.
 YAMLLINT_EXISTS := $(shell if yamllint --version > /dev/null 2>&1; then echo "yes"; fi)
