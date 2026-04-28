@@ -296,7 +296,8 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
 
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
-  CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null) || CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}")
+  # CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null)
+  CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}")
   # This is probably the same as `sha`=`$GITHUB_SHA`
   CI_COMMIT_RANGE_END=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}")
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
