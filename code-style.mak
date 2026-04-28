@@ -71,15 +71,11 @@
 ### User-overridable variables
 ###
 
-# Set the variables *before* your makefile includes `code-style.mak`.
+# You should set the variables *before* your makefile includes `code-style.mak`.
 
-ifndef PLUME_SCRIPTS
-PLUME_SCRIPTS := .plume-scripts
-endif
+PLUME_SCRIPTS ?= .plume-scripts
 
-ifndef CODE_STYLE_EXCLUSIONS
-CODE_STYLE_EXCLUSIONS := --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=${PLUME_SCRIPTS} --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
-endif
+CODE_STYLE_EXCLUSIONS ?= --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=${PLUME_SCRIPTS} --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
 
 
 ###########################################################################
