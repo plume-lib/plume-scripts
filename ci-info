@@ -289,14 +289,16 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_REF};"
-    echo "echo   base_ref=${GITHUB_BASE_REF}, head_ref=${GITHUB_HEAD_REF};"
+    echo "echo   base_ref=${GITHUB_BASE_REF} ref_name=${GITHUB_REF_NAME} sha=${GITHUB_SHA};"
+    # GITHUB_HEAD_REF is in the PR fork which is not available.
     echo "echo   pwd=$(pwd);"
   fi
 
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
-  CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}") || CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}")
-  CI_COMMIT_RANGE_END=$(git rev-parse "${GITHUB_HEAD_REF}") || CI_COMMIT_RANGE_END=$(git rev-parse remotes/origin/"${GITHUB_HEAD_REF}")
+  CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null) || CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}")
+  # This is probably the same as `sha`=`$GITHUB_SHA`
+  CI_COMMIT_RANGE_END=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}")
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 
 else
