@@ -110,6 +110,7 @@ Other causes of an empty diff include:
 fi
 
 if [ -n "$CI_LINT_DIFF_ERROR" ]; then
+  sleep 1
   echo
   echo "*****"
   echo "${SCRIPT_NAME} error:"
@@ -185,6 +186,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "Environment:"
   env | sort
   echo
+  echo "Now, repeating the error; it appears before and after diagnostics."
   echo "*****"
   echo "${SCRIPT_NAME} error:"
   echo "$CI_LINT_DIFF_ERROR"

@@ -404,10 +404,6 @@ if [ "$VERBOSE" = "--verbose" ]; then
 fi
 echo "CI_BRANCH_NAME=$CI_BRANCH_NAME; export CI_BRANCH_NAME;"
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
-fi
-echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
-if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
 fi
 echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
@@ -415,3 +411,7 @@ if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
 fi
 echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
+if [ "$VERBOSE" = "--verbose" ]; then
+  echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+fi
+echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
