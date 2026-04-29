@@ -119,6 +119,10 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
+  echo "---- ci-info output ----"
+  echo "$ci_info_output"
+  echo "---- end of ci-info output ----"
+  echo
   # This is not very effective because environment variables were set by
   # the previous invocation of ci-info.
   echo "---------------- start of ${SCRIPT_DIR}/ci-info --debug"
