@@ -27,9 +27,9 @@
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 #
-# If environment variable GITHUB_PAT is set when this script is called, it is
-# used as GitHub Personal Access Token when making GitHub API calls.  This can
-# avoid "403 rate limit exceeded" failures.
+# If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
+# called, it is used as GitHub Personal Access Token when making GitHub API
+# calls.  This can avoid "403 rate limit exceeded" failures.
 #
 # On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
 # for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
@@ -92,6 +92,8 @@ head1() {
 # "GITHUB_PAT" is a GitHub Personal Access Token.
 if [ -n "$GITHUB_PAT" ]; then
   auth_header_option=(--header="Authorization: token ${GITHUB_PAT}")
+elif [ -n "$GH_TOKEN" ]; then
+  auth_header_option=(--header="Authorization: token ${GH_TOKEN}")
 fi
 
 ### Organization
