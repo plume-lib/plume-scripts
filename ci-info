@@ -302,16 +302,17 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH}" 2> /dev/null); then
-          echo "echo Cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
+          echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
           echo "echo env:"
           env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo echo /'
           # echo "echo git branch:"
           # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' 's/$/"/'
           echo "echo git show:"
           git --no-pager show | sed -e 's/^/echo "echo /' -e 's/$/"/'
-          echo "echo exiting"
-          # exit 2
-          exit
+          CI_COMMIT_RANGE_START=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}"^)
+          # echo "echo exiting"
+          # # exit 2
+          # exit
         fi
       fi
     fi
