@@ -142,7 +142,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub pull request"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
-    echo "echo CI_ORGANIZATION=$CI_ORGANIZATION"
+    echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
 fi
 
