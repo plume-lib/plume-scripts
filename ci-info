@@ -145,6 +145,8 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
       https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
     echo "echo json = "
     curl -LsSf https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
+    echo "echo json2 = "
+    curl https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
   fi
 fi
 
