@@ -155,10 +155,11 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "echo GitHub pull request"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
-    echo "cmd =     ${GET_URL_TO_STDOUT} \
-      https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
-    echo "echo json = "
+    echo "cmd =     ${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
+    echo "echo json = (see next line)"
     "${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
+    foo="$("${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}")"
+    echo "${foo}"
   fi
 fi
 
