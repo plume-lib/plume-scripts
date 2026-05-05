@@ -143,6 +143,10 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "echo GitHub pull request"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
+    echo "cmd =     curl -LsSf \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2026-03-10" \
+      https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
     echo "echo json = "
     curl -LsSf \
       -H "Accept: application/vnd.github+json" \
