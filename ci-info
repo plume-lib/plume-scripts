@@ -131,6 +131,14 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   fi
 elif [ -n "$CIRCLE_PR_USERNAME" ]; then
   CI_ORGANIZATION="$CIRCLE_PR_USERNAME"
+elif [ -n "$GITHUB_HEAD_REF" ]; then
+  # GitHub Actions pull request
+  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
+  CI_ORGANIZATION=$(curl -LsSf \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2026-03-10" \
+    https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}" \
+    | jq '.head.repo.owner.login')
 fi
 
 ## Git clone
