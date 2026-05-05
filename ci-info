@@ -138,7 +138,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   if [ -n "$(command -v curl 2> /dev/null)" ]; then
     GET_URL_TO_STDOUT="curl"
   elif [ -n "$(command -v wget 2> /dev/null)" ]; then
-    GET_URL_TO_STDOUT="wget -O -"
+    GET_URL_TO_STDOUT="wget -q -O -"
   else
     echo "echo Neither curl nor wget is installed"
     exit 2
@@ -158,8 +158,6 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "cmd =     ${GET_URL_TO_STDOUT} \
       https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
     echo "echo json = "
-    "${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
-    echo "echo json2 = "
     "${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
   fi
 fi
