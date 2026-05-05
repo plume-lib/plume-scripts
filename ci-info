@@ -133,7 +133,6 @@ elif [ -n "$CIRCLE_PR_USERNAME" ]; then
   CI_ORGANIZATION="$CIRCLE_PR_USERNAME"
 elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request
-  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
 
   if [ -n "$(command -v curl 2> /dev/null)" ]; then
     GET_URL_TO_STDOUT="curl"
@@ -148,6 +147,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     exit 2
   fi
 
+  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   CI_ORGANIZATION=$(${GET_URL_TO_STDOUT} \
     https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}" \
     | jq '.head.repo.owner.login')
@@ -155,16 +155,6 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "echo GitHub pull request"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
-    echo "cmd =     ${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
-    echo "echo json = (see next line)"
-    ${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
-    foo="$(${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}")"
-    echo "${foo}"
-    echo "echo wget = (see next line)"
-    wget -q -O - https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
-    echo "echo curl = (see next line)"
-    curl https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
-    ls -l .
   fi
 fi
 
