@@ -160,6 +160,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     "${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
     foo="$("${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}")"
     echo "${foo}"
+    ls -l .
   fi
 fi
 
