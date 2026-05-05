@@ -148,7 +148,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     exit 2
   fi
 
-  CI_ORGANIZATION=$("${GET_URL_TO_STDOUT}" \
+  CI_ORGANIZATION=$(${GET_URL_TO_STDOUT} \
     https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}" \
     | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
@@ -158,7 +158,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "cmd =     ${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/${GITHUB_PR_NUMBER}"
     echo "echo json = (see next line)"
     ${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
-    foo="$("${GET_URL_TO_STDOUT}" https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}")"
+    foo="$(${GET_URL_TO_STDOUT} https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}")"
     echo "${foo}"
     echo "echo wget = (see next line)"
     wget -q -O - https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}"
