@@ -134,7 +134,21 @@ elif [ -n "$CIRCLE_PR_USERNAME" ]; then
 elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
-  CI_ORGANIZATION=$(curl -LsSf \
+
+  if [ -n "$(command -v curl 2> /dev/null)" ]; then
+    GET_URL_TO_STDOUT="curl"
+  elif [ -n "$(command -v wget 2> /dev/null)" ]; then
+    GET_URL_TO_STDOUT="wget -O -"
+  else
+    echo "echo Neither curl nor wget is installed"
+    exit 2
+  fi
+  if [ -z "$(command -v jq 2> /dev/null)" ]; then
+    echo "echo jq is not installed"
+    exit 2
+  fi
+
+  CI_ORGANIZATION=$("${GET_URL_TO_STDOUT}" \
     https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}" \
     | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
