@@ -135,7 +135,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request
 
   if [ -n "$(command -v curl 2> /dev/null)" ]; then
-    GET_URL_TO_STDOUT="curl"
+    GET_URL_TO_STDOUT="curl -s"
   elif [ -n "$(command -v wget 2> /dev/null)" ]; then
     GET_URL_TO_STDOUT="wget -q -O -"
   else
@@ -305,7 +305,20 @@ elif [ -n "$CIRCLE_COMPARE_URL" ]; then
   # CIRCLE_BRANCH may be "pull/327"
   case "$CIRCLE_BRANCH" in
     pull/*)
-      CI_BRANCH_NAME=$(curl -s "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref')
+      if [ -n "$(command -v curl 2> /dev/null)" ]; then
+        GET_URL_TO_STDOUT="curl -s"
+      elif [ -n "$(command -v wget 2> /dev/null)" ]; then
+        GET_URL_TO_STDOUT="wget -q -O -"
+      else
+        echo "echo Neither curl nor wget is installed"
+        exit 2
+      fi
+      if [ -z "$(command -v jq 2> /dev/null)" ]; then
+        echo "echo jq is not installed"
+        exit 2
+      fi
+
+      CI_BRANCH_NAME=$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref')
       ;;
     *)
       CI_BRANCH_NAME=$CIRCLE_BRANCH
