@@ -12,6 +12,10 @@ ifeq (,$(wildcard checkbashisms))
 dummy := $(shell wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms)
 endif
 
+checkbashisms:
+	wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms
+	chmod +x $@
+
 test:
 	${MAKE} -C tests test
 

@@ -449,6 +449,9 @@ else
 endif
 endif # ifeq (,${SH_AND_BASH_SCRIPTS})
 ifneq (,${SH_SCRIPTS})
+ifeq (,${PLUME_SCRIPTS}/checkbashisms)
+	@make --quiet -C ${PLUME_SCRIPTS} checkbashisms
+endif
 	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic ${PLUME_SCRIPTS}/checkbashisms -l ${SH_SCRIPTS}
 endif
 showvars::
