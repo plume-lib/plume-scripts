@@ -19,3 +19,6 @@ tests/lint-diff-test/words2-lint.txt
 tests/lint-diff-test/words2.txt
 tests/sort-compiler-output-test/errors1-sorted.actual
 tests/sort-directory-order-test/lines1.output
+tests/squeeze-blank-lines-test/lines1.output
+tests/squeeze-blank-lines-test/lines1.output2
+tests/squeeze-blank-lines-test/lines2.output

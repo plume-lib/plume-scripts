@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Removes leading and trailing blank lines.  Within the file, replaces multiple
+# blank lines by one blank line.  Lines containing only whitespace count as
+# blank at beginning and end of file, but not within file.  (TODO: make the
+# behavior consistent.)
+#
+# If given a filename, modifies the file in place.
+# Otherwise, reads from stdin and outputs to stdout.
+
+# 1. Determine the input source.
+# If $1 exists, read from that file; otherwise, read from stdin.
+input="${1:-/dev/stdin}"
+
+# 2. Process the data: squeeze internal blank lines, then remove leading blank
+# lines, then remove trailing blank lines.
+
+processed_data=$(cat -s "$input" \
+  | sed '/[^[:blank:]]/,$!d' \
+  | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
+
+# 3. Determine the output destination.
+if [ -n "$1" ]; then
+  # If a file was provided, write back to it (in-place)
+  echo "$processed_data" > "$1"
+else
+  # Otherwise, output to stdout
+  echo "$processed_data"
+fi

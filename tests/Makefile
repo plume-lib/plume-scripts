@@ -4,6 +4,7 @@ test:
 	${MAKE} -C resolve-blank-lines-test test
 	${MAKE} -C sort-compiler-output-test test
 	${MAKE} -C sort-directory-order-test test
+	${MAKE} -C squeeze-blank-lines-test test
 
 clean:
 	${MAKE} -C jacoco-coverage-ratchet-test clean
@@ -11,3 +12,4 @@ clean:
 	${MAKE} -C resolve-blank-lines-test clean
 	${MAKE} -C sort-compiler-output-test clean
 	${MAKE} -C sort-directory-order-test clean
+	${MAKE} -C squeeze-blank-lines-test clean
