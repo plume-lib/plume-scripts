@@ -289,6 +289,19 @@ elif [ -n "$CIRCLECI" ]; then
     echo "echo CircleCI; CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
   fi
   if [ -n "$CIRCLE_PR_NUMBER" ]; then
+    if [ -n "$(command -v curl 2> /dev/null)" ]; then
+      GET_URL_TO_STDOUT="curl -s"
+    elif [ -n "$(command -v wget 2> /dev/null)" ]; then
+      GET_URL_TO_STDOUT="wget -q -O -"
+    else
+      echo "echo Neither curl nor wget is installed"
+      exit 2
+    fi
+    if [ -z "$(command -v jq 2> /dev/null)" ]; then
+      echo "echo jq is not installed"
+      exit 2
+    fi
+
     pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
     CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.bash.sha')
     CI_COMMIT_RANGE_END=$(echo "${pull_details}" | jq -r '.head.sha')
