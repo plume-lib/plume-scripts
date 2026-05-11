@@ -65,6 +65,87 @@ FILENAME_LINENO_RE = re.compile(r"([^:]*):([0-9]+):.*")
 INITIAL_WHITESPACE_RE = re.compile(r"[ \t]")
 
 
+def main() -> None:
+    """Filter warnings output, to only show output for changed lines."""
+    args = parse_args()
+
+    # A dictionary from file names to a set of ints (line numbers for changed lines).
+    changed = changed_lines(args)
+
+    if DEBUG:
+        for filename in sorted(changed):
+            print(filename, sorted(changed[filename]))
+
+    # True if a warning has been issued about relative directories.
+    relative_diff_warned = warn_relative_diff(args)
+
+    if args.warning_filename is None:
+        args.warning_filename = "stdin"
+        warnings = sys.stdin
+    else:
+        warning_path = Path(args.warning_filename)
+        if warning_path.is_file() and warning_path.stat().st_size == 0:
+            sys.exit(0)
+        # pylint: disable=consider-using-with
+        warnings = warning_path.open(encoding="utf-8")  # noqa: SIM115
+
+    # 1 if this produced any output, 0 if not.
+    status = 0
+    # true if we just printed a warning and are looking for continuation lines to print.
+    print_multiline_warning = False
+
+    for warning_line in warnings:
+        if print_multiline_warning and INITIAL_WHITESPACE_RE.match(warning_line):
+            print(warning_line, end="")
+            continue
+        print_multiline_warning = False
+
+        should_output = False
+
+        # Special case for Java exception in the output.
+        if warning_line.startswith("Exception in thread"):
+            should_output = True
+
+        match = FILENAME_LINENO_RE.match(warning_line)
+        if match:
+            try:
+                filename = strip_dirs(match.group(1), args.strip_warnings)
+            except TypeError:
+                filename = "warnings filename above common directory"
+                ## It's not an error; it just means this file doesn't appear in warnings output.
+                # eprint('Bad --strip-warnings={0} ; line has fewer "/": {1}'.format(
+                #   strip_warnings, match.group(1)))
+                # sys.exit(2)
+            if (
+                filename.startswith("/")
+                and args.relative_diff is not None
+                and args.strip_warnings == 0
+            ):
+                if not relative_diff_warned:
+                    eprint(
+                        # No spaces around string literals becaues this is `eprint`.
+                        "warning:",
+                        args.diff_filename,
+                        "uses relative paths but",
+                        args.warning_filename,
+                        "uses absolute paths",
+                    )
+                    relative_diff_warned = True
+            lineno = int(match.group(2))
+            if filename in changed and lineno in changed[filename]:
+                should_output = True
+
+        if should_output:
+            print(warning_line, end="")
+            status = 1
+            print_multiline_warning = True
+
+    if warnings is not sys.stdin:
+        warnings.close()
+
+    sys.exit(status)
+
+
 def eprint(*args: object, **kwargs: Any) -> None:
     """Print to stderr."""
     print(*args, file=sys.stderr, **kwargs)
@@ -447,84 +528,6 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
             eprint("lint-diff.py: end of input files.")
 
     return result
-
-
-def main() -> None:
-    """Filter warnings output, to only show output for changed lines."""
-    args = parse_args()
-
-    # A dictionary from file names to a set of ints (line numbers for changed lines).
-    changed = changed_lines(args)
-
-    if DEBUG:
-        for filename in sorted(changed):
-            print(filename, sorted(changed[filename]))
-
-    # True if a warning has been issued about relative directories.
-    relative_diff_warned = warn_relative_diff(args)
-
-    if args.warning_filename is None:
-        args.warning_filename = "stdin"
-        warnings = sys.stdin
-    else:
-        # pylint: disable=consider-using-with
-        warnings = Path(args.warning_filename).open(encoding="utf-8")  # noqa: SIM115
-
-    # 1 if this produced any output, 0 if not.
-    status = 0
-    # true if we just printed a warning and are looking for continuation lines to print.
-    print_multiline_warning = False
-
-    for warning_line in warnings:
-        if print_multiline_warning and INITIAL_WHITESPACE_RE.match(warning_line):
-            print(warning_line, end="")
-            continue
-        print_multiline_warning = False
-
-        should_output = False
-
-        # Special case for Java exception in the output.
-        if warning_line.startswith("Exception in thread"):
-            should_output = True
-
-        match = FILENAME_LINENO_RE.match(warning_line)
-        if match:
-            try:
-                filename = strip_dirs(match.group(1), args.strip_warnings)
-            except TypeError:
-                filename = "warnings filename above common directory"
-                ## It's not an error; it just means this file doesn't appear in warnings output.
-                # eprint('Bad --strip-warnings={0} ; line has fewer "/": {1}'.format(
-                #   strip_warnings, match.group(1)))
-                # sys.exit(2)
-            if (
-                filename.startswith("/")
-                and args.relative_diff is not None
-                and args.strip_warnings == 0
-            ):
-                if not relative_diff_warned:
-                    eprint(
-                        # No spaces around string literals becaues this is `eprint`.
-                        "warning:",
-                        args.diff_filename,
-                        "uses relative paths but",
-                        args.warning_filename,
-                        "uses absolute paths",
-                    )
-                    relative_diff_warned = True
-            lineno = int(match.group(2))
-            if filename in changed and lineno in changed[filename]:
-                should_output = True
-
-        if should_output:
-            print(warning_line, end="")
-            status = 1
-            print_multiline_warning = True
-
-    if warnings is not sys.stdin:
-        warnings.close()
-
-    sys.exit(status)
 
 
 if __name__ == "__main__":
