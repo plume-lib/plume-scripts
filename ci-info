@@ -30,14 +30,6 @@
 # If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
-#
-# On CircleCI, it depends on environment variable CIRCLE_COMPARE_URL, which is set
-# for CircleCI v2 and earlier.  To set CIRCLE_COMPARE_URL on V2.1 and later (per
-# https://discuss.circleci.com/t/is-circle-compare-url-still-a-thing/33366):
-# jobs:
-#   my-job:
-#     environment:
-#       CIRCLE_COMPARE_URL: << pipeline.project.git_url >>/compare/<< pipeline.git.base_revision >>..<<pipeline.git.revision>>
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
@@ -62,6 +54,7 @@ if [ "$#" -gt 1 ]; then
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
+  # `env` only prints EXPORTED varibales, so `set` is usually more useful.
   echo
   echo 'echo ---------------- start of env'
   env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
@@ -286,46 +279,23 @@ elif [ "$TRAVIS" = "true" ]; then
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 
-elif [ -n "$CIRCLE_COMPARE_URL" ]; then
-  ## CircleCI v2 or earlier, or CIRCLE_COMPARE_URL was set for compatibility.
-  if [ "$DEBUG" = "--debug" ]; then
-    echo "echo CircleCI $CIRCLE_COMPARE_URL $CIRCLE_PULL_REQUEST;"
-  fi
+elif [ -n "$CIRCLECI" ]; then
   if [ -n "$CIRCLE_PULL_REQUEST" ]; then
     CI_IS_PULL_REQUEST=true
   else
     CI_IS_PULL_REQUEST=false
   fi
-  CI_COMMIT_RANGE=$(echo "${CIRCLE_COMPARE_URL}" | cut -d/ -f7)
-  case $CI_COMMIT_RANGE in
-    *"..."*)
-      CI_COMMIT_RANGE_START=$(git rev-parse "${COMMIT_RANGE}")
-      CI_COMMIT_RANGE_END=$(git rev-parse "${COMMIT_RANGE}")
-      CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
-      ;;
-  esac
-  # CIRCLE_BRANCH may be "pull/327"
-  case "$CIRCLE_BRANCH" in
-    pull/*)
-      if [ -n "$(command -v curl 2> /dev/null)" ]; then
-        GET_URL_TO_STDOUT="curl -s"
-      elif [ -n "$(command -v wget 2> /dev/null)" ]; then
-        GET_URL_TO_STDOUT="wget -q -O -"
-      else
-        echo "echo Neither curl nor wget is installed"
-        exit 2
-      fi
-      if [ -z "$(command -v jq 2> /dev/null)" ]; then
-        echo "echo jq is not installed"
-        exit 2
-      fi
-
-      CI_BRANCH_NAME=$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}" | jq -r '.head.ref')
-      ;;
-    *)
-      CI_BRANCH_NAME=$CIRCLE_BRANCH
-      ;;
-  esac
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo CircleCI; CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
+  fi
+  if [ -n "$CIRCLE_PR_NUMBER" ]; then
+    pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
+    CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.bash.sha')
+    CI_COMMIT_RANGE_END=$(echo "${pull_details}" | jq -r '.head.sha')
+    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+  else
+    CI_BRANCH_NAME=$CIRCLE_BRANCH
+  fi
 
 elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
@@ -364,11 +334,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
   if [ "$DEBUG" = "--debug" ]; then
-    if [ -n "$CIRCLE_PULL_REQUEST" ]; then
-      echo "echo CircleCI pull request with CIRCLE_COMPARE_URL not set: $CIRCLE_PULL_REQUEST;"
-    else
-      echo "echo Else clause: no CI environment detected;"
-    fi
+    echo "echo Else clause: no CI environment detected;"
   fi
   CI_IS_PULL_REQUEST=false
   # git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
@@ -389,7 +355,7 @@ if [ "$DEBUG" = "--debug" ]; then
   echo "echo CI_COMMIT_RANGE=${CI_COMMIT_RANGE};"
 fi
 
-## The above may have not set CI_COMMIT_RANGE.  Set it.
+## The above may not have set CI_COMMIT_RANGE.  Set it.
 
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ -z "$CI_COMMIT_RANGE" ]; then
