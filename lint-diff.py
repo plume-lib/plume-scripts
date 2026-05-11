@@ -69,6 +69,11 @@ def main() -> None:
     """Filter warnings output, to only show output for changed lines."""
     args = parse_args()
 
+    if args.warning_filename is not None:
+        warning_path = Path(args.warning_filename)
+        if warning_path.is_file() and warning_path.stat().st_size == 0:
+            sys.exit(0)
+
     # A dictionary from file names to a set of ints (line numbers for changed lines).
     changed = changed_lines(args)
 
@@ -83,9 +88,6 @@ def main() -> None:
         args.warning_filename = "stdin"
         warnings = sys.stdin
     else:
-        warning_path = Path(args.warning_filename)
-        if warning_path.is_file() and warning_path.stat().st_size == 0:
-            sys.exit(0)
         # pylint: disable=consider-using-with
         warnings = warning_path.open(encoding="utf-8")  # noqa: SIM115
 
