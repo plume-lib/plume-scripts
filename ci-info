@@ -54,7 +54,7 @@ if [ "$#" -gt 1 ]; then
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
-  # `env` only prints EXPORTED varibales, so `set` is usually more useful.
+  # `env` only prints EXPORTED variables, so `set` is usually more useful.
   echo
   echo 'echo ---------------- start of env'
   env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
@@ -85,6 +85,7 @@ head1() {
 ### Variables
 
 # "GITHUB_PAT" is a GitHub Personal Access Token.
+auth_header_option=()
 if [ -n "$GITHUB_PAT" ]; then
   auth_header_option=(--header="Authorization: token ${GITHUB_PAT}")
 elif [ -n "$GH_TOKEN" ]; then
@@ -171,7 +172,6 @@ if [ -z "$CI_ORGANIZATION" ]; then
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
-  echo "echo SLUG=${CI_ORGANIZATION}"
   echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
 fi
 
@@ -308,9 +308,8 @@ elif [ -n "$CIRCLECI" ]; then
     CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.base.sha')
     CI_COMMIT_RANGE_END=$(echo "${pull_details}" | jq -r '.head.sha')
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
-  else
-    CI_BRANCH_NAME=$CIRCLE_BRANCH
   fi
+  CI_BRANCH_NAME=$CIRCLE_BRANCH
 
 elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
@@ -333,10 +332,10 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
     if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
-        if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH}" 2> /dev/null); then
+        if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH_NAME}" 2> /dev/null); then
           pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}")"
           if ! CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.base.sha'); then
-            echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
+            echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH_NAME}"
             echo 'echo ---------------- start of set'
             set | sed -e 's/^/echo /'
             echo 'echo ---------------- end of set'
@@ -355,8 +354,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
       fi
     fi
   fi
-  # # This is the same as `sha`=`$GITHUB_SHA`:
-  # CI_COMMIT_RANGE_END=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}")
+  # These are the same: `sha`=`echo $GITHUB_SHA`=`git rev-parse remotes/pull/"${GITHUB_REF_NAME}"`.
   CI_COMMIT_RANGE_END=${GITHUB_SHA}
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 
