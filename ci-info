@@ -321,20 +321,12 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "echo   GITHUB_SHA=${GITHUB_SHA};"
     # GITHUB_HEAD_REF is in the PR fork which is not available.
     echo "echo   GITHUB_HEAD_REF=${GITHUB_HEAD_REF};"
-    echo "echo   pwd=$(pwd);"
-    echo "echo   branches:"
-    git branch -a = "$(git branch -a)" | sed -e 's/^/echo "echo /' -e 's/$/"/'
-    git rev-parse HEAD
-    git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
   fi
+  # At this point, these two are the same:
+  # git rev-parse HEAD
+  # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
 
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
-
-  pull_details2="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}")"
-  CI_COMMIT_RANGE_START2=$(echo "${pull_details2}" | jq -r '.base.sha')
-  CI_COMMIT_RANGE_END2=$(echo "${pull_details2}" | jq -r '.head.sha')
-  CI_COMMIT_RANGE2="${CI_COMMIT_RANGE_START2}...${CI_COMMIT_RANGE_END2}"
-  echo "echo CI_COMMIT_RANGE2=${CI_COMMIT_RANGE2}"
 
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
@@ -354,7 +346,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
             git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
             echo "echo git show:"
             git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
-            CI_COMMIT_RANGE_START=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}"^)
+            CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
             # echo "echo exiting"
             # # exit 2
             # exit
@@ -363,13 +355,10 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
       fi
     fi
   fi
-  # This is probably the same as `sha`=`$GITHUB_SHA`
-  CI_COMMIT_RANGE_END=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}")
+  # # This is the same as `sha`=`$GITHUB_SHA`:
+  # CI_COMMIT_RANGE_END=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}")
+  CI_COMMIT_RANGE_END=${GITHUB_SHA}
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
-
-  echo "echo Are these the same:"
-  echo "echo CI_COMMIT_RANGE =${CI_COMMIT_RANGE}"
-  echo "echo CI_COMMIT_RANGE2=${CI_COMMIT_RANGE2}"
 
 else
   # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
