@@ -182,11 +182,13 @@ fi
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ]; then
   echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
-  if [ -z "${URL}" ]; then
+  if [ -n "${URL}" ]; then
     echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | sed -e 's/^/echo /'
+  else
+    echo "echo URL=${URL};"
   fi
-  echo "echo current branch: $(git branch --show-current)"
-  echo "echo current repo: $(git config --get remote.origin.url)"
+  echo "echo current branch: $(git branch --show-current);"
+  echo "echo current repo: $(git config --get remote.origin.url);"
 fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
@@ -326,12 +328,15 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH}" 2> /dev/null); then
           echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
-          echo "echo env:"
-          env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo echo /'
+          echo 'echo ---------------- start of set'
+          set | sed -e 's/^/echo /'
+          echo 'echo ---------------- end of set'
           # echo "echo git branch:"
-          # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' 's/$/"/'
+          # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' -e 's/$/"/'
+          echo "echo git log --graph:"
+          git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
           echo "echo git show:"
-          git --no-pager show | sed -e 's/^/echo "echo /' -e 's/$/"/'
+          git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
           CI_COMMIT_RANGE_START=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}"^)
           # echo "echo exiting"
           # # exit 2
