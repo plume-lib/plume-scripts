@@ -324,6 +324,11 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     echo "echo   pwd=$(pwd);"
   fi
 
+  pull_details2="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
+  CI_COMMIT_RANGE_START2=$(echo "${pull_details2}" | jq -r '.base.sha')
+  CI_COMMIT_RANGE_END2=$(echo "${pull_details2}" | jq -r '.head.sha')
+  CI_COMMIT_RANGE2="${CI_COMMIT_RANGE_START2}...${CI_COMMIT_RANGE_END2}"
+
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
   if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
@@ -355,10 +360,6 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   CI_COMMIT_RANGE_END=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}")
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 
-  pull_details2="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
-  CI_COMMIT_RANGE_START2=$(echo "${pull_details2}" | jq -r '.base.sha')
-  CI_COMMIT_RANGE_END2=$(echo "${pull_details2}" | jq -r '.head.sha')
-  CI_COMMIT_RANGE2="${CI_COMMIT_RANGE_START2}...${CI_COMMIT_RANGE_END2}"
   echo "echo Are these the same:"
   echo "echo CI_COMMIT_RANGE =${CI_COMMIT_RANGE}"
   echo "echo CI_COMMIT_RANGE2=${CI_COMMIT_RANGE2}"
