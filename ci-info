@@ -322,7 +322,10 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     # GITHUB_HEAD_REF is in the PR fork which is not available.
     echo "echo   GITHUB_HEAD_REF=${GITHUB_HEAD_REF};"
     echo "echo   pwd=$(pwd);"
-    echo "echo   git branch -a = $(git branch -a)"
+    echo "echo   branches:"
+    git branch -a = "$(git branch -a)" | sed -e 's/^/echo "echo /' -e 's/$/"/'
+    git rev-parse HEAD
+    git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
   fi
 
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
