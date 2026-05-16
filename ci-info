@@ -315,9 +315,12 @@ elif [ -n "$CIRCLECI" ]; then
 elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_REF};"
-    echo "echo   base_ref=${GITHUB_BASE_REF} ref_name=${GITHUB_REF_NAME} sha=${GITHUB_SHA};"
+    echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER};"
+    echo "echo   GITHUB_BASE_REF=${GITHUB_BASE_REF};"
+    echo "echo   GITHUB_REF_NAME=${GITHUB_REF_NAME};"
+    echo "echo   GITHUB_SHA=${GITHUB_SHA};"
     # GITHUB_HEAD_REF is in the PR fork which is not available.
+    echo "echo   GITHUB_HEAD_REF=${GITHUB_HEAD_REF};"
     echo "echo   pwd=$(pwd);"
   fi
 
@@ -327,20 +330,23 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH}" 2> /dev/null); then
-          echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
-          echo 'echo ---------------- start of set'
-          set | sed -e 's/^/echo /'
-          echo 'echo ---------------- end of set'
-          # echo "echo git branch:"
-          # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' -e 's/$/"/'
-          echo "echo git log --graph:"
-          git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
-          echo "echo git show:"
-          git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
-          CI_COMMIT_RANGE_START=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}"^)
-          # echo "echo exiting"
-          # # exit 2
-          # exit
+          pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
+          if ! CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.base.sha'); then
+            echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
+            echo 'echo ---------------- start of set'
+            set | sed -e 's/^/echo /'
+            echo 'echo ---------------- end of set'
+            # echo "echo git branch:"
+            # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' -e 's/$/"/'
+            echo "echo git log --graph:"
+            git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+            echo "echo git show:"
+            git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+            CI_COMMIT_RANGE_START=$(git rev-parse remotes/pull/"${GITHUB_REF_NAME}"^)
+            # echo "echo exiting"
+            # # exit 2
+            # exit
+          fi
         fi
       fi
     fi
