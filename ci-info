@@ -322,12 +322,16 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     # GITHUB_HEAD_REF is in the PR fork which is not available.
     echo "echo   GITHUB_HEAD_REF=${GITHUB_HEAD_REF};"
     echo "echo   pwd=$(pwd);"
+    echo "echo   git branch -a = $(git branch -a)"
   fi
 
-  pull_details2="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
+  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
+
+  pull_details2="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}")"
   CI_COMMIT_RANGE_START2=$(echo "${pull_details2}" | jq -r '.base.sha')
   CI_COMMIT_RANGE_END2=$(echo "${pull_details2}" | jq -r '.head.sha')
   CI_COMMIT_RANGE2="${CI_COMMIT_RANGE_START2}...${CI_COMMIT_RANGE_END2}"
+  echo "echo CI_COMMIT_RANGE2=${CI_COMMIT_RANGE2}"
 
   CI_IS_PULL_REQUEST=true
   CI_BRANCH_NAME="${GITHUB_HEAD_REF}"
@@ -335,7 +339,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH}" 2> /dev/null); then
-          pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
+          pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}")"
           if ! CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.base.sha'); then
             echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH}"
             echo 'echo ---------------- start of set'
