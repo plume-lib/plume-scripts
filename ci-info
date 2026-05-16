@@ -144,10 +144,10 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
 
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   CI_ORGANIZATION=$(${GET_URL_TO_STDOUT} \
-    https://api.github.com/repos/typetools/checker-framework/pulls/"${GITHUB_PR_NUMBER}" \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}" \
     | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo GitHub pull request"
+    echo "echo GitHub Actions pull request"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
