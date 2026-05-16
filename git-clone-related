@@ -106,22 +106,24 @@ if [ -d "${DESTINATION}" ]; then
   (cd "${DESTINATION}" && (git pull -q || (git branch && true)))
 else
   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-
-  CI_INFO="$SCRIPT_DIR/../plume-scripts/ci-info"
+  CI_INFO=$SCRIPT_DIR/ci-info
   if [ ! -f "$CI_INFO" ]; then
-    CI_INFO="$SCRIPT_DIR/../.plume-scripts/ci-info"
+    CI_INFO="$SCRIPT_DIR/../plume-scripts/ci-info"
+    if [ ! -f "$CI_INFO" ]; then
+      CI_INFO="$SCRIPT_DIR/../.plume-scripts/ci-info"
+      if [ ! -f "$CI_INFO" ]; then
+        CI_INFO="$SCRIPT_DIR/.plume-scripts/ci-info"
+        if [ ! -f "$CI_INFO" ]; then
+          git -C "$SCRIPT_DIR" clone --depth 1 https://github.com/plume-lib/plume-scripts .plume-scripts
+          CI_INFO="$SCRIPT_DIR/.plume-scripts/ci-info"
+          if [ ! -f "$CI_INFO" ]; then
+            echo "ci-info script does not exist"
+            exit 1
+          fi
+        fi
+      fi
+    fi
   fi
-  if [ ! -f "$CI_INFO" ]; then
-    CI_INFO="$SCRIPT_DIR/.plume-scripts/ci-info"
-  fi
-  if [ ! -f "$CI_INFO" ]; then
-    (cd "$SCRIPT_DIR" && git clone --depth 1 https://github.com/plume-lib/plume-scripts .plume-scripts)
-  fi
-  if [ ! -f "$CI_INFO" ]; then
-    echo "CI_INFO does not exist: $CI_INFO"
-    exit 1
-  fi
-
   if [ -n "$DEBUG" ]; then
     echo "About to run ci-info --debug"
     "${CI_INFO}" --debug "${UPSTREAM_ORG}"
