@@ -305,11 +305,13 @@ elif [ -n "$CIRCLECI" ]; then
     fi
 
     pull_details="$($GET_URL_TO_STDOUT "${auth_header_option[@]}" "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}")"
+    CI_BRANCH_NAME=$(echo "${pull_details}" | jq -r '.head.ref')
     CI_COMMIT_RANGE_START=$(echo "${pull_details}" | jq -r '.base.sha')
     CI_COMMIT_RANGE_END=$(echo "${pull_details}" | jq -r '.head.sha')
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+  else
+    CI_BRANCH_NAME=$CIRCLE_BRANCH
   fi
-  CI_BRANCH_NAME=$CIRCLE_BRANCH
 
 elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
