@@ -360,8 +360,15 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   CI_COMMIT_RANGE_END=${GITHUB_SHA}
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 
+  # If this elif is reached, it's not a pull request (except maybe a re-run Azure Pipelines pull request).
+elif [ -n "$GITHUB_ACTIONS" ]; then
+  # GitHub Actions, non-pull-request.
+  CI_IS_PULL_REQUEST=false
+  CI_BRANCH_NAME="${GITHUB_REF_NAME}"
+  CI_COMMIT_RANGE_END="${GITHUB_SHA}"
+
 else
-  # It's not a pull request (except maybe a re-run Azure Pipelines pull request).
+
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo Else clause: no CI environment detected;"
   fi
