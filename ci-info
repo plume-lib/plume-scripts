@@ -363,6 +363,9 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   # If this elif is reached, it's not a pull request (except maybe a re-run Azure Pipelines pull request).
 elif [ -n "$GITHUB_ACTIONS" ]; then
   # GitHub Actions, non-pull-request.
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD);"
+  fi
   CI_IS_PULL_REQUEST=false
   CI_BRANCH_NAME="${GITHUB_REF_NAME}"
   CI_COMMIT_RANGE_END="${GITHUB_SHA}"
