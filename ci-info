@@ -337,7 +337,7 @@ elif [ -n "$CIRCLECI" ]; then
     CI_BRANCH_NAME=$CIRCLE_BRANCH
   fi
 
-elif [ -n "$GITHUB_HEAD_REF" ]; then
+elif [ -n "${GITHUB_HEAD_REF}" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER};"
@@ -390,6 +390,11 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD);"
   fi
+  if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+    echo "echo GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
+    exit 2
+  fi
+
   CI_IS_PULL_REQUEST=false
   # GITHUB_REF_NAME may be, for example, "40/merge".
   if [[ -n $(git branch --list branch-name) ]]; then
