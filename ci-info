@@ -55,6 +55,7 @@ fi
 
 if [ "$DEBUG" = "--debug" ]; then
   # `env` only prints EXPORTED variables, so `set` is usually more useful.
+  echo "echo ci-info is running in $(pwd)"
   echo
   echo 'echo ---------------- start of env'
   env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
@@ -64,9 +65,13 @@ if [ "$DEBUG" = "--debug" ]; then
   set | sed -e 's/^/echo /'
   echo 'echo ---------------- end of set'
   echo
+  echo 'echo ---------------- start of all branches'
   git --no-pager branch -a | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of all branches'
   echo
+  echo 'echo ---------------- start of 1000 lines of git log'
   git --no-pager log --graph | head --lines=1000 | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of 1000 lines of git log'
   echo
 fi
 
@@ -367,7 +372,12 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     echo "echo GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD);"
   fi
   CI_IS_PULL_REQUEST=false
-  CI_BRANCH_NAME="${GITHUB_REF_NAME}"
+  # GITHUB_REF_NAME may be, for example, "40/merge".
+  if [[ -n $(git branch --list branch-name) ]]; then
+    CI_BRANCH_NAME="${GITHUB_REF_NAME}"
+  else
+    CI_BRANCH_NAME="NEEDED"
+  fi
   CI_COMMIT_RANGE_END="${GITHUB_SHA}"
 
 else
