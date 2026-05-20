@@ -69,6 +69,10 @@ if [ "$DEBUG" = "--debug" ]; then
   git --no-pager branch -a | sed -e 's/^/echo /'
   echo 'echo ---------------- end of all branches'
   echo
+  echo 'echo ---------------- start of all remote branches'
+  git --no-pager branch -r | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of all branches'
+  echo
   echo 'echo ---------------- start of 1000 lines of git log'
   git --no-pager log --graph | head --lines=1000 | sed -e 's/^/echo /'
   echo 'echo ---------------- end of 1000 lines of git log'
@@ -190,7 +194,7 @@ if [ "$DEBUG" = "--debug" ]; then
   if [ -n "${URL}" ]; then
     echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | sed -e 's/^/echo /'
   else
-    echo "echo URL=${URL};"
+    echo "echo URL is empty (is set only for non-CI runs);"
   fi
   echo "echo current branch: $(git branch --show-current);"
   echo "echo current repo: $(git config --get remote.origin.url);"
