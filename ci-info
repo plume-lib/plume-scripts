@@ -31,6 +31,10 @@
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
 
+# PROBLEM: The directory from which ci-info is running must override environment
+# variables, because a CI job may itself call "git clone" and then later call
+# ci-info from that clone.  Idea: check the directory name.
+
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
 
@@ -390,6 +394,7 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD);"
   fi
+
   if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
     echo "echo GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
     exit 2
