@@ -2,7 +2,7 @@
 # bash because this script uses arrays
 
 # Outputs information about a CI job, when run under Azure Pipelines,
-# CircleCI, GitHub Actions, or Travis CI.  (See note below about CircleCI v1.)
+# CircleCI, GitHub Actions, or Travis CI.
 
 # Typical use:
 #
