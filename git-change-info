@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Determines the start and end commits for a CI job, when run under
-# Azure Pipelines, CircleCI, GitHub Actions, or Travis CI.
+# Determines the start and end commits for a CI job.
+# Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 
 # Typical use:
 #
@@ -21,15 +21,6 @@
 #   eval "$(/tmp/plume-scripts/git-change-info DEFAULT-ORGANIZATION)"
 
 # Either snippet of code sets these variables:
-# CI_IS_PULL_REQUEST: Either "true" or "false" (without the quotes).
-# CI_HEAD_ORGANIZATION: In a PR, the source or head organization.
-#   Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
-# CI_HEAD_BRANCH_NAME: The name of the current branch; in a PR, the source/head branch.
-# CI_BASE_ORGANIZATION: In a PR, "organization/repository" for the base; otherwise empty.
-# CI_BASE_REPOSITORY: In a PR, "organization/repository" for the base; otherwise empty.
-# CI_PR_NUMBER: In a PR, the numeric pull request number; otherwise empty.
-# CI_HEAD_COMMIT: The SHA of the most recent commit; the commit range end.
-# CI_BASE_COMMIT: The SHA of the commit range start.
 # CI_COMMIT_RANGE: An argument to `git diff` with the range of commits IDs.
 #    (Don't use it with `git log`, which interprets its argument differently.)
 # CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID/SHA.
@@ -151,45 +142,52 @@ get_pull_json() {
   fi
 }
 
-## Continuous integration services
-if [ "$TRAVIS" = "true" ]; then
-  CI_HEAD_ORGANIZATION=${TRAVIS_PULL_REQUEST_SLUG%/*}
-  if [ -z "$CI_HEAD_ORGANIZATION" ]; then
-    CI_HEAD_ORGANIZATION=${TRAVIS_REPO_SLUG%/*}
-  fi
-elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
-  if [ "$BUILD_REASON" = "PullRequest" ]; then
-    CI_BASE_ORG_REPO="${BUILD_REPOSITORY_NAME}"
-    CI_PR_NUMBER="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-  else
-    CI_HEAD_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
-  fi
-elif [ -n "$CIRCLE_PR_USERNAME" ]; then
-  CI_HEAD_ORGANIZATION="${CIRCLE_PR_USERNAME}"
-  echo "echo CI_HEAD_ORGANIZATION=${CI_HEAD_ORGANIZATION}"
-  CI_HEAD_BRANCH_NAME="${CIRCLE_BRANCH}"
-  echo "echo CI_BRANCH_NAME=${CI_HEAD_BRANCH_NAME}"
-  if [ -n "${CIRCLE_PR_NUMBER}" ]; then
-    CI_PR_NUMBER="${CIRCLE_PR_NUMBER}"
-  fi
-  some_org_information="NEEDED"
-  CI_BASE_ORG_REPO="${some_org_information}/${CIRCLE_PR_REPONAME}"
-  CI_COMMIT_RANGE_END="${CIRCLE_SHA1}"
-elif [ -n "$GITHUB_HEAD_REF" ]; then
-  # GitHub Actions pull request
-  CI_BASE_ORG_REPO="${GITHUB_REPOSITORY}"
-  CI_PR_NUMBER=${GITHUB_REF_NAME%/merge}
-fi
-
 ### Organization
 
-if [ -z "${CI_HEAD_ORGANIZATION}" ]; then
-  get_pull_json
-  if [ -n "${PULL_JSON}" ]; then
-    CI_HEAD_ORGANIZATION=$(echo "${PULL_JSON}" | jq '.head.repo.owner.login')
-    if [ -z "${CI_HEAD_ORGANIZATION}" ]; then
-      :
+## Continuous integration services
+if [ "$TRAVIS" = "true" ]; then
+  CI_ORGANIZATION=${TRAVIS_PULL_REQUEST_SLUG%/*}
+  if [ -z "$CI_ORGANIZATION" ]; then
+    CI_ORGANIZATION=${TRAVIS_REPO_SLUG%/*}
+  fi
+elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
+  # TODO: Can I implement this without a GitHub API request?
+  if [ "$BUILD_REASON" = "PullRequest" ]; then
+    url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+    pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
+    CI_ACCESSED_GITHUB_API=true
+    SLUG=$(echo "${pull_json}" | jq .head.label | sed 's/"//g')
+    if [ -z "$SLUG" ]; then
+      echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
+      if [ -n "${auth_header_option}" ]; then
+        echo "echo auth_header_option is set."
+      fi
+      echo "echo ---- start of wget output ----"
+      # shellcheck disable=SC2001
+      echo "${pull_json}" | sed -e 's/^/echo /'
+      echo "echo ---- end of wget output ----"
+      exit 2
     fi
+    CI_ORGANIZATION=${SLUG%:*}
+  else
+    CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
+    # CI_REPO=${BUILD_REPOSITORY_NAME##*/}
+  fi
+elif [ -n "$CIRCLE_PR_USERNAME" ]; then
+  CI_ORGANIZATION="$CIRCLE_PR_USERNAME"
+elif [ -n "$GITHUB_HEAD_REF" ]; then
+  # GitHub Actions pull request
+
+  # TODO: Can I implement this without a GitHub API request?
+  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
+  url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
+  pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
+  CI_ACCESSED_GITHUB_API=true
+  CI_ORGANIZATION=$(echo "${pull_json}" | jq '.head.repo.owner.login')
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo GitHub Actions pull request"
+    echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
+    echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
 fi
 
@@ -214,6 +212,7 @@ if [ "$DEBUG" = "--debug" ]; then
   echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
 fi
 
+
 ### Other information (besides organization)
 
 ## Both of these commands for DEFAULT_BRANCH_NAME seem to work.
@@ -235,7 +234,6 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH;"
   fi
-  CI_IS_PULL_REQUEST=true
   # WARNING!  $BUILD_SOURCEBRANCHNAME is just a name, not a full ref path.  For example,
   # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge".
   CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
@@ -251,7 +249,6 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
     echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
     echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
   fi
-  CI_IS_PULL_REQUEST=false
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
   # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
@@ -310,7 +307,6 @@ elif [ "$TRAVIS" = "true" ]; then
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo Travis CI $TRAVIS;"
   fi
-  CI_IS_PULL_REQUEST=$TRAVIS_PULL_REQUEST
   CI_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
   if [ "$VERBOSE" = "--verbose" ]; then
     echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
@@ -321,13 +317,8 @@ elif [ "$TRAVIS" = "true" ]; then
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 
 elif [ -n "$CIRCLECI" ]; then
-  if [ -n "$CIRCLE_PULL_REQUEST" ]; then
-    CI_IS_PULL_REQUEST=true
-  else
-    CI_IS_PULL_REQUEST=false
-  fi
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo CircleCI; CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
+    echo "echo CircleCI, CIRCLE_PULL_REQUEST=$CIRCLE_PULL_REQUEST;"
   fi
   if [ -n "$CIRCLE_PR_NUMBER" ]; then
     # TODO: Can I implement this without a GitHub API request?
@@ -368,7 +359,6 @@ elif [ -n "${GITHUB_HEAD_REF}" ]; then
 
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
 
-  CI_IS_PULL_REQUEST=true
   CI_BRANCH="${GITHUB_HEAD_REF}"
   if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
     if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
@@ -411,9 +401,8 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     exit 2
   fi
 
-  CI_IS_PULL_REQUEST=false
-  # GITHUB_REF_NAME may be, for example, "40/merge".
-  if [ -n "$(git branch --list branch-name)" ]; then
+  # GITHUB_REF_NAME may be a branch name or "40/merge".
+  if [ -n "$(git branch --list "${GITHUB_REF_NAME}")" ]; then
     CI_BRANCH="${GITHUB_REF_NAME}"
   else
     # TODO: Can I implement this without a GitHub API request?
@@ -428,7 +417,6 @@ else
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo Else clause: no CI environment detected;"
   fi
-  CI_IS_PULL_REQUEST=false
   # git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
   CI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
@@ -440,7 +428,6 @@ else
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
-  echo "echo CI_IS_PULL_REQUEST=${CI_IS_PULL_REQUEST};"
   echo "echo CI_BRANCH=${CI_BRANCH};"
   echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START};"
   echo "echo CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END};"
@@ -512,10 +499,6 @@ if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
 fi
 echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
-if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST;"
-fi
-echo "CI_IS_PULL_REQUEST=$CI_IS_PULL_REQUEST; export CI_IS_PULL_REQUEST;"
 if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_BRANCH=$CI_BRANCH;"
 fi

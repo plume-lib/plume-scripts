@@ -1,8 +1,8 @@
 #!/bin/sh
 
-# Outputs the GitHub organization and branch for a CI job, when run under Azure
-# Pipelines, CircleCI, GitHub Actions, or Travis CI.  Other information about
+# Outputs the GitHub organization and branch for a CI job.  Other information about
 # the CI job can be computed, but it is beyond the scope of this simple script.
+# Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 
 # Typical use:
 #
@@ -21,10 +21,16 @@
 #   fi
 #   eval "$(/tmp/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
 
-# Either snippet of code sets two variables:
+# Either snippet of code sets these variables:
 # CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source or head.
 #   Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
 # CI_BRANCH: The name of the source/head branch (in a PR) or of the branch being tested.
+
+# Requires the `jq` program and either `curl` or `wget`.
+#
+# If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
+# called, it is used as GitHub Personal Access Token when making GitHub API
+# calls.  This can avoid "403 rate limit exceeded" failures.
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
@@ -303,6 +309,7 @@ if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_BRANCH=$CI_BRANCH;"
 fi
 echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
+# I could check ${pull_json} instead of having a separate variable.
 if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_ACCESSED_GITHUB_API=$CI_ACCESSED_GITHUB_API;"
 fi
