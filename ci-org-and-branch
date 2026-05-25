@@ -263,8 +263,8 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     exit 2
   fi
 
-  # GITHUB_REF_NAME may be, for example, "40/merge".
-  if [ -n "$(git branch --list branch-name)" ]; then
+  # GITHUB_REF_NAME may be a branch name or "40/merge".
+  if [ -n "$(git branch --list "${GITHUB_REF_NAME}")" ]; then
     CI_BRANCH="${GITHUB_REF_NAME}"
   else
     # TODO: Can I implement this without a GitHub API request?
