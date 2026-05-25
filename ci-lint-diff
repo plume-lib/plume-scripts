@@ -22,6 +22,8 @@
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
 
+# This script is a thin wrapper around `lint-diff.py`.
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
 

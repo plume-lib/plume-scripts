@@ -1,0 +1,309 @@
+#!/bin/sh
+
+# Outputs the GitHub organization and branch for a CI job, when run under Azure
+# Pipelines, CircleCI, GitHub Actions, or Travis CI.  Other information about
+# the CI job can be computed, but it is beyond the scope of this simple script.
+
+# Typical use:
+#
+#   if [ -d /tmp/plume-scripts ] ; then
+#     git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+#   else
+#     mkdir -p /tmp && git -C /tmp clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   fi
+#   eval "$(/tmp/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
+#
+# Alternatively, to use a specific version of this script rather than the latest:
+#
+#   if [ ! -d /tmp/plume-scripts ] ; then
+#     mkdir -p /tmp/$USER
+#     git -C /tmp/$USER clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   fi
+#   eval "$(/tmp/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
+
+# Either snippet of code sets two variables:
+# CI_ORGANIZATION: The GitHub organization.  In a PR, refers to the source or head.
+#   Optional argument DEFAULT-ORGANIZATION is used if no organization can be determined.
+# CI_BRANCH: The name of the source/head branch (in a PR) or of the branch being tested.
+
+# SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+SCRIPT_NAME="$(basename -- "$0")"
+
+DEBUG=""
+if [ "$1" = "--verbose" ]; then
+  VERBOSE="--verbose"
+  shift
+fi
+
+if [ "$1" = "--debug" ]; then
+  DEBUG="--debug"
+  VERBOSE="--verbose"
+  shift
+fi
+
+if [ "$#" -gt 1 ]; then
+  usage="Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
+  echo "echo \"$usage\";"
+  echo "$usage" >&2
+  echo "exit 2"
+  exit 2
+fi
+
+if [ "$DEBUG" = "--debug" ]; then
+  # `env` only prints EXPORTED variables, so `set` is usually more useful.
+  echo "echo ${SCRIPT_NAME} is running in $(pwd)"
+  echo
+  echo 'echo ---------------- start of env'
+  env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of env'
+  echo
+  echo 'echo ---------------- start of set'
+  set | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of set'
+  echo
+  echo 'echo ---------------- start of git status'
+  git --no-pager status | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of git status'
+  echo
+  echo 'echo ---------------- start of all branches'
+  git --no-pager branch -a | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of all branches'
+  echo
+  echo 'echo ---------------- start of all remote branches'
+  git --no-pager branch -r | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of all branches'
+  echo
+  echo 'echo ---------------- start of 1000 lines of git log'
+  git --no-pager log --graph | head --lines=1000 | sed -e 's/^/echo /'
+  echo 'echo ---------------- end of 1000 lines of git log'
+  echo
+fi
+
+### Variables
+
+# "GITHUB_PAT" is a GitHub Personal Access Token.
+# TODO: Should this be "Authorization: Bearer <YOUR-TOKEN>" instead?  See https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
+if [ -n "$GITHUB_PAT" ]; then
+  auth_header_option="--header=Authorization: token ${GITHUB_PAT}"
+elif [ -n "$GH_TOKEN" ]; then
+  auth_header_option="--header=Authorization: token ${GH_TOKEN}"
+fi
+
+### Prerequisites
+
+# TODO: Try to not access the GitHub REST API, because it can get throttled.
+if [ -n "$(command -v curl 2> /dev/null)" ]; then
+  GET_URL_TO_STDOUT="curl ${auth_header_option} -s"
+elif [ -n "$(command -v wget 2> /dev/null)" ]; then
+  GET_URL_TO_STDOUT="wget ${auth_header_option} -q -O -"
+else
+  echo "echo Neither curl nor wget is installed"
+  exit 2
+fi
+if [ -z "$(command -v jq 2> /dev/null)" ]; then
+  echo "echo jq is not installed"
+  exit 2
+fi
+
+### Organization
+
+## Continuous integration services
+if [ "$TRAVIS" = "true" ]; then
+  CI_ORGANIZATION=${TRAVIS_PULL_REQUEST_SLUG%/*}
+  if [ -z "$CI_ORGANIZATION" ]; then
+    CI_ORGANIZATION=${TRAVIS_REPO_SLUG%/*}
+  fi
+elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
+  # TODO: Can I implement this without a GitHub API request?
+  if [ "$BUILD_REASON" = "PullRequest" ]; then
+    url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+    pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
+    CI_ACCESSED_GITHUB_API=true
+    SLUG=$(echo "${pull_json}" | jq .head.label | sed 's/"//g')
+    if [ -z "$SLUG" ]; then
+      echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
+      if [ -n "${auth_header_option}" ]; then
+        echo "echo auth_header_option is set."
+      fi
+      echo "echo ---- start of wget output ----"
+      # shellcheck disable=SC2001
+      echo "${pull_json}" | sed -e 's/^/echo /'
+      echo "echo ---- end of wget output ----"
+      exit 2
+    fi
+    CI_ORGANIZATION=${SLUG%:*}
+  else
+    CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
+    # CI_REPO=${BUILD_REPOSITORY_NAME##*/}
+  fi
+elif [ -n "$CIRCLE_PR_USERNAME" ]; then
+  CI_ORGANIZATION="$CIRCLE_PR_USERNAME"
+elif [ -n "$GITHUB_HEAD_REF" ]; then
+  # GitHub Actions pull request
+
+  # TODO: Can I implement this without a GitHub API request?
+  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
+  url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
+  pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
+  CI_ACCESSED_GITHUB_API=true
+  CI_ORGANIZATION=$(echo "${pull_json}" | jq '.head.repo.owner.login')
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo GitHub Actions pull request"
+    echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
+    echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
+  fi
+fi
+
+## Git clone
+if [ -z "$CI_ORGANIZATION" ]; then
+  URL=$(git config --get remote.origin.url)
+  # This removes the leading part of two possible forms for a URL:
+  #   https://github.com/mernst/annotation-tools
+  #   git@github.com:mernst/annotation-tools.git
+  SLUG=${URL#https://github.com/}
+  SLUG=${SLUG#git@github.com:}
+  CI_ORGANIZATION=${SLUG%/*}
+  # TODO: Maybe add a sanity check here.
+fi
+
+## Default
+if [ -z "$CI_ORGANIZATION" ]; then
+  CI_ORGANIZATION=$1
+fi
+
+if [ "$DEBUG" = "--debug" ]; then
+  echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
+fi
+
+### Other information (besides organization)
+
+## Both of these commands for DEFAULT_BRANCH_NAME seem to work.
+# DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+if [ "$DEBUG" = "--debug" ]; then
+  echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
+  if [ -n "${URL}" ]; then
+    echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | sed -e 's/^/echo /'
+  else
+    echo "echo URL is empty (is set only for non-CI runs);"
+  fi
+  echo "echo current branch: $(git branch --show-current);"
+  echo "echo current repo: $(git config --get remote.origin.url);"
+fi
+
+if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
+  ## Azure Pipelines pull request
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH;"
+  fi
+  # WARNING!  $BUILD_SOURCEBRANCHNAME is just a name, not a full ref path.  For example,
+  # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge".
+  CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
+elif [ -n "$BUILD_SOURCEBRANCH" ]; then
+  # Azure Pipelines build for a branch (possibly master).
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
+    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
+  fi
+  # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
+  # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
+  # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
+  CI_BRANCH=$BUILD_SOURCEBRANCHNAME
+elif [ "$TRAVIS" = "true" ]; then
+  ## Travis CI
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo Travis CI $TRAVIS;"
+  fi
+  CI_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
+  if [ "$VERBOSE" = "--verbose" ]; then
+    echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
+    echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
+    echo "echo CI_BRANCH=$CI_BRANCH;"
+  fi
+  # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
+
+elif [ -n "$CIRCLECI" ]; then
+  if [ -n "$CIRCLE_PR_NUMBER" ]; then
+    # TODO: Can I implement this without a GitHub API request?
+    url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
+    pull_json="$(${GET_URL_TO_STDOUT} "${url}")"
+    CI_ACCESSED_GITHUB_API=true
+    CI_BRANCH=$(echo "${pull_json}" | jq -r '.head.ref')
+  else
+    CI_BRANCH=$CIRCLE_BRANCH
+  fi
+
+elif [ -n "${GITHUB_HEAD_REF}" ]; then
+  # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER};"
+    echo "echo   GITHUB_BASE_REF=${GITHUB_BASE_REF};"
+    echo "echo   GITHUB_REF_NAME=${GITHUB_REF_NAME};"
+    echo "echo   GITHUB_SHA=${GITHUB_SHA};"
+    # GITHUB_HEAD_REF is in the PR fork which is not available.
+    echo "echo   GITHUB_HEAD_REF=${GITHUB_HEAD_REF};"
+  fi
+  # At this point, these two are the same:
+  # git rev-parse HEAD
+  # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
+
+  GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
+
+  CI_BRANCH="${GITHUB_HEAD_REF}"
+
+  # If this elif is reached, it's not a pull request (except maybe a re-run Azure Pipelines pull request).
+elif [ -n "$GITHUB_ACTIONS" ]; then
+  # GitHub Actions, non-pull-request.
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD);"
+  fi
+
+  if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+    echo "echo GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
+    exit 2
+  fi
+
+  # GITHUB_REF_NAME may be, for example, "40/merge".
+  if [ -n "$(git branch --list branch-name)" ]; then
+    CI_BRANCH="${GITHUB_REF_NAME}"
+  else
+    # TODO: Can I implement this without a GitHub API request?
+    url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
+    pull_json="$(${GET_URL_TO_STDOUT} "${url}")"
+    CI_ACCESSED_GITHUB_API=true
+    CI_BRANCH=$(echo "${pull_json}" | jq -r '.head.ref')
+  fi
+
+else
+
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "echo Else clause: no CI environment detected;"
+  fi
+  # git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
+  CI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  # In an Azure Pipelines pull request, `git branch` yields "(HEAD detached at pull/4/merge)".
+  # If you re-run a pull request via "Queue" rather than "Rebuild",
+  # variables SYSTEM_PULLREQUEST_TARGETBRANCH and SYSTEM_PULLREQUEST_SOURCEBRANCH are not set.
+  if [ "$CI_BRANCH" = '(HEAD' ]; then
+    CI_BRANCH=$DEFAULT_BRANCH_NAME
+  fi
+fi
+
+if [ "$DEBUG" = "--debug" ]; then
+  echo "echo CI_BRANCH=${CI_BRANCH};"
+fi
+
+### Print it out
+
+if [ "$VERBOSE" = "--verbose" ]; then
+  echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
+fi
+echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
+if [ "$VERBOSE" = "--verbose" ]; then
+  echo "echo CI_BRANCH=$CI_BRANCH;"
+fi
+echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
+if [ "$VERBOSE" = "--verbose" ]; then
+  echo "echo CI_ACCESSED_GITHUB_API=$CI_ACCESSED_GITHUB_API;"
+fi
+echo "CI_ACCESSED_GITHUB_API=$CI_ACCESSED_GITHUB_API; export CI_ACCESSED_GITHUB_API;"

@@ -75,7 +75,12 @@
 
 PLUME_SCRIPTS ?= .plume-scripts
 
-CODE_STYLE_EXCLUSIONS ?= --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=${PLUME_SCRIPTS} --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+CODE_STYLE_EXCLUSIONS_DEFAULT ?= --exclude-dir=.do-like-javac --exclude-dir=.git --exclude-dir='.nfs*' --exclude-dir=.venv --exclude-dir=api --exclude-dir=build --exclude='.nfs*' --exclude='\#*' --exclude='*~' --exclude='*.bak' --exclude='*.tar' --exclude='*.tdy' --exclude=gradlew
+ifeq (.,${PLUME_SCRIPTS})
+CODE_STYLE_EXCLUSIONS ?= ${CODE_STYLE_EXCLUSIONS_DEFAULT}
+else
+CODE_STYLE_EXCLUSIONS ?= ${CODE_STYLE_EXCLUSIONS_DEFAULT} --exclude-dir=${PLUME_SCRIPTS}
+endif
 
 
 ###########################################################################
@@ -109,6 +114,7 @@ CODE_STYLE_EXCLUSIONS ?= --exclude-dir=.do-like-javac --exclude-dir=.git --exclu
 .PHONY: style-fix style-check
 
 showvars::
+	@echo "PLUME_SCRIPTS=${PLUME_SCRIPTS}"
 	@echo "CODE_STYLE_DISABLE=${CODE_STYLE_DISABLE}"
 
 # This "if" is closed nearly at the end of the file.

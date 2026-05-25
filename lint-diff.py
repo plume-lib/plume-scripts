@@ -89,7 +89,7 @@ def main() -> None:
         warnings = sys.stdin
     else:
         # pylint: disable=consider-using-with
-        warnings = warning_path.open(encoding="utf-8")  # noqa: SIM115
+        warnings = warning_path.open(encoding="utf-8")
 
     # 1 if this produced any output, 0 if not.
     status = 0
