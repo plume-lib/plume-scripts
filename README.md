@@ -73,7 +73,7 @@ Prints "yes" if this process is running under CI.  Prints nothing otherwise.
 
 Outputs the head GitHub organization and branch for a CI job.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
-[Documentation](ci-info) at top of file.
+[Documentation](ci-org-and-branch) at top of file.
 
 <!--
 ### ci-lint-diff
