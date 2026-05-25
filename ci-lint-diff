@@ -54,17 +54,17 @@ if [ "$DEBUG" = "--debug" ]; then
   git log --graph | head --lines=10000
 fi
 
-ci_info_output="$("${SCRIPT_DIR}"/ci-info)"
-ci_info_status_code=$?
-if [ "$ci_info_status_code" -ne 0 ]; then
-  echo "ci-info failed with status $ci_info_status_code"
-  echo "---- ci-info output ----"
-  echo "$ci_info_output"
-  echo "---- end of ci-info output ----"
+git_changes_output="$("${SCRIPT_DIR}"/git-changes)"
+git_changes_status_code=$?
+if [ "$git_changes_status_code" -ne 0 ]; then
+  echo "git-changes failed with status $git_changes_status_code"
+  echo "---- git-changes output ----"
+  echo "$git_changes_output"
+  echo "---- end of git-changes output ----"
   exit 2
 fi
 
-eval "$ci_info_output"
+eval "$git_changes_output"
 
 if [ -z "$CI_COMMIT_RANGE" ]; then
   CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE is not set.\n"
@@ -120,15 +120,15 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
-  echo "---- ci-info output ----"
-  echo "$ci_info_output"
-  echo "---- end of ci-info output ----"
+  echo "---- git-changes output ----"
+  echo "$git_changes_output"
+  echo "---- end of git-changes output ----"
   echo
   # This is not very effective because environment variables were set by
-  # the previous invocation of ci-info.
-  echo "---------------- start of ${SCRIPT_DIR}/ci-info --debug"
-  "${SCRIPT_DIR}"/ci-info --debug
-  echo "---------------- end of ${SCRIPT_DIR}/ci-info --debug"
+  # the previous invocation of git-changes.
+  echo "---------------- start of ${SCRIPT_DIR}/git-changes --debug"
+  "${SCRIPT_DIR}"/git-changes --debug
+  echo "---------------- end of ${SCRIPT_DIR}/git-changes --debug"
   echo
 
   echo git rev-parse \$CI_COMMIT_RANGE_START

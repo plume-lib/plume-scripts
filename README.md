@@ -69,97 +69,25 @@ Works for either space- or colon- delimiated paths.
 
 Prints "yes" if this process is running under CI.  Prints nothing otherwise.
 
-### ci-info
+### ci-org-and-branch
 
-Obtains information about a CI (continuous integration) job, such as the
-organization, the branch, the range of commits, and whether it is a pull
-request.  Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+Outputs the head GitHub organization and branch for a CI job.
+Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 [Documentation](ci-info) at top of file.
 
+<!--
 ### ci-lint-diff
 
 Given a file of warnings (such as those output by `lint` or other tools),
 reports only those that are in the diff for the current pull request.
 Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 [Documentation](ci-lint-diff) at top of file.
+-->
 
 ### ci-last-success.py
 
 Prints the SHA commit id corresponding to the most recent successful CI job.
 [Documentation](ci-last-success.py) at top of file.
-
-## Git version control
-
-**The maintained version of these scripts is in <https://github.com/plume-lib/git-scripts>.
-The scripts will be removed from the plume-scripts repository in the future.**
-
-### ediff-merge-script
-
-A script for use as a git mergetool; runs Emacs ediff as the mergetool.
-[Documentation](ediff-merge-script) at top of file.
-
-### git-authors
-
-Lists all the authors of commits in a git repository.
-[Documentation](git-authors) at top of file.
-
-### git-clone-related
-
-This script has been superseded by `git-clone-related`
-in the [git-scripts](https://github.com/plume-lib/git-scripts) repository.
-
-Clones a repository related to the one where this script is called, trying
-to match the fork and branch.
-Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
-[Documentation](git-clone-related) at top of file.
-
-Suppose you have two related Git repositories:\
-  *MY-ORG*`/`*MY-REPO*\
-  *MY-ORG*`/`*MY-OTHER-REPO*
-
-In a CI job that is testing branch BR in fork F of *MY-REPO*,
-you would like to use fork F of *MY-OTHER-REPO* if it exists,
-and you would like to use branch BR if it exists.
-Here is how to accomplish that:
-
-```sh
-if [ -d "/tmp/$USER/plume-scripts" ] ; then
-  git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
-else
-  mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
-fi
-/tmp/$USER/plume-scripts/git-clone-related codespecs fjalar
-```
-
-### git-find-fork
-
-Finds a fork of a GitHub repository, or returns the upstream repository
-if the fork does not exist.
-[Documentation](git-find-fork) at top of file.
-
-### git-find-branch
-
-Tests whether a branch exists in a Git repository;
-prints the branch, or prints "master" if the branch does not exist.
-[Documentation](git-find-branch) at top of file.
-
-### resolve-adjacent-conflicts
-
-Edits files in place to resolve git conflicts that arise from edits to
-adjacent lines.
-[Documentation](resolve-adjacent-conflicts) at top of file.
-
-### resolve-blank-lines
-
-Edits files in place to resolve git conflicts that arise from differences in
-blank lines and whitespace.
-[Documentation](resolve-blank-lines) at top of file.
-
-### resolve-import-conflicts
-
-Edits files in place to resolve git conflicts that arise from Java `import`
-statements.
-[Documentation](resolve-import-conflicts) at top of file.
 
 ## Search and replace
 

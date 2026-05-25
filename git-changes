@@ -10,7 +10,7 @@
 #   else
 #     mkdir -p /tmp && git -C /tmp clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
 #   fi
-#   eval "$(/tmp/plume-scripts/git-change-info DEFAULT-ORGANIZATION)"
+#   eval "$(/tmp/plume-scripts/git-changes DEFAULT-ORGANIZATION)"
 #
 # Alternatively, to use a specific version of this script rather than the latest:
 #
@@ -18,7 +18,7 @@
 #     mkdir -p /tmp/$USER
 #     git -C /tmp/$USER clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git
 #   fi
-#   eval "$(/tmp/plume-scripts/git-change-info DEFAULT-ORGANIZATION)"
+#   eval "$(/tmp/plume-scripts/git-changes DEFAULT-ORGANIZATION)"
 
 # Either snippet of code sets these variables:
 # CI_COMMIT_RANGE: An argument to `git diff` with the range of commits IDs.
@@ -35,9 +35,9 @@
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
 
-# PROBLEM: The directory from which git-change-info is running must override environment
+# PROBLEM: The directory from which git-changes is running must override environment
 # variables, because a CI job may itself call "git clone" and then later call
-# git-change-info from that clone.  Idea: check the directory name.
+# git-changes from that clone.  Idea: check the directory name.
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
@@ -155,7 +155,6 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
-    CI_ACCESSED_GITHUB_API=true
     SLUG=$(echo "${pull_json}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
       echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
@@ -182,7 +181,6 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
-  CI_ACCESSED_GITHUB_API=true
   CI_ORGANIZATION=$(echo "${pull_json}" | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request"
@@ -211,7 +209,6 @@ fi
 if [ "$DEBUG" = "--debug" ]; then
   echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
 fi
-
 
 ### Other information (besides organization)
 
@@ -489,6 +486,20 @@ if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   # The start and end commits could still be the same, if the current branch was cloned with
   # --depth=1.
   CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+fi
+
+if [ "$VERBOSE" = "--verbose" ]; then
+  if [ -n "${pull_json}" ]; then
+    echo "echo CI_ACCESSED_GITHUB_API=true;"
+  else
+    echo "echo CI_ACCESSED_GITHUB_API=false;"
+  fi
+fi
+
+if [ "$VERBOSE" = "--verbose" ]; then
+  echo 'echo ---------------- start of first 10000 lines of diff:'
+  git --no-pager diff "${CI_COMMIT_RANGE}" | head --lines=10000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+  echo 'echo ---------------- end of first 10000 lines of diff.'
 fi
 
 # The diff might be empty if the last commit is the revert of the one before it.

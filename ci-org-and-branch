@@ -124,7 +124,6 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
-    CI_ACCESSED_GITHUB_API=true
     SLUG=$(echo "${pull_json}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
       echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
@@ -151,7 +150,6 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
-  CI_ACCESSED_GITHUB_API=true
   CI_ORGANIZATION=$(echo "${pull_json}" | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request"
@@ -233,7 +231,6 @@ elif [ -n "$CIRCLECI" ]; then
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}")"
-    CI_ACCESSED_GITHUB_API=true
     CI_BRANCH=$(echo "${pull_json}" | jq -r '.head.ref')
   else
     CI_BRANCH=$CIRCLE_BRANCH
@@ -276,7 +273,6 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}")"
-    CI_ACCESSED_GITHUB_API=true
     CI_BRANCH=$(echo "${pull_json}" | jq -r '.head.ref')
   fi
 
@@ -299,6 +295,14 @@ if [ "$DEBUG" = "--debug" ]; then
   echo "echo CI_BRANCH=${CI_BRANCH};"
 fi
 
+if [ "$VERBOSE" = "--verbose" ]; then
+  if [ -n "${pull_json}" ]; then
+    echo "echo CI_ACCESSED_GITHUB_API=true;"
+  else
+    echo "echo CI_ACCESSED_GITHUB_API=false;"
+  fi
+fi
+
 ### Print it out
 
 if [ "$VERBOSE" = "--verbose" ]; then
@@ -309,8 +313,3 @@ if [ "$VERBOSE" = "--verbose" ]; then
   echo "echo CI_BRANCH=$CI_BRANCH;"
 fi
 echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
-# I could check ${pull_json} instead of having a separate variable.
-if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_ACCESSED_GITHUB_API=$CI_ACCESSED_GITHUB_API;"
-fi
-echo "CI_ACCESSED_GITHUB_API=$CI_ACCESSED_GITHUB_API; export CI_ACCESSED_GITHUB_API;"
