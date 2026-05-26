@@ -37,7 +37,7 @@ SCRIPT_NAME="$(basename -- "$0")"
 
 DEBUG=""
 DEFAULT_ORGANIZATION=""
-while [ "$#" -gt 1 ]; do
+while [ "$#" -gt 0 ]; do
   case $1 in
     --verbose)
       VERBOSE="--verbose"
