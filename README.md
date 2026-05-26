@@ -5,7 +5,6 @@ This project contains utilities for:
 
 * [Shell scripting](#shell-scripting)
 * [Continuous integration](#continuous-integration)
-* [Git version control](#git-version-control)
 * [Search and replace](#search-and-replace)
 * [Sorting](#sorting)
 * [Java](#java)

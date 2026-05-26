@@ -36,24 +36,30 @@
 SCRIPT_NAME="$(basename -- "$0")"
 
 DEBUG=""
-if [ "$1" = "--verbose" ]; then
-  VERBOSE="--verbose"
+DEFAULT_ORGANIZATION=""
+while [ "$#" -gt 1 ]; do
+  case $1 in
+    --verbose)
+      VERBOSE="--verbose"
+      ;;
+    --debug)
+      DEBUG="--debug"
+      VERBOSE="--verbose"
+      ;;
+    *)
+      if [ -n "${DEFAULT_ORGANIZATION}" ]; then
+        usage="Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
+        echo "echo \"$usage\";"
+        echo "$usage" >&2
+        echo "exit 2"
+        exit 2
+      else
+        DEFAULT_ORGANIZATION="$1"
+      fi
+      ;;
+  esac
   shift
-fi
-
-if [ "$1" = "--debug" ]; then
-  DEBUG="--debug"
-  VERBOSE="--verbose"
-  shift
-fi
-
-if [ "$#" -gt 1 ]; then
-  usage="Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
-  echo "echo \"$usage\";"
-  echo "$usage" >&2
-  echo "exit 2"
-  exit 2
-fi
+done
 
 if [ "$DEBUG" = "--debug" ]; then
   # `env` only prints EXPORTED variables, so `set` is usually more useful.
@@ -147,12 +153,13 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   # GitHub Actions pull request
 
   # TODO: Can I implement this without a GitHub API request?
+  # Is GITHUB_ACTOR equal to CI_ORGANIZATION, maybe??  (Need to observe beyond mernst.)
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1)"
   CI_ORGANIZATION=$(echo "${pull_json}" | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo GitHub Actions pull request"
+    echo "echo GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
@@ -172,7 +179,7 @@ fi
 
 ## Default
 if [ -z "$CI_ORGANIZATION" ]; then
-  CI_ORGANIZATION=$1
+  CI_ORGANIZATION="${DEFAULT_ORGANIZATION}"
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
