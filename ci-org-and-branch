@@ -130,7 +130,7 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1 | tr -d '[:cntrl:]')"
-    SLUG=$(echo "${pull_json}" | jq .head.label | sed 's/"//g')
+    SLUG=$(printf '%s' "${pull_json}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
       echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
       if [ -n "${auth_header_option}" ]; then
@@ -138,7 +138,7 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       fi
       echo "echo ---- start of wget output ----"
       # shellcheck disable=SC2001
-      echo "${pull_json}" | sed -e 's/^/echo /'
+      printf '%s' "${pull_json}" | sed -e 's/^/echo /'
       echo "echo ---- end of wget output ----"
       exit 2
     fi
@@ -157,7 +157,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1 | tr -d '[:cntrl:]')"
-  CI_ORGANIZATION=$(echo "${pull_json}" | jq '.head.repo.owner.login')
+  CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
@@ -238,7 +238,7 @@ elif [ -n "$CIRCLECI" ]; then
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}" | tr -d '[:cntrl:]')"
-    CI_BRANCH=$(echo "${pull_json}" | jq -r '.head.ref')
+    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
   else
     CI_BRANCH=$CIRCLE_BRANCH
   fi
@@ -280,7 +280,7 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
     pull_json="$(${GET_URL_TO_STDOUT} "${url}" | tr -d '[:cntrl:]')"
-    CI_BRANCH=$(echo "${pull_json}" | jq -r '.head.ref')
+    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
   fi
 
 else
