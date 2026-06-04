@@ -249,13 +249,13 @@ def diff_filenames(diff_filename: str) -> set[str]:
         All the filenames in the given diff file.
     """
     try:
-        return diff_filenames(diff_filename, "utf-8")
+        return diff_filenames_with_encoding(diff_filename, "utf-8")
     except UnicodeDecodeError:
         # Fall back to latin1 encoding.
-        return diff_filenames(diff_filename, "iso-8859-1")
+        return diff_filenames_with_encoding(diff_filename, "iso-8859-1")
 
 
-def diff_filenames(diff_filename: str, encoding: str) -> set[str]:
+def diff_filenames_with_encoding(diff_filename: str, encoding: str) -> set[str]:
     """All the filenames in the given diff file.
 
     Returns:
