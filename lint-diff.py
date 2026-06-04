@@ -89,7 +89,7 @@ def main() -> None:
         warnings = sys.stdin
     else:
         # pylint: disable=consider-using-with
-        warnings = warning_path.open(encoding="utf-8")
+        warnings = warning_path.open(encoding=encoding(warning_path))
 
     # 1 if this produced any output, 0 if not.
     status = 0
@@ -248,21 +248,8 @@ def diff_filenames(diff_filename: str) -> set[str]:
     Returns:
         All the filenames in the given diff file.
     """
-    try:
-        return diff_filenames_with_encoding(diff_filename, "utf-8")
-    except UnicodeDecodeError:
-        # Fall back to latin1 encoding.
-        return diff_filenames_with_encoding(diff_filename, "iso-8859-1")
-
-
-def diff_filenames_with_encoding(diff_filename: str, encoding: str) -> set[str]:
-    """All the filenames in the given diff file.
-
-    Returns:
-        All the filenames in the given diff file.
-    """
     result = set()
-    with Path(diff_filename).open(encoding=encoding) as diff:
+    with Path(diff_filename).open(encoding=encoding(diff_filename)) as diff:
         for diff_line in diff:
             match = PLUSPLUSPLUS_RE.match(diff_line)
             if match:
@@ -279,7 +266,7 @@ def warning_filenames(warning_filename: str) -> set[str]:
         All the filenames in the given warning file.
     """
     result = set()
-    with Path(warning_filename).open(encoding="utf-8") as warnings:
+    with Path(warning_filename).open(encoding=encoding(warning_filename)) as warnings:
         for warning_line in warnings:
             match = FILENAME_LINENO_RE.match(warning_line)
             if match:
@@ -468,7 +455,7 @@ def changed_lines(args: argparse.Namespace) -> dict[str, set[int]]:
     """
     changed: dict[str, set[int]] = {}
 
-    with Path(args.diff_filename).open(encoding="utf-8") as diff:
+    with Path(args.diff_filename).open(encoding=encoding(args.diff_filename)) as diff:
         atat_re = re.compile(r"@@ -([0-9]+)(,[0-9]+)? \+([0-9]+)(,[0-9]+)? @@.*")
         # content_re = re.compile("[ +-].*")
 
@@ -537,12 +524,29 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
         result = True
         if DEBUG:
             eprint(f"lint-diff.py: diff file {args.diff_filename}:")
-            eprint("{}", Path(args.diff_filename).read_text(encoding="utf-8"))
+            eprint("{}", Path(args.diff_filename).read_text(encoding=encoding(args.diff_filename)))
             eprint(f"lint-diff.py: lint file {args.warning_filename}:")
-            eprint("{}", Path(args.warning_filename).read_text(encoding="utf-8"))
+            eprint(
+                "{}",
+                Path(args.warning_filename).read_text(encoding=encoding(args.warning_filename)),
+            )
             eprint("lint-diff.py: end of input files.")
 
     return result
+
+
+# As an alternative, could use the `chardet` package, but I don't want external dependencies.
+def encoding(file_path):
+    """Detect the encoding of a file.
+
+    Returns:
+        "utf-8" if the file is encoded using UTF-8, "iso-8859-1" otherwise.
+    """
+    try:
+        Path(file_path).read_bytes().decode("utf-8")
+        return "utf-8"
+    except UnicodeDecodeError:
+        return "iso-8859-1"
 
 
 if __name__ == "__main__":
