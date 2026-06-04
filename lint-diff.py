@@ -248,8 +248,21 @@ def diff_filenames(diff_filename: str) -> set[str]:
     Returns:
         All the filenames in the given diff file.
     """
+    try:
+        return diff_filenames(diff_filename, "utf-8")
+    except UnicodeDecodeError:
+        # Fall back to latin1 encoding.
+        return diff_filenames(diff_filename, "iso-8859-1")
+
+
+def diff_filenames(diff_filename: str, encoding: str) -> set[str]:
+    """All the filenames in the given diff file.
+
+    Returns:
+        All the filenames in the given diff file.
+    """
     result = set()
-    with Path(diff_filename).open(encoding="utf-8") as diff:
+    with Path(diff_filename).open(encoding=encoding) as diff:
         for diff_line in diff:
             match = PLUSPLUSPLUS_RE.match(diff_line)
             if match:
