@@ -431,7 +431,7 @@ else
 ifeq (,${SHFMT_EXISTS})
 	@echo "skipping shfmt because it is not installed"
 else
-	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (shfmt --version && false)
+	@${SHELL_BKT_COMMAND} ${PLUME_SCRIPTS}/cronic shfmt -w -i 2 -ci -bn -sr ${SH_AND_BASH_SCRIPTS} || (echo -s "shfmt version " && shfmt --version && false)
 endif
 ifeq (,${SHELLCHECK_EXISTS})
 	@echo "skipping shellcheck because it is not installed"
