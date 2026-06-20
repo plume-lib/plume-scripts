@@ -32,6 +32,11 @@ jobs:
             sudo apt install golang-go
             go install mvdan.cc/sh/v3/cmd/shfmt@latest
       - run:
+          name: Install shfmt; `apt install shfmt` is version 3.8.0, which is quite old
+          command: |
+            sudo apt install golang-go
+            go install mvdan.cc/sh/v3/cmd/shfmt@latest
+      - run:
           name: Install uv
           command: curl -LsSf https://astral.sh/uv/install.sh | sh
 
