@@ -39,18 +39,18 @@ QUICK EXAMPLE
 
        Note that in the case of these examples, the -w (list whole-words only)
        option  would  be  useful.   And  if your terminal supports ANSI escape
-       sequences, you can use -bold to higlight the items found.  Furthermore,
+       sequences, you can use -bold to highlight the items found. Furthermore,
        if your display supports color as well, you can use -red, -green, -yel-
        low, etc. instead to have the searched  items  marked  with  the  given
        color.
 
        Normally, various kinds of files are automatically removed from consid-
-       eration.  If it has has a certain ending (such as ".tar",  ".Z",  ".o",
-       .etc),  or  if  the beginning of the file looks like a binary, it'll be
-       excluded.  You can control exactly how this works  --  see  below.  One
-       quick  way  to  override this is to use the -all option, which means to
-       consider all the files that would normally be  automatically  excluded.
-       Or,  if you're curious, you can use -why to have notes about what files
+       eration.   If it  has a  certain ending  (such as  ".tar", ".Z",  ".o",
+       .etc), or if  the beginning of the  file looks like a  binary, it'll be
+       excluded.  You  can control exactly how  this works -- see  below.  One
+       quick way to  override this is to  use the -all option,  which means to
+       consider all the  files that would normally  be automatically excluded.
+       Or, if you're curious, you can use  -why to have notes about what files
        are skipped (and why) printed to stderr.
 
 
@@ -64,7 +64,7 @@ BASIC OVERVIEW
            -skip .o .Z .gif
        (among others) to exclude those kinds of files (which you probably want
        to skip when searching for text, as is normal).  Files that look to  be
-       be binary will also be excluded.
+       binary will also be excluded.
 
        Files  ending  with  "#"  and  "~" will also be excluded unless the -x~
        option is given.
@@ -314,7 +314,7 @@ GREP-LIKE OPTIONS
               contain  matching  lines.  This will likely be *much* faster, as
               special optimizations are made -- particularly with large files.
 
-       -n     Pepfix each line by its line number.
+       -n     Prefix each line by its line number.
 
        -nice  Not  a grep-like option, but similar to -list, so included here.
               -nice will have the output be a bit  more  human-readable,  with
@@ -378,7 +378,7 @@ OTHER OPTIONS
        -v     Set the level of message verbosity.  -v will print a note  when-
               ever  a  new  directory  is entered.  -vv will also print a note
               "every so often". This can be useful  to  see  what's  happening
-              when  searching  huge  directories.   -vvv will print a new with
+              when  searching  huge  directories.  -vvv will print a note with
               every file.  -vvvv is -vvv plus -why.
 
        -e     This ends the options, and can be useful  if  the  regex  begins
@@ -441,7 +441,7 @@ STARTUP FILE
               be  in  the  variable  $N,  but remember that files excluded via
               -skip, etc., won't even be considered for a  filter).  If  true,
               the  COMMAND  will  be  executed and its standard-output will be
-              checked. ``%'' in the command string  will  be  replace  by  the
+              checked. ``%'' in the command string  will  be  replaced by  the
               filename.
 
               The  most  common  example  would be to uncompress a file on the
@@ -450,7 +450,7 @@ STARTUP FILE
               Note that had the ``zcat'' been ``gunzip'' instead, you'd uncom-
               press  your  files  in  place instead of searching them, so take
               care when specifying a filter! If you're worried about mixing up
-              GNU'z zcat with an old one, you might use seperate ones as with:
+              GNU's zcat with an old one, you might use separate ones as with:
                  filter: $N =~ m/.gz$/ : "/my/GNU/binaries/zcat %"
                  filter: $N =~ m/.Z$/ : "/the/non-GNU/binaries/zcat %"
 

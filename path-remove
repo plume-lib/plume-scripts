@@ -3,7 +3,7 @@
 # Shorten a path environment variable by removing duplicates and
 # non-existent directories.
 # With optional argument "-r REGEXP", removes any matching path element.
-# Works for either space- or colon- delimiated paths.
+# Works for either space- or colon-delimited paths.
 # Usage:
 #   # csh
 #   setenv PATH `echo $PATH | .../plume-scripts/path-remove`

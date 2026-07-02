@@ -32,7 +32,7 @@
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
 
-# Alternatives:  The grable-git-properties plugin automatically detects branch
+# Alternatives:  The gradle-git-properties plugin automatically detects branch
 # names from various CI environments.
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"

@@ -230,7 +230,7 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
   # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge".
   CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
   # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
-  # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that instead of
+  # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that because
   # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
   CI_COMMIT_RANGE_START=$(head1)
   CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
@@ -273,7 +273,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
     #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
     #   elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
     #     # The commit is not in the repository.  Maybe it is older than the
-    #     # commits pulled into this repository.  This can happen when when
+    #     # commits pulled into this repository.  This can happen when
     #     # api.github.com incorrectly returns "state: pending" for successful
     #     # jobs.
     #     echo "echo \"WARNING: ci-last-success.py script returned commit not in repository; using last commit.\";"

@@ -125,7 +125,7 @@ def main() -> None:
             ):
                 if not relative_diff_warned:
                     eprint(
-                        # No spaces around string literals becaues this is `eprint`.
+                        # No spaces around string literals because this is `eprint`.
                         "warning:",
                         args.diff_filename,
                         "uses relative paths but",
