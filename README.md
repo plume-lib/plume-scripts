@@ -59,7 +59,7 @@ at top of file.
 Cleans up a path environment variable by removing duplicates and
 non-existent directories.
 Can optionally remove certain path elements.
-Works for either space- or colon- delimiated paths.
+Works for either space- or colon-delimited paths.
 [Documentation](path-remove) at top of file.
 
 ## Continuous integration

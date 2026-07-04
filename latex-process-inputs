@@ -37,7 +37,7 @@
 # there are no more \input commands.  The script does not know which file a
 # given \input command came from.  The solution is to rewrite the script to
 # work line-by-line.  That will also do a better job of not handling \input
-# and %-comments in verbatm-included files.
+# and %-comments in verbatim-included files.
 # Writing a test suite would help with validating this change.
 
 use Cwd;

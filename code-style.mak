@@ -6,7 +6,7 @@
 
 # This Makefile fragment defines targets:
 # * style-check : runs a linter on all HTML, Markdown, Python, Shell, and YAML
-#   files in or under the current.
+#   files in or under the current directory.
 # * style-fix : fixes linting problems, where possible.  Not all can be fixed.
 # * plume-scripts-update : updates the linting rules to the latest version.
 

@@ -1,7 +1,7 @@
 [project]
 name = "plume-scripts"
 version = "0.1.0"
-description = "Add your description here"
+description = "Scripts for programming and system administration"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

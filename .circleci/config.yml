@@ -27,7 +27,7 @@ jobs:
           command: sudo apt -y install devscripts shellcheck yamllint
       - run:
           name: Install shfmt.  In image cimg/python:3.14, `apt install shfmt` is version 3.8.0, which is quite old.
-          # Alternately, can use apt if we used a different docker image.
+          # Alternatively, can use apt if we used a different docker image.
           command: |
             sudo apt install golang-go
             go install mvdan.cc/sh/v3/cmd/shfmt@latest

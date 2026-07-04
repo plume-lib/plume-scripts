@@ -48,7 +48,7 @@ $version = "960908.11";
 ##   From Lionel Cons a few bug fixes and cool emacs interface:
 ##
 ##    ``Also, I integrated search in Emacs so that I can use "M-x search"
-##      and then "C-x `" to browse through the occurences (like grep).
+##      and then "C-x `" to browse through the occurrences (like grep).
 ##      Here is the code that I use:
 ##
 ##        (defun search (dir what) "Run search with all grep goodies."
@@ -636,7 +636,7 @@ sub import_program
     close(DATA);
 
     ## Inline uppercase $-variables by their current values, removing
-    ## any preceeding eval if applicable
+    ## any preceding eval if applicable
     if ($] >= 5) {
         eval '
 	    $prog =~ s/(?:\beval\s*)?\$([A-Z][A-Z0-9_]{2,}\b)/
@@ -893,7 +893,7 @@ sub dummy {
 ## all in upper case, specifically, any string matching
 ##	\$([A-Z][A-Z0-9_]{2,}\b
 ## will have the true value for that variable inlined. Also, any 'eval'
-## immediately preceeding one of the inlined variables is removed.
+## immediately preceding one of the inlined variables is removed.
 ##
 ##
 ## The idea is that when the whole thing is then eval'ed to define &dodir,
@@ -1302,7 +1302,7 @@ Note that in the case of these examples, the
 (list whole-words only) option would be useful.
 And if your terminal supports ANSI escape sequences, you can use
 .B \-bold
-to higlight the items found. Furthermore, if your display supports
+to highlight the items found. Furthermore, if your display supports
 color as well, you can use
 .BR \-red ,
 .BR \-green ,
@@ -1310,7 +1310,7 @@ color as well, you can use
 etc. instead to have the searched items marked with the given color.
 .PP
 Normally, various kinds of files are automatically removed from consideration.
-If it has has a certain ending (such as ".tar", ".Z", ".o", .etc), or if
+If it has a certain ending (such as ".tar", ".Z", ".o", .etc), or if
 the beginning of the file looks like a binary, it'll be excluded.
 You can control exactly how this works -- see below. One quick way to
 override this is to use the
@@ -1335,7 +1335,7 @@ add
 .fi
 (among others) to exclude those kinds of files (which you probably want to
 skip when searching for text, as is normal).
-Files that look to be be binary will also be excluded.
+Files that look to be binary will also be excluded.
 
 Files ending with "#" and "~" will also be excluded unless the
 .B -x~
@@ -1681,7 +1681,7 @@ lines. This will likely be *much* faster, as special optimizations are
 made -- particularly with large files.
 .TP
 .B -n
-Pepfix each line by its line number.
+Prefix each line by its line number.
 .TP
 .B -nice
 Not a grep-like option, but similar to
@@ -1774,7 +1774,7 @@ will print a note whenever a new directory is entered.
 will also print a note "every so often". This can be useful to see
 what's happening when searching huge directories.
 .B -vvv
-will print a new with every file.
+will print a note with every file.
 .B -vvvv
 is
 -vvv
@@ -1864,7 +1864,7 @@ files excluded via
 etc., won't even be considered for a filter). If true, the
 .I COMMAND
 will be executed and its standard-output will be checked. ``\fB%\fP'' in the
-command string will be replace by the filename.
+command string will be replaced by the filename.
 
 The most common example would be to uncompress a file on the fly, i.e.
 .nf
@@ -1873,7 +1873,7 @@ The most common example would be to uncompress a file on the fly, i.e.
 Note that had the ``\fBzcat\fP'' been ``\fBgunzip\fP'' instead, you'd
 uncompress your files in place instead of searching them, so take care when
 specifying a filter! If you're worried about mixing up GNU's zcat with
-an old one, you might use seperate ones as with:
+an old one, you might use separate ones as with:
 .nf
    filter: $N =~ m/\.gz$/ : "/my/GNU/binaries/zcat %"
    filter: $N =~ m/\.Z$/ : "/the/non-GNU/binaries/zcat %"
