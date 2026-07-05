@@ -54,8 +54,12 @@ if [ "$DEBUG" = "--debug" ]; then
   git log --graph | head --lines=10000
 fi
 
+# Temporarily disable "set -e" so a failure of git-changes is handled below
+# rather than aborting this script (which would skip the diagnostics).
+set +e
 git_changes_output="$("${SCRIPT_DIR}"/git-changes)"
 git_changes_status_code=$?
+set -e
 if [ "$git_changes_status_code" -ne 0 ]; then
   echo "git-changes failed with status $git_changes_status_code"
   echo "---- git-changes output ----"
@@ -181,7 +185,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   ls -l /tmp/
   echo
   echo "Contents of /tmp:"
-  cat more /tmp/*
+  cat /tmp/*
   echo
   echo "Environment:"
   env | sort

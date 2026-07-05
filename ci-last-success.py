@@ -24,7 +24,10 @@ DEBUG = False
 # DEBUG=True
 
 if len(sys.argv) != 3 and len(sys.argv) != 4:
-    print(f"Wrong number of arguments {len(sys.argv) - 1}, expected 2 or 3")
+    print(
+        f"Wrong number of arguments {len(sys.argv) - 1}, expected 2 or 3",
+        file=sys.stderr,
+    )
     sys.exit(2)
 
 org = sys.argv[1]
