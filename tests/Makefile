@@ -1,3 +1,5 @@
+.PHONY: test clean
+
 test:
 	${MAKE} -C jacoco-coverage-ratchet-test test
 	${MAKE} -C lint-diff-test test
