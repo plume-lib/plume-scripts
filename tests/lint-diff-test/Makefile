@@ -1,3 +1,5 @@
+.PHONY: test clean
+
 test: test-words test-reldir test-guessstrip test-javaexception
 
 
