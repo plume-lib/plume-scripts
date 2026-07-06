@@ -103,6 +103,6 @@ if False:
 errors = list(map(itemgetter(0), groupby(errors)))
 
 
-print(prefix)
+print(prefix, end="")
 for error in errors:
     print(error, end="")
