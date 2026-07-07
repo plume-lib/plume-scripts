@@ -160,7 +160,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1 | tr -d '[:cntrl:]')"
-  CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq '.head.repo.owner.login')
+  CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq -r '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
     echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"

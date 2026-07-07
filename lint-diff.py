@@ -407,7 +407,7 @@ def parse_args() -> argparse.Namespace:
         "--debug", dest="DEBUG", action="store_true", help="print diagnostic output"
     )
     parser.add_argument("diff_filename", metavar="diff.txt", default=Path.cwd())
-    parser.add_argument("warning_filename", metavar="warnings.txt", default=None)
+    parser.add_argument("warning_filename", metavar="warnings.txt", nargs="?", default=None)
 
     args = parser.parse_args()
     DEBUG = args.DEBUG
@@ -461,28 +461,41 @@ def changed_lines(args: argparse.Namespace) -> dict[str, set[int]]:
 
         filename = ""
         lineno = -1000000
+        # Number of old-side and new-side lines remaining in the current hunk.
+        # While either is positive, the current line is a hunk body line (which
+        # starts with " ", "+", or "-") and must not be mistaken for a header
+        # such as "+++"/"---" -- an added line whose content starts with "++ "
+        # would otherwise look like a "+++ " file header.
+        remaining_old = 0
+        remaining_new = 0
         for diff_line in diff:
-            if diff_line.startswith("---"):
+            if remaining_old <= 0 and remaining_new <= 0:
+                # Not inside a hunk body: look for headers.
+                if diff_line.startswith("---"):
+                    continue
+                match = PLUSPLUSPLUS_RE.match(diff_line)
+                if match:
+                    if match.group(1).startswith("b/"):  # heuristic
+                        args.relative_diff = diff_line
+                    try:
+                        filename = strip_dirs(match.group(1), args.strip_diff)
+                    except TypeError:
+                        filename = "diff filename above common directory"
+                        ## Not an error; it just means this file doesn't appear in warnings output.
+                        # eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(
+                        #   strip_diff, match.group(1)))
+                        # sys.exit(2)
+                    if filename not in changed:
+                        changed[filename] = set()
+                    continue
+                match = atat_re.match(diff_line)
+                if match:
+                    lineno = int(match.group(3))
+                    remaining_old = int(match.group(2)[1:]) if match.group(2) else 1
+                    remaining_new = int(match.group(4)[1:]) if match.group(4) else 1
+                    continue
                 continue
-            match = PLUSPLUSPLUS_RE.match(diff_line)
-            if match:
-                if match.group(1).startswith("b/"):  # heuristic
-                    args.relative_diff = diff_line
-                try:
-                    filename = strip_dirs(match.group(1), args.strip_diff)
-                except TypeError:
-                    filename = "diff filename above common directory"
-                    ## It's not an error; it just means this file doesn't appear in warnings output.
-                    # eprint('Bad --strip-diff={0} ; line has fewer "/": {1}'.format(
-                    #   strip_diff, match.group(1)))
-                    # sys.exit(2)
-                if filename not in changed:
-                    changed[filename] = set()
-                continue
-            match = atat_re.match(diff_line)
-            if match:
-                lineno = int(match.group(3))
-                continue
+            # Inside a hunk body.
             if diff_line.startswith("+"):
                 # Not just the changed line: changed[filename].add(lineno)
                 for changed_lineno in range(
@@ -490,14 +503,19 @@ def changed_lines(args: argparse.Namespace) -> dict[str, set[int]]:
                 ):
                     changed[filename].add(changed_lineno)
                 lineno += 1
-            if diff_line.startswith(" "):
-                lineno += 1
-            if diff_line.startswith("-"):
+                remaining_new -= 1
+            elif diff_line.startswith("-"):
                 for changed_lineno in range(
                     lineno - args.context_lines, lineno + args.context_lines
                 ):
                     changed[filename].add(changed_lineno)
-                continue
+                remaining_old -= 1
+            elif diff_line.startswith(" "):
+                lineno += 1
+                remaining_old -= 1
+                remaining_new -= 1
+            # Any other line (e.g., "\ No newline at end of file") is left as-is
+            # and does not consume a hunk line.
 
     return changed
 

@@ -58,7 +58,7 @@ if ((@ARGV[0] eq "-help") || (@ARGV[0] eq "--help")) {
   shift @ARGV;
 } elsif ((@ARGV[0] eq "-antlist") || (@ARGV[0] eq "--antlist")) {
   $list_mode = 1;
-  $makefile_list_mode = 1;
+  $ant_list_mode = 1;
   shift @ARGV;
 } elsif ((@ARGV[0] eq "-makefilelist") || (@ARGV[0] eq "--makefilelist")) {
   $list_mode = 1;

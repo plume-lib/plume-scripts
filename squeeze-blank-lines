@@ -22,8 +22,8 @@ processed_data=$(cat -s "$input" \
 # 3. Determine the output destination.
 if [ -n "$1" ]; then
   # If a file was provided, write back to it (in-place)
-  echo "$processed_data" > "$1"
+  printf '%s\n' "$processed_data" > "$1"
 else
   # Otherwise, output to stdout
-  echo "$processed_data"
+  printf '%s\n' "$processed_data"
 fi

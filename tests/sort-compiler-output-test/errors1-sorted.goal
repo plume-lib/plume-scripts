@@ -17,7 +17,6 @@ mvn -B package -Dmaven.test.skip=true -Danimal.sniffer.skip=true -P checkerframe
 [INFO] --- maven-compiler-plugin:3.8.1:compile (value-check) @ guava ---
 [INFO] Changes detected - recompiling the module!
 [INFO] Compiling 619 source files to /home/mernst/research/types/libraries/guava-fork-typetools/guava/target/classes
-
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/base/Absent.java:[64,32] [[signedness, allcheckers]:type.argument] incompatible type argument for type parameter T of Supplier.
   found   : capture#0220 extends T extends @UnknownSignedness Object
   required: @Signed Object
