@@ -86,17 +86,14 @@
     <rule ref="category/java/codestyle.xml/FinalParameterInAbstractMethod" />
     <rule ref="category/java/codestyle.xml/ForLoopShouldBeWhileLoop" />
     <rule ref="category/java/codestyle.xml/LambdaCanBeMethodReference" />
-    <rule ref="category/java/codestyle.xml/LinguisticNaming" />
     <rule ref="category/java/codestyle.xml/LocalHomeNamingConvention" />
     <rule ref="category/java/codestyle.xml/LocalInterfaceSessionNamingConvention" />
     <rule ref="category/java/codestyle.xml/MDBAndSessionBeanNamingConvention" />
     <rule ref="category/java/codestyle.xml/ModifierOrder" />
     <rule ref="category/java/codestyle.xml/NoPackage" />
     <rule ref="category/java/codestyle.xml/PackageCase" />
-    <rule ref="category/java/codestyle.xml/PrematureDeclaration" />
     <rule ref="category/java/codestyle.xml/RemoteInterfaceNamingConvention" />
     <rule ref="category/java/codestyle.xml/RemoteSessionInterfaceNamingConvention" />
-    <rule ref="category/java/codestyle.xml/TooManyStaticImports" />
     <rule ref="category/java/codestyle.xml/UnnecessaryAnnotationValueElement" />
     <rule ref="category/java/codestyle.xml/UnnecessaryBoxing" />
     <rule ref="category/java/codestyle.xml/UnnecessaryFullyQualifiedName" />
@@ -111,11 +108,13 @@
 
     <!-- code style rules that might be useful, but generate too much noise for now
     <rule ref="category/java/codestyle.xml/CallSuperInConstructor" />
-    <rule ref="category/java/codestyle.xml/CommentDefaultAccessModifier" />
     <rule ref="category/java/codestyle.xml/ConfusingTernary" />
     <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass" />
+    <rule ref="category/java/codestyle.xml/LinguisticNaming" />
     <rule ref="category/java/codestyle.xml/LocalVariableCouldBeFinal" />
     <rule ref="category/java/codestyle.xml/MethodArgumentCouldBeFinal" />
+    <rule ref="category/java/codestyle.xml/PrematureDeclaration" />
+    <rule ref="category/java/codestyle.xml/UselessParentheses" />
      -->
 
     <!-- code style rules that seem to be broken
@@ -126,6 +125,7 @@
 
     <!-- code style rules we are not using
     <rule ref="category/java/codestyle.xml/ClassNamingConventions" />
+    <rule ref="category/java/codestyle.xml/CommentDefaultAccessModifier" />
     <rule ref="category/java/codestyle.xml/FieldNamingConventions" />
     <rule ref="category/java/codestyle.xml/FormalParameterNamingConventions" />
     <rule ref="category/java/codestyle.xml/LocalVariableNamingConventions" />
@@ -136,6 +136,7 @@
     <rule ref="category/java/codestyle.xml/ShortMethodName" />
       Complains about "Type", "Node", etc.
     <rule ref="category/java/codestyle.xml/ShortVariable" />
+    <rule ref="category/java/codestyle.xml/TooManyStaticImports" />
     <rule ref="category/java/codestyle.xml/TypeParameterNamingConventions" />
     <rule ref="category/java/codestyle.xml/UnnecessaryModifier" />
       Redundant `public` can be useful.
@@ -353,7 +354,6 @@
     <rule ref="category/java/performance.xml/OptimizableToArrayCall" />
     <rule ref="category/java/performance.xml/StringInstantiation" />
     <rule ref="category/java/performance.xml/StringToString" />
-    <rule ref="category/java/performance.xml/TooFewBranchesForSwitch" />
     <rule ref="category/java/performance.xml/UseArrayListInsteadOfVector" />
     <rule ref="category/java/performance.xml/UseIndexOfChar" />
     <rule ref="category/java/performance.xml/UseIOStreamsWithApacheCommonsFileItem" />
@@ -366,6 +366,7 @@
     <rule ref="category/java/performance.xml/ConsecutiveAppendsShouldReuse" />
       It's not clear this helps, and "fluent" appends are harder to read.
     <rule ref="category/java/performance.xml/RedundantFieldInitializer" />  Explicit initializers are better style
+    <rule ref="category/java/performance.xml/TooFewBranchesForSwitch" />
     <rule ref="category/java/performance.xml/UseStringBufferForStringAppends" />
      -->
 
