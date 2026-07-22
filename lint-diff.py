@@ -161,7 +161,7 @@ def strip_dirs(filename: str, num_dirs: int) -> str:
     """
     if num_dirs == 0:
         return filename
-    return os.path.join(*(filename.split(os.path.sep)[num_dirs:]))  # noqa: PTH118
+    return os.path.join(*(filename.split(os.path.sep)[num_dirs:]))  # ruff:ignore[os-path-join]
 
 
 ## Tests:
