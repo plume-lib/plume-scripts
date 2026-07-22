@@ -180,7 +180,7 @@
     <rule ref="category/java/design.xml/ImmutableField" />
     <rule ref="category/java/design.xml/MutableStaticState" />
     -->
-    
+
     <!-- design rules we are not using
     <rule ref="category/java/design.xml/AvoidCatchingGenericException" />
     <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts" />
