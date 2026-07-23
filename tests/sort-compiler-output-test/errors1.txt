@@ -3,17 +3,17 @@ Compilation started at Wed May 31 11:53:25
 
 mvn -B package -Dmaven.test.skip=true -Danimal.sniffer.skip=true -P checkerframework-local
 [INFO] Scanning for projects...
-[INFO] 
+[INFO]
 [INFO] -----------------------< com.google.guava:guava >-----------------------
 [INFO] Building Guava: Google Core Libraries for Java 31.1-jre
 [INFO] -------------------------------[ bundle ]-------------------------------
-[INFO] 
+[INFO]
 [INFO] --- maven-enforcer-plugin:3.0.0-M3:enforce (enforce-versions) @ guava ---
-[INFO] 
+[INFO]
 [INFO] --- maven-dependency-plugin:3.1.1:properties (default) @ guava ---
-[INFO] 
+[INFO]
 [INFO] --- maven-dependency-plugin:3.1.1:unpack-dependencies (unpack-jdk-sources) @ guava ---
-[INFO] 
+[INFO]
 [INFO] --- maven-compiler-plugin:3.8.1:compile (value-check) @ guava ---
 [INFO] Changes detected - recompiling the module!
 [INFO] Compiling 619 source files to /home/mernst/research/types/libraries/guava-fork-typetools/guava/target/classes
@@ -36,10 +36,10 @@ mvn -B package -Dmaven.test.skip=true -Danimal.sniffer.skip=true -P checkerframe
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/hash/Striped64.java:[303,26] [removal] AccessController in java.security has been deprecated and marked for removal
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/reflect/Types.java:[369,19] [removal] AccessControlException in java.security has been deprecated and marked for removal
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/io/FileBackedOutputStream.java:[135,27] [removal] finalize() in Object has been deprecated and marked for removal
-[INFO] 
+[INFO]
 [INFO] --- maven-resources-plugin:3.3.0:resources (default-resources) @ guava ---
 [INFO] Copying 0 resource
-[INFO] 
+[INFO]
 [INFO] --- maven-compiler-plugin:3.8.1:compile (default-compile) @ guava ---
 [INFO] Changes detected - recompiling the module!
 [INFO] Compiling 619 source files to /home/mernst/research/types/libraries/guava-fork-typetools/guava/target/classes
@@ -10210,7 +10210,7 @@ mvn -B package -Dmaven.test.skip=true -Danimal.sniffer.skip=true -P checkerframe
   required: @Initialized @NonNull OutputStream
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/io/FileBackedOutputStream.java:[241,23] [[fbc, nullness, allcheckers]:dereference.of.nullable] dereference of possibly-null reference memory
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/io/FileBackedOutputStream.java:[241,46] [[fbc, nullness, allcheckers]:dereference.of.nullable] dereference of possibly-null reference memory
-[INFO] 
+[INFO]
 [INFO] --- maven-compiler-plugin:3.8.1:compile (main-compile) @ guava ---
 [INFO] Changes detected - recompiling the module!
 [INFO] Compiling 619 source files to /home/mernst/research/types/libraries/guava-fork-typetools/guava/target/classes
@@ -20381,9 +20381,9 @@ mvn -B package -Dmaven.test.skip=true -Danimal.sniffer.skip=true -P checkerframe
   required: @Initialized @NonNull OutputStream
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/io/FileBackedOutputStream.java:[241,23] [[fbc, nullness, allcheckers]:dereference.of.nullable] dereference of possibly-null reference memory
 [WARNING] /home/mernst/research/types/libraries/guava-fork-typetools/guava/src/com/google/common/io/FileBackedOutputStream.java:[241,46] [[fbc, nullness, allcheckers]:dereference.of.nullable] dereference of possibly-null reference memory
-[INFO] 
+[INFO]
 [INFO] --- maven-help-plugin:3.1.1:active-profiles (show-profiles) @ guava ---
-[INFO] 
+[INFO]
 Active Profiles for Project 'com.google.guava:guava:bundle:31.1-jre':
 
 The following profiles are active:
@@ -20394,21 +20394,21 @@ The following profiles are active:
 
 
 
-[INFO] 
+[INFO]
 [INFO] --- maven-bundle-plugin:2.5.0:manifest (bundle-manifest) @ guava ---
-[INFO] 
+[INFO]
 [INFO] --- maven-resources-plugin:3.3.0:testResources (default-testResources) @ guava ---
 [INFO] Not copying test resources
-[INFO] 
+[INFO]
 [INFO] --- maven-compiler-plugin:3.8.1:testCompile (default-testCompile) @ guava ---
 [INFO] Not compiling test sources
-[INFO] 
+[INFO]
 [INFO] --- maven-surefire-plugin:2.22.1:test (default-test) @ guava ---
 [INFO] Tests are skipped.
-[INFO] 
+[INFO]
 [INFO] --- animal-sniffer-maven-plugin:1.20:check (check-java-version-compatibility) @ guava ---
 [INFO] Signature checking is skipped.
-[INFO] 
+[INFO]
 [INFO] --- maven-bundle-plugin:2.5.0:bundle (default-bundle) @ guava ---
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS

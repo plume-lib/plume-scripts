@@ -1,4 +1,6 @@
-.PHONY: test clean
+.PHONY: test clean all
+
+all: test
 
 test: test-words test-reldir test-guessstrip test-javaexception
 
@@ -16,7 +18,7 @@ words2.txt: words.txt
 	grep -v 'a.*a.*e' $< > $@
 
 # Suppose that the edit goes from words1.txt to words2.txt.
-words12-diff.txt: words1.txt words2.txt
+words12.diff: words1.txt words2.txt
 	diff -u $^ > $@ || true
 
 words-lint.txt: words.txt
@@ -26,7 +28,7 @@ words-lint.txt: words.txt
 words2-lint.txt: words2.txt
 	grep -Hn 'a.*i' $< > $@ || true
 
-words2-lint-pruned.txt: words12-diff.txt words2-lint.txt
+words2-lint-pruned.txt: words12.diff words2-lint.txt
 	../../lint-diff.py --context=0 $^ > $@ || true
 
 # The goal is lines from words-lint.txt that are in words2.txt but not words1.txt.
@@ -43,7 +45,7 @@ words2-lint-pruned.txt-goal: words-lint.txt
 test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 	diff $^
 
-reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
+reldir-lint-pruned.txt: reldir.diff reldir-lint.txt
 	../../lint-diff.py --strip-diff=1 --strip-lint=2 --context=0 $^ > $@ || true
 
 
@@ -52,7 +54,7 @@ reldir-lint-pruned.txt: reldir-diff.txt reldir-lint.txt
 test-guessstrip: guessstrip-lint-pruned.txt-goal guessstrip-lint-pruned.txt
 	diff $^
 
-guessstrip-lint-pruned.txt: guessstrip-diff.txt guessstrip-lint.txt
+guessstrip-lint-pruned.txt: guessstrip.diff guessstrip-lint.txt
 	../../lint-diff.py  --guess-strip $^ > $@ || true
 
 # "javaexception" test
@@ -60,7 +62,7 @@ guessstrip-lint-pruned.txt: guessstrip-diff.txt guessstrip-lint.txt
 test-javaexception: javaexception-lint-pruned.txt-goal javaexception-lint-pruned.txt
 	diff $^
 
-javaexception-lint-pruned.txt: javaexception-diff.txt javaexception-lint.txt
+javaexception-lint-pruned.txt: javaexception.diff javaexception-lint.txt
 	../../lint-diff.py  --guess-strip $^ > $@ || true
 
 
@@ -68,4 +70,4 @@ javaexception-lint-pruned.txt: javaexception-diff.txt javaexception-lint.txt
 
 # The `clean` target would be simpler if all generated files were put in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt words12-diff.txt words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt
+	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt

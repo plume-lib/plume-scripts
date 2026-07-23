@@ -1,4 +1,8 @@
+.PHONY: all clean test
+
 PROGRAM=../../jacoco-coverage-ratchet
+
+all: test
 
 .PHONY: clean test test12 test21 test13 test31
 test: test12 test21 test13 test31
@@ -25,4 +29,3 @@ test31:
 
 clean:
 	rm -f out12.txt out21.txt out13.txt out31.txt
-
