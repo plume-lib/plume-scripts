@@ -1,3 +1,9 @@
+###########################################################################
+### Do not use
+###
+
+# This is superseded by `prek`.
+
 # Code style; defines `style-check` and `style-fix`.
 PLUME_SCRIPTS ?= .plume-scripts
 ifeq (,$(wildcard ${PLUME_SCRIPTS}))

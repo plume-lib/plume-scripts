@@ -1,5 +1,11 @@
 #!/bin/sh
 
+###########################################################################
+### Do not use
+###
+
+# This is superseded by `prek`.
+
 # Under CI, there are two CPUs, but limit to 1 to avoid out-of-memory error.
 if [ -n "$("${PLUME_SCRIPTS:-.plume-scripts}"/is-ci.sh)" ]; then
   num_jobs=1
