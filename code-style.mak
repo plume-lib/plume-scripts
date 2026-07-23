@@ -30,7 +30,7 @@
 #   SH_SCRIPTS_USER := dots/.aliases dots/.environment dots/.profile
 #   BASH_SCRIPTS_USER := dots/.bashrc dots/.bash_profile
 #   # CODE_STYLE_EXCLUSIONS_USER is in the form of arguments to `grep`.
-#   CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter 
+#   CODE_STYLE_EXCLUSIONS_USER := --exclude-dir apheleia --exclude-dir 'apheleia-*' --exclude-dir=mew --exclude=csail-athena-tickets.bash --exclude=conda-initialize.sh --exclude=addrfilter
 #   # CODE_STYLE_FILTER_OUT_USER is in the form of arguments to Make's `filter-out`.
 #   CODE_STYLE_FILTER_OUT_USER := %/doc/daikon/% %/doc/developer/%
 # * To disable all style checking:

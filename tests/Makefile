@@ -1,4 +1,6 @@
-.PHONY: test clean
+.PHONY: test clean all
+
+all: test
 
 test:
 	${MAKE} -C jacoco-coverage-ratchet-test test

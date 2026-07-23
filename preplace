@@ -126,7 +126,7 @@ if (scalar(@ARGV) == 0) {
 
 # Must pass an absolute filename, not ".", to collect(), because flags like "-e"
 # and "-f" fail if a filename starts with "./" and contains any other "/".
-my $pwd = `pwd`;
+my $pwd = `pwd`; # pragma: allowlist secret
 chomp($pwd);
 
 @filelist = ();

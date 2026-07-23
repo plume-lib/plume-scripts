@@ -1,0 +1,27 @@
+#!/bin/sh
+# Given a list of file names as arguments, print the ones with unique
+# contents: for each group of files with identical contents, only the
+# first one (in argument order) is printed.
+
+# Pick a hashing command; sha256 makes accidental collisions
+# (calling distinct files identical) astronomically unlikely.
+if command -v sha256sum >/dev/null 2>&1; then
+  hash_cmd="sha256sum"
+elif command -v shasum >/dev/null 2>&1; then
+  hash_cmd="shasum -a 256"
+else
+  hash_cmd="cksum"
+fi
+
+seen=""
+for f in "$@"; do
+  # Skip anything that is not a readable regular file.
+  [ -f "$f" ] || continue
+
+  sum=$($hash_cmd < "$f" | cut -d' ' -f1)
+
+  case " $seen " in
+    *" $sum "*) ;;             # content already seen; skip it
+    *) seen="$seen $sum"; printf '%s\n' "$f" ;;
+  esac
+done

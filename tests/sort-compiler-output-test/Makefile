@@ -1,4 +1,6 @@
-.PHONY: test clean
+.PHONY: test clean all
+
+all: test
 
 test: clean errors1-sorted.actual
 	diff errors1-sorted.goal errors1-sorted.actual

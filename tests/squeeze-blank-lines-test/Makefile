@@ -1,4 +1,6 @@
-.PHONY: test clean
+.PHONY: test clean all
+
+all: test
 
 test: lines1.output lines1.output2 lines2.output
 	diff -u lines1.output-goal lines1.output

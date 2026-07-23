@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Removes leading and trailing blank lines.  Within the file, replaces multiple
 # blank lines by one blank line.  Lines containing only whitespace count as
