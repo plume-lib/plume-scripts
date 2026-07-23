@@ -221,7 +221,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
   fi
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
-  # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
+  # Some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH=$BUILD_SOURCEBRANCHNAME
 elif [ "$TRAVIS" = "true" ]; then
   ## Travis CI

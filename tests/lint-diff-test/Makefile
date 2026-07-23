@@ -32,7 +32,7 @@ words2-lint-pruned.txt: words12.diff words2-lint.txt
 	../../lint-diff.py --context=0 $^ > $@ || true
 
 # The goal is lines from words-lint.txt that are in words2.txt but not words1.txt.
-# perl command removes lines that match both a.*e.*t and a.*a.*e .
+# The perl command removes lines that match both a.*e.*t and a.*a.*e .
 words2-lint-pruned.txt-goal: words-lint.txt
 	grep ':.*a.*e.*t' $< | perl -ni -e 'print unless /a.*e.*t/ && /a.*a.*e/' > $@ || true
 

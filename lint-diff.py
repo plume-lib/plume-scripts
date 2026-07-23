@@ -18,7 +18,7 @@
 #         If warnings.txt is omitted, use standard input.
 # Output: all lines in warnings.txt that are on a changed line.
 #         Output status is 1 if it produced any output, 0 if not, 2 if error.
-# Options: --guess-strip means guess values for --strip-diff and --strip-lint.
+# Options: --guess-strip means guess values for --strip-diff and --strip-warnings.
 #          --strip-diff=N means to ignore N leading "/" in diff.txt.
 #          --strip-warnings=N means to ignore N leading "/" in warnings.txt.
 #              Affects matching, but not output, of lines.

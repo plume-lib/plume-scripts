@@ -102,7 +102,7 @@ sub cmp_parents_first {
   if ($debug) { print "num_extra_slashes $num_extra_slashes_a $num_extra_slashes_b\n"; }
 
   # If one of the directories contains all the slashes that the other does,
-  # plus more, then the one with less slashes is a file in a parent
+  # plus more, then the one with fewer slashes is a file in a parent
   # directory and should appear earlier in the sort order.
   if (($num_extra_slashes_a == 0) && ($num_extra_slashes_b != 0)) {
     return -1;
