@@ -21,7 +21,7 @@
 #   eval "$(/tmp/plume-scripts/git-changes DEFAULT-ORGANIZATION)"
 
 # Either snippet of code sets these variables:
-# CI_COMMIT_RANGE: An argument to `git diff` with the range of commits IDs.
+# CI_COMMIT_RANGE: An argument to `git diff` with the range of commit IDs.
 #    (Don't use it with `git log`, which interprets its argument differently.)
 # CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID/SHA.
 # CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID/SHA.
@@ -243,7 +243,7 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
   fi
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
-  # some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
+  # Some clients such as `git-clone-related` MUST be given a branch name, not a commit ID.
   CI_BRANCH=$BUILD_SOURCEBRANCHNAME
   if [ "$BUILD_SOURCEBRANCHNAME" = "$DEFAULT_BRANCH_NAME" ]; then
     DEFAULT_CI_COMMIT_RANGE_START=$(head1)
