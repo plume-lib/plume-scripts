@@ -51,7 +51,8 @@
     <!-- best practices rules we are not using
     <rule ref="category/java/bestpractices.xml/AvoidPrintStackTrace" />
     <rule ref="category/java/bestpractices.xml/AvoidReassigningParameters" />
-    <rule ref="category/java/bestpractices.xml/ExhaustiveSwitchHasDefault" />      Including a default is protection against future changes to the enum.
+    <rule ref="category/java/bestpractices.xml/ExhaustiveSwitchHasDefault" />
+      Including a default is protection against future changes to the enum.
     <rule ref="category/java/bestpractices.xml/LiteralsFirstInComparisons" />
     <rule ref="category/java/bestpractices.xml/LooseCoupling" />
     <rule ref="category/java/bestpractices.xml/PreserveStackTrace" />
