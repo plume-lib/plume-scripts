@@ -9,16 +9,16 @@
 # That feature is useful in scripts and cron jobs, but is not supported
 # in all versions of mail.
 
-# Read standard input
-BODY=/tmp/maile-input-$$
-cat > $BODY 2>&1
+# Read standard input into a temporary file.
+BODY=$(mktemp "${TMPDIR:-/tmp}/maile-input.XXXXXX") || exit 1
+trap 'rm -f "$BODY"' EXIT
+cat > "$BODY"
 
 # Invoke mail if body is non-empty.
-if [ -s $BODY ]; then
+if [ -s "$BODY" ]; then
   # Non-empty body
-  mail "$@" < $BODY
+  mail "$@" < "$BODY"
 fi
-rm -f $BODY
 
 ## Testing
 ## This should produce no error

@@ -103,22 +103,45 @@ fi
 # "GITHUB_PAT" is a GitHub Personal Access Token.
 # TODO: Should this be "Authorization: Bearer <YOUR-TOKEN>" instead?  See https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
 if [ -n "$GITHUB_PAT" ]; then
-  auth_header_option="--header=Authorization: token ${GITHUB_PAT}"
+  auth_token="$GITHUB_PAT"
 elif [ -n "$GH_TOKEN" ]; then
-  auth_header_option="--header=Authorization: token ${GH_TOKEN}"
+  auth_token="$GH_TOKEN"
+else
+  auth_token=""
 fi
 
 ### Prerequisites
 
 # TODO: Try to not access the GitHub REST API, because it can get throttled.
 if [ -n "$(command -v curl 2> /dev/null)" ]; then
-  GET_URL_TO_STDOUT="curl ${auth_header_option} -s"
+  http_get_tool="curl"
 elif [ -n "$(command -v wget 2> /dev/null)" ]; then
-  GET_URL_TO_STDOUT="wget ${auth_header_option} -q -O -"
+  http_get_tool="wget"
 else
   echo "echo Neither curl nor wget is installed"
   exit 2
 fi
+
+# get_url URL: fetch URL to standard output, sending an Authorization header
+# if $auth_token is set.  The header is passed as a single argument rather than
+# being word-split out of a command string; that avoids mangling the header and
+# leaking the token into stray connection attempts.
+get_url() {
+  if [ "$http_get_tool" = "curl" ]; then
+    if [ -n "$auth_token" ]; then
+      curl -s --header "Authorization: token $auth_token" "$1"
+    else
+      curl -s "$1"
+    fi
+  else
+    if [ -n "$auth_token" ]; then
+      wget -q -O - --header="Authorization: token $auth_token" "$1"
+    else
+      wget -q -O - "$1"
+    fi
+  fi
+}
+
 if [ -z "$(command -v jq 2> /dev/null)" ]; then
   echo "echo jq is not installed"
   exit 2
@@ -148,12 +171,12 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   # TODO: Can I implement this without a GitHub API request?
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-    pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1 | tr -d '[:cntrl:]')"
+    pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
     SLUG=$(printf '%s' "${pull_json}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
       echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
-      if [ -n "${auth_header_option}" ]; then
-        echo "echo auth_header_option is set."
+      if [ -n "$auth_token" ]; then
+        echo "echo auth_token is set."
       fi
       echo "echo ---- start of wget output ----"
       # shellcheck disable=SC2001
@@ -175,7 +198,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   # Is GITHUB_ACTOR equal to CI_ORGANIZATION, maybe??  (Need to observe beyond mernst.)
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
-  pull_json="$(${GET_URL_TO_STDOUT} "${url}" 2>&1 | tr -d '[:cntrl:]')"
+  pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
   CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq -r '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
     echo "echo GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
@@ -315,7 +338,7 @@ elif [ -n "$CIRCLECI" ]; then
   if [ -n "$CIRCLE_PR_NUMBER" ]; then
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
-    pull_json="$(${GET_URL_TO_STDOUT} "${url}" | tr -d '[:cntrl:]')"
+    pull_json="$(get_url "${url}" | tr -d '[:cntrl:]')"
     CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
     CI_COMMIT_RANGE_START=$(printf '%s' "${pull_json}" | jq -r '.base.sha')
     CI_COMMIT_RANGE_END=$(printf '%s' "${pull_json}" | jq -r '.head.sha')
@@ -356,7 +379,7 @@ elif [ -n "${GITHUB_HEAD_REF}" ]; then
     if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH_NAME}" 2> /dev/null); then
-          pull_json="$($GET_URL_TO_STDOUT "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}" | tr -d '[:cntrl:]')"
+          pull_json="$(get_url "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}" | tr -d '[:cntrl:]')"
           if ! CI_COMMIT_RANGE_START=$(printf '%s' "${pull_json}" | jq -e -r '.base.sha // empty'); then
             echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH_NAME}"
             echo 'echo ---------------- start of set'
@@ -399,7 +422,7 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
   else
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
-    pull_json="$(${GET_URL_TO_STDOUT} "${url}" | tr -d '[:cntrl:]')"
+    pull_json="$(get_url "${url}" | tr -d '[:cntrl:]')"
     CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
   fi
   CI_COMMIT_RANGE_END="${GITHUB_SHA}"
@@ -444,7 +467,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
       CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
       if [ "$DEBUG" = "--debug" ]; then
-        echo "echo Set CI_COMMIT_START=$CI_COMMIT_START from git rev-parse origin/$DEFAULT_BRANCH_NAME;"
+        echo "echo Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$DEFAULT_BRANCH_NAME;"
       fi
     else
       if git show --summary HEAD | grep -q ^Merge:; then

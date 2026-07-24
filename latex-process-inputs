@@ -50,17 +50,17 @@ my $debug = 0;
 my $list_mode = 0;              # boolean indicating list mode vs. inline mode
 my $ant_list_mode = 0;
 my $makefile_list_mode = 0;
-if ((@ARGV[0] eq "-help") || (@ARGV[0] eq "--help")) {
+if (($ARGV[0] eq "-help") || ($ARGV[0] eq "--help")) {
   print "Optional arguments: -list -antlist -makefilelist\n";
   exit(0);
-} elsif ((@ARGV[0] eq "-list") || (@ARGV[0] eq "--list")) {
+} elsif (($ARGV[0] eq "-list") || ($ARGV[0] eq "--list")) {
   $list_mode = 1;
   shift @ARGV;
-} elsif ((@ARGV[0] eq "-antlist") || (@ARGV[0] eq "--antlist")) {
+} elsif (($ARGV[0] eq "-antlist") || ($ARGV[0] eq "--antlist")) {
   $list_mode = 1;
   $ant_list_mode = 1;
   shift @ARGV;
-} elsif ((@ARGV[0] eq "-makefilelist") || (@ARGV[0] eq "--makefilelist")) {
+} elsif (($ARGV[0] eq "-makefilelist") || ($ARGV[0] eq "--makefilelist")) {
   $list_mode = 1;
   $makefile_list_mode = 1;
   shift @ARGV;

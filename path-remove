@@ -52,7 +52,6 @@ while (<>) {
       foreach $temp (@pieces) {
 	if (! -d $temp) { next; }
 	if (defined($already_seen{$temp})) { next; }
-        if ($temp =~ /vortex\/(M3|Smalltalk)\/bin\/shell$/) { next; }
         if (defined($extra_regexp) && ($temp =~ /$extra_regexp/)) { next; }
         # This directory should appear in the output
         push(@result, $temp);

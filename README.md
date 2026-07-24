@@ -7,6 +7,7 @@ This project contains utilities for:
 * [Continuous integration](#continuous-integration)
 * [Search and replace](#search-and-replace)
 * [Sorting](#sorting)
+* [Unique file contents](#unique-file-contents)
 * [Java](#java)
 * [LaTeX](#latex)
 
@@ -87,6 +88,12 @@ Works for Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 
 Prints the SHA commit id corresponding to the most recent successful CI job.
 [Documentation](ci-last-success.py) at top of file.
+
+### git-changes
+
+Determines the start and end commits for a CI job.
+Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+[Documentation](git-changes) at top of file.
 
 ## Search and replace
 

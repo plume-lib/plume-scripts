@@ -50,7 +50,10 @@ def read_jacoco_csv_to_map(filename: str) -> dict[str, tuple[int, int]]:
     with Path.open(Path(filename)) as csvfile:
         dict_reader = csv.DictReader(csvfile)
         for row in dict_reader:
-            fq_classname = row["PACKAGE"] + "." + row["CLASS"]
+            # Include GROUP (the Maven/Gradle module) in the key.  Without it,
+            # two modules that share a fully-qualified class name would collide
+            # and one module's coverage would be silently dropped.
+            fq_classname = row["GROUP"] + ":" + row["PACKAGE"] + "." + row["CLASS"]
             result[fq_classname] = (int(row["INSTRUCTION_MISSED"]), int(row["INSTRUCTION_COVERED"]))
     return result
 

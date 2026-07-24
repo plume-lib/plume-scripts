@@ -118,7 +118,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo
   echo "*****"
   echo "${SCRIPT_NAME} error:"
-  echo "$CI_LINT_DIFF_ERROR"
+  printf '%b\n' "$CI_LINT_DIFF_ERROR"
   echo "*****"
   echo
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
@@ -193,7 +193,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "Now, repeating the error; it appears before and after diagnostics."
   echo "*****"
   echo "${SCRIPT_NAME} error:"
-  echo "$CI_LINT_DIFF_ERROR"
+  printf '%b\n' "$CI_LINT_DIFF_ERROR"
   echo "*****"
   exit 2
 fi

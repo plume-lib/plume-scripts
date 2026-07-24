@@ -111,8 +111,10 @@ sub collect {
       && ($_ =~ /^(\.bzr|CVS|\.git|\.gradle|\.hg|\.svn)$/)) {
     $File::Find::prune = 1;
   }
+  # Match -name against the basename ($_), not the full path, per the usage
+  # message ("files whose names match") and consistent with the prune above.
   if ((-f $fullname)
-      && ((! defined($fileregex)) || ($fullname =~ /$fileregex/o))) {
+      && ((! defined($fileregex)) || ($_ =~ /$fileregex/o))) {
     if ($debug) {
       print STDERR "collected $fullname\n";
     }
@@ -129,6 +131,7 @@ if (scalar(@ARGV) == 0) {
 my $pwd = `pwd`; # pragma: allowlist secret
 chomp($pwd);
 
+my $exit_status = 0;
 @filelist = ();
 for my $arg (@ARGV) {
   if ($arg eq ".") { $arg = $pwd; }
@@ -140,7 +143,10 @@ for my $arg (@ARGV) {
   } elsif (-f abs_path($arg)) {
     push @filelist, abs_path($arg);
   } else {
+    # A bad explicit argument is an error; exit nonzero so callers (Makefiles,
+    # pipelines) do not silently ignore the failure.
     print STDERR "argument $arg is neither a file nor a directory\n";
+    $exit_status = 1;
   }
 }
 
@@ -186,9 +192,12 @@ foreach my $file (@filelist) {
     } else {
       die "Cannot choose delimiter; regexes use too many special characters";
     }
-    # Quote $file in case it contains whitespace.
+    # Single-quote $file for the shell in case it contains whitespace or other
+    # special characters.  Escape any single quotes it contains ('->'\'') so
+    # that a filename such as "it's.txt" does not mangle the command.
     # Unfortunately, if the from or to regex contains a single quote, then the command is mangled.
-    my $command = "perl -pi$backupsuffix -e 'use strict; s$delimiter$fromregex$delimiter$toregex${delimiter}g' '$file'";
+    (my $quoted_file = $file) =~ s/'/'\\''/g;
+    my $command = "perl -pi$backupsuffix -e 'use strict; s$delimiter$fromregex$delimiter$toregex${delimiter}g' '$quoted_file'";
     if ($debug) {
       print STDERR "command: $command\n";
     }
@@ -199,3 +208,5 @@ foreach my $file (@filelist) {
     }
   }
 }
+
+exit($exit_status);
