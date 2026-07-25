@@ -468,7 +468,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     # created, but it doesn't change when force-push occurs (as Renovate does),
     # making it out of date.
     case $CI_BRANCH in
-      renovate/*) CI_COMMIT_RANGE_START=$(git rev-parse HEAD^1) ;;
+      renovate/*) CI_COMMIT_RANGE_START=$(head1) ;;
       *)
         if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
           CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
