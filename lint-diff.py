@@ -46,7 +46,7 @@
 # suggests it has this same functionality, but my tests indicate it does not.
 
 import argparse
-import collections
+import collections.abc
 import os
 import re
 import sys
@@ -285,7 +285,7 @@ def guess_strip_filenames(
     Arguments are two lists of file names.
 
     Returns:
-        A pair of integers.
+        A 4-tuple of 2 integers and 2 strings, as for `min_strips`.
     """
     result = (1000, 1000, "no files seen yet", "no files seen yet")
     for diff_filename in diff_filenames:
@@ -300,7 +300,7 @@ def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str,
     Arguments are files produced by diff and a lint tool, respectively.
 
     Returns:
-        A pair of integers.
+        A 4-tuple of 2 integers and 2 strings, as for `min_strips`.
     """
     diff_files = diff_filenames(diff_file)
     warning_files = warning_filenames(warning_file)
@@ -542,10 +542,9 @@ def warn_relative_diff(args: argparse.Namespace) -> bool:
         result = True
         if DEBUG:
             eprint(f"lint-diff.py: diff file {args.diff_filename}:")
-            eprint("{}", Path(args.diff_filename).read_text(encoding=encoding(args.diff_filename)))
+            eprint(Path(args.diff_filename).read_text(encoding=encoding(args.diff_filename)))
             eprint(f"lint-diff.py: lint file {args.warning_filename}:")
             eprint(
-                "{}",
                 Path(args.warning_filename).read_text(encoding=encoding(args.warning_filename)),
             )
             eprint("lint-diff.py: end of input files.")

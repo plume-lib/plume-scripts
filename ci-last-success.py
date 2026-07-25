@@ -60,7 +60,7 @@ def successful(sha: str) -> bool:
     url_status = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}/status"
     if DEBUG:
         print(url_status)
-    resp_status = requests.get(url_status)
+    resp_status = requests.get(url_status, timeout=30)
     if resp_status.status_code != 200:
         # This means something went wrong, possibly rate-limiting.
         msg = f"GET {url_status} {resp_status.status_code} {resp_status.headers} {resp_status.text}"
@@ -96,5 +96,3 @@ while True:
         print(f"No successful CI job found at or before {commit_arg}", file=sys.stderr)
         sys.exit(1)
     commit = the_parent
-
-sys.exit(1)

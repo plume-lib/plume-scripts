@@ -20,10 +20,17 @@ processed_data=$(cat -s "$input" \
   | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
 
 # 3. Determine the output destination.
+# When the input is empty or entirely blank, $processed_data is empty; emit
+# nothing rather than a single blank line (command substitution stripped the
+# trailing newline, so printf would otherwise re-add one).
 if [ -n "$1" ]; then
-  # If a file was provided, write back to it (in-place)
-  printf '%s\n' "$processed_data" > "$1"
-else
-  # Otherwise, output to stdout
+  # If a file was provided, write back to it (in-place).
+  if [ -n "$processed_data" ]; then
+    printf '%s\n' "$processed_data" > "$1"
+  else
+    : > "$1"
+  fi
+elif [ -n "$processed_data" ]; then
+  # Otherwise, output to stdout.
   printf '%s\n' "$processed_data"
 fi
