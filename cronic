@@ -68,7 +68,11 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ER
   echo "$@"
   echo
   if [[ $EXPECTED -eq 0 ]]; then
-    echo "RESULT CODE: $RESULT  (0 means success)"
+    if [[ $RESULT -eq 0 ]]; then
+      echo "RESULT CODE: $RESULT  (success)"
+    else
+      echo "RESULT CODE: $RESULT  (failure)"
+    fi
   else
     echo "RESULT CODE: $RESULT  (expected: $EXPECTED)"
   fi
