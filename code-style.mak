@@ -143,13 +143,6 @@ dummy := $(shell cd ${PLUME_SCRIPTS} \
    && wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms \
    && chmod +x checkbashisms)
 endif
-# Install a git pre-commit hook if one doesn't already exist.
-ifneq (,$(wildcard .git/hooks))
-ifeq (,$(wildcard .git/hooks/pre-commit))
-dummy := $(shell cd .git/hooks \
-   && ln -s ../../${PLUME_SCRIPTS}/code-style-pre-commit pre-commit)
-endif
-endif
 
 BKT_EXISTS := $(shell if command -v bkt > /dev/null 2>&1; then echo "yes"; fi)
 UV_EXISTS := $(shell if command -v uv > /dev/null 2>&1; then echo "yes"; fi)
