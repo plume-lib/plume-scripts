@@ -18,6 +18,7 @@ jobs:
         with:
           fetch-depth: 1
           show-progress: false
+          persist-credentials: false
       - name: Install tools
         run: |
           sudo apt-get -qqy install shfmt
