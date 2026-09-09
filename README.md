@@ -71,9 +71,18 @@ Prints "yes" if this process is running under CI.  Prints nothing otherwise.
 
 ### ci-org-and-branch
 
-Outputs the head GitHub organization and branch for a CI job.
+Outputs shell script code that sets variables `CI_ORGANIZATION` and `CI_BRANCH`
+to the head GitHub organization and branch for a CI job.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+As a general rule, prefer `set-ci-org-and-branch` over this script.
 [Documentation](ci-org-and-branch) at top of file.
+
+### set-ci-org-and-branch
+
+When sourced, sets variables `CI_ORGANIZATION` and `CI_BRANCH`
+holding the head GitHub organization and branch for a CI job.
+Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+[Documentation](set-ci-org-and-branch) at top of file.
 
 <!--
 ### ci-lint-diff

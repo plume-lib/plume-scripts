@@ -3,6 +3,9 @@
 # Outputs the GitHub organization and branch for a CI job.  Other information about
 # the CI job can be computed, but it is beyond the scope of this simple script.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+#
+# The client `eval`s this script's output.  Script `set-ci-org-and-branch`
+# computes the same information, but the client sources it.
 
 # Typical use:
 #
