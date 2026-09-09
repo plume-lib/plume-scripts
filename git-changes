@@ -337,23 +337,50 @@ elif [ -n "$CIRCLECI" ]; then
   fi
   if [ -n "$CIRCLE_PR_NUMBER" ]; then
     # TODO: Can I implement this without a GitHub API request?
+    # The request is unauthenticated, so it is subject to throttling; every
+    # value it provides has a fallback that is computed locally.
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
     pull_json="$(get_url "${url}" | tr -d '[:cntrl:]')"
-    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
-    CI_COMMIT_RANGE_START=$(printf '%s' "${pull_json}" | jq -r '.base.sha')
-    CI_COMMIT_RANGE_END=$(printf '%s' "${pull_json}" | jq -r '.head.sha')
-    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+    # "// empty" maps JSON null to the empty string; the redirection discards
+    # jq's complaint if the response is not JSON at all (as when throttling
+    # yields an HTML error page).
+    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref // empty' 2> /dev/null)
+    CI_COMMIT_RANGE_START=$(printf '%s' "${pull_json}" | jq -r '.base.sha // empty' 2> /dev/null)
+    CI_COMMIT_RANGE_END=$(printf '%s' "${pull_json}" | jq -r '.head.sha // empty' 2> /dev/null)
+    if [ -z "$CI_BRANCH" ]; then
+      # For a pull request, this is like "pull/1234" rather than a branch name.
+      CI_BRANCH=$CIRCLE_BRANCH
+    fi
+    if [ -z "$CI_COMMIT_RANGE_END" ]; then
+      CI_COMMIT_RANGE_END=${CIRCLE_SHA1:-$(git rev-parse HEAD)}
+    fi
 
-    if ! git rev-parse --verify -q "${CI_COMMIT_RANGE_START}^{commit}" > /dev/null; then
+    if [ -n "$CI_COMMIT_RANGE_START" ] \
+      && ! git rev-parse --verify -q "${CI_COMMIT_RANGE_START}^{commit}" > /dev/null; then
+      # The commit is not in this clone, which may be shallow.  Deepen it.
       git fetch --depth=25 origin
       if ! git rev-parse --verify -q "${CI_COMMIT_RANGE_START}^{commit}" > /dev/null; then
         git fetch --unshallow origin
         if ! git rev-parse --verify -q "${CI_COMMIT_RANGE_START}^{commit}" > /dev/null; then
-          echo "echo cannot find commit range start ${CI_COMMIT_RANGE_START} in origin"
-          exit 2
+          echo "echo cannot find commit range start ${CI_COMMIT_RANGE_START} in origin;"
+          CI_COMMIT_RANGE_START=""
         fi
       fi
     fi
+
+    if [ -z "$CI_COMMIT_RANGE_START" ]; then
+      # Either the GitHub API request failed, or its answer is not in origin.
+      # Use the fork point from the default branch instead.
+      git fetch --unshallow origin > /dev/null 2>&1
+      if [ -n "$DEFAULT_BRANCH_NAME" ]; then
+        git fetch -q origin "$DEFAULT_BRANCH_NAME"
+        CI_COMMIT_RANGE_START=$(git merge-base FETCH_HEAD "$CI_COMMIT_RANGE_END" 2> /dev/null)
+      fi
+      if [ -z "$CI_COMMIT_RANGE_START" ]; then
+        CI_COMMIT_RANGE_START=$(head1)
+      fi
+    fi
+    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
   else
     CI_BRANCH=$CIRCLE_BRANCH
   fi
