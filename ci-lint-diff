@@ -62,9 +62,10 @@ git_changes_status_code=$?
 set -e
 if [ "$git_changes_status_code" -ne 0 ]; then
   echo "git-changes failed with status $git_changes_status_code"
-  echo "---- git-changes output ----"
+  echo "git-changes reported the reason on standard error, above."
+  echo "---- git-changes standard output ----"
   echo "$git_changes_output"
-  echo "---- end of git-changes output ----"
+  echo "---- end of git-changes standard output ----"
   exit 2
 fi
 
@@ -124,14 +125,16 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
-  echo "---- git-changes output ----"
+  echo "---- git-changes standard output ----"
   echo "$git_changes_output"
-  echo "---- end of git-changes output ----"
+  echo "---- end of git-changes standard output ----"
   echo
   # This is not very effective because environment variables were set by
   # the previous invocation of git-changes.
+  # `git-changes` writes its diagnostics to standard error; redirect them so
+  # that they appear between the two markers rather than somewhere above.
   echo "---------------- start of ${SCRIPT_DIR}/git-changes --debug"
-  "${SCRIPT_DIR}"/git-changes --debug
+  "${SCRIPT_DIR}"/git-changes --debug 2>&1
   echo "---------------- end of ${SCRIPT_DIR}/git-changes --debug"
   echo
 
