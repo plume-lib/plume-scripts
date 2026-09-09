@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# This script is obsolete.  Use `ci-org-and-branch` and `git-changes` instead.
+
 # Determines the start and end commits for a CI job.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 

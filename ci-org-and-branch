@@ -338,7 +338,10 @@ if [ "$DEBUG" = "--debug" ]; then
 fi
 
 if [ "$VERBOSE" = "--verbose" ]; then
-  if [ -n "${pull_json}" ]; then
+  # A throttled or otherwise failed request also has a non-empty response body,
+  # so test whether the response really does describe a pull request.
+  if [ -n "${pull_json}" ] \
+    && printf '%s' "${pull_json}" | jq -e -r '.head.sha // empty' > /dev/null 2>&1; then
     echo "echo CI_ACCESSED_GITHUB_API=true;"
   else
     echo "echo CI_ACCESSED_GITHUB_API=false;"
