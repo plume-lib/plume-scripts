@@ -262,9 +262,17 @@ elif [ "$TRAVIS" = "true" ]; then
 elif [ -n "$CIRCLECI" ]; then
   if [ -n "$CIRCLE_PR_NUMBER" ]; then
     # TODO: Can I implement this without a GitHub API request?
+    # The request is unauthenticated, so it is subject to throttling.
+    # "// empty" maps JSON null to the empty string; the redirection discards
+    # jq's complaint if the response is not JSON at all (as when throttling
+    # yields an HTML error page).
     url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
     pull_json="$(get_url "${url}" | tr -d '[:cntrl:]')"
-    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
+    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref // empty' 2> /dev/null)
+    if [ -z "$CI_BRANCH" ]; then
+      # For a pull request, this is like "pull/1234" rather than a branch name.
+      CI_BRANCH=$CIRCLE_BRANCH
+    fi
   else
     CI_BRANCH=$CIRCLE_BRANCH
   fi
@@ -307,7 +315,7 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     # GITHUB_REF_NAME is like "40/merge" here, so strip "/merge" for the PR number.
     url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_REF_NAME%/merge}"
     pull_json="$(get_url "${url}" | tr -d '[:cntrl:]')"
-    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref')
+    CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref // empty' 2> /dev/null)
   fi
 
 else
