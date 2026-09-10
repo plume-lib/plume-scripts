@@ -49,8 +49,7 @@ fi
 WARNINGSFILE=$1
 
 # If there are no warnings, there is nothing to report, so don't compute the
-# diff.  (`lint-diff.py` also exits early on an empty warnings file, but this
-# script would fail before reaching it if the diff is empty.)
+# diff.
 if [ ! -s "$WARNINGSFILE" ]; then
   echo "${SCRIPT_NAME}: $WARNINGSFILE is empty; nothing to report."
   exit 0
@@ -159,11 +158,18 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   cat "$diff_err_file"
   echo "---- end of stderr of git diff $CI_COMMIT_RANGE ----"
   echo
+  # `git-changes --debug` dumps the environment, so run it only under --debug,
+  # because CI logs are often public and the environment may contain access
+  # tokens (such as GITHUB_PAT).
   # This is not very effective because environment variables were set by
   # the previous invocation of git-changes.
-  echo "---------------- start of ${SCRIPT_DIR}/git-changes --debug"
-  "${SCRIPT_DIR}"/git-changes --debug
-  echo "---------------- end of ${SCRIPT_DIR}/git-changes --debug"
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "---------------- start of ${SCRIPT_DIR}/git-changes --debug"
+    "${SCRIPT_DIR}"/git-changes --debug
+    echo "---------------- end of ${SCRIPT_DIR}/git-changes --debug"
+  else
+    echo "Re-run with --debug to also print the output of ${SCRIPT_DIR}/git-changes --debug."
+  fi
   echo
 
   echo git rev-parse \$CI_COMMIT_RANGE_START
