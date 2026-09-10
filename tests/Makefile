@@ -4,6 +4,7 @@
 # recipe line per directory, because `checkmake` permits at most 5 lines in a
 # recipe.
 TEST_DIRS = \
+	cronic-test \
 	eval-quoting-test \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
@@ -16,6 +17,7 @@ all: test
 
 TEST_DIRS = \
   ci-info-test \
+  cronic-test \
   jacoco-coverage-ratchet-test \
   lint-diff-test \
   sort-compiler-output-test \
