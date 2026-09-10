@@ -3,8 +3,6 @@
 # One line per test directory, iterated over below.  A loop rather than one
 # recipe line per directory, because `checkmake` permits at most 5 lines in a
 # recipe.
-# There is exactly one assignment to TEST_DIRS:  a second one would silently
-# override this one, and the test directories it omitted would stop running.
 TEST_DIRS = \
 	ci-info-test \
 	eval-quoting-test \
