@@ -2,16 +2,19 @@
 
 all: test
 
+TEST_DIRS = \
+  ci-info-test \
+  jacoco-coverage-ratchet-test \
+  lint-diff-test \
+  sort-compiler-output-test \
+  sort-directory-order-test \
+  squeeze-blank-lines-test
+
+# The recipes loop over ${TEST_DIRS} rather than naming one directory per line,
+# because `checkmake` permits at most 5 lines in a recipe.
+
 test:
-	${MAKE} -C jacoco-coverage-ratchet-test test
-	${MAKE} -C lint-diff-test test
-	${MAKE} -C sort-compiler-output-test test
-	${MAKE} -C sort-directory-order-test test
-	${MAKE} -C squeeze-blank-lines-test test
+	for dir in ${TEST_DIRS}; do ${MAKE} -C $$dir test || exit 1; done
 
 clean:
-	${MAKE} -C jacoco-coverage-ratchet-test clean
-	${MAKE} -C lint-diff-test clean
-	${MAKE} -C sort-compiler-output-test clean
-	${MAKE} -C sort-directory-order-test clean
-	${MAKE} -C squeeze-blank-lines-test clean
+	for dir in ${TEST_DIRS}; do ${MAKE} -C $$dir clean || exit 1; done

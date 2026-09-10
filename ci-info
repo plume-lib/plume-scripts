@@ -70,16 +70,40 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# Copies standard input to standard output, with the value of each variable
+# whose name suggests a credential replaced.  A debug dump would otherwise
+# write secrets into the CI log, which is often readable by anyone who can see
+# the job.  Matching by name pattern rather than by an allowlist of names also
+# covers secrets that this script does not know about; GitHub Actions, for
+# example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
+# The placeholder contains no shell metacharacters, because the client `eval`s
+# this script's output.
+# This function is defined here rather than with the other functions below,
+# because the debug dump just after it uses it.
+redact_tokens() {
+  awk '
+    /^[A-Za-z_][A-Za-z0-9_]*=/ {
+      name = $0
+      sub(/=.*/, "", name)
+      if (toupper(name) ~ /TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|APIKEY|API_KEY|PRIVATE_KEY|_PAT$|^PAT$/) {
+        print name "=REDACTED"
+        next
+      }
+    }
+    { print }
+  '
+}
+
 if [ "$DEBUG" = "--debug" ]; then
   # `env` only prints EXPORTED variables, so `set` is usually more useful.
   echo "echo ${SCRIPT_NAME} is running in $(pwd)"
   echo
   echo 'echo ---------------- start of env'
-  env -0 | sort -z | tr '\0' '\n' | sed -e 's/^/echo /'
+  env -0 | sort -z | tr '\0' '\n' | redact_tokens | sed -e 's/^/echo /'
   echo 'echo ---------------- end of env'
   echo
   echo 'echo ---------------- start of set'
-  set | sed -e 's/^/echo /'
+  set | redact_tokens | sed -e 's/^/echo /'
   echo 'echo ---------------- end of set'
   echo
   echo 'echo ---------------- start of git status'
@@ -481,15 +505,21 @@ elif [ -n "${GITHUB_HEAD_REF}" ]; then
           pull_json="$(get_url "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}" | tr -d '[:cntrl:]')"
           if ! CI_COMMIT_RANGE_START=$(printf '%s' "${pull_json}" | jq -e -r '.base.sha // empty'); then
             echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH_NAME}"
-            echo 'echo ---------------- start of set'
-            set | sed -e 's/^/echo /'
-            echo 'echo ---------------- end of set'
-            # echo "echo git branch:"
-            # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' -e 's/$/"/'
-            echo "echo git log --graph:"
-            git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
-            echo "echo git show:"
-            git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+            # This is a routine failure in a shallow single-branch checkout,
+            # so dump the state only when asked.  `set` prints the whole
+            # environment, and CI logs are often readable by anyone who can
+            # see the job.
+            if [ "$DEBUG" = "--debug" ]; then
+              echo 'echo ---------------- start of set'
+              set | redact_tokens | sed -e 's/^/echo /'
+              echo 'echo ---------------- end of set'
+              # echo "echo git branch:"
+              # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' -e 's/$/"/'
+              echo "echo git log --graph:"
+              git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+              echo "echo git show:"
+              git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+            fi
             CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
             # echo "echo exiting"
             # # exit 2
