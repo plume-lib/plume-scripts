@@ -14,7 +14,7 @@
 #   (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 #   /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt
 #
-# If you get a warning that /tmp/diff is empty, here are two possible reasons:
+# If you get an "Empty diff" error, here are two possible reasons:
 #  * Your branch is identical to the base/upstream branch.  In this case, the pull
 #    request is pointless.
 #  * Your clone is shallow and does not contain all the commits.  You can fix that
@@ -28,6 +28,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
 
 DEBUG=""
+CI_LINT_DIFF_ERROR=""
 
 if [ "$#" -eq 0 ]; then
   echo "Usage: ${SCRIPT_NAME} [--debug] WARNINGS-FILE" >&2
@@ -47,11 +48,18 @@ if ! [ -f "$1" ]; then
 fi
 WARNINGSFILE=$1
 
+# If there are no warnings, there is nothing to report, so don't compute the
+# diff.  (`lint-diff.py` also exits early on an empty warnings file, but this
+# script would fail before reaching it if the diff is empty.)
+if [ ! -s "$WARNINGSFILE" ]; then
+  exit 0
+fi
+
 set -e
 
 if [ "$DEBUG" = "--debug" ]; then
   env | sort
-  git log --graph | head --lines=10000
+  git log --graph | head -n 10000
 fi
 
 # Temporarily disable "set -e" so a failure of git-changes is handled below
@@ -76,40 +84,61 @@ else
   if [ -z "$CI_COMMIT_RANGE_START" ]; then
     CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE_START is not set.\n"
   else
-    if ! git cat-file -e "${CI_COMMIT_RANGE_START}^{commit}"; then
+    # Discard git's own "fatal:" message; the message below is friendlier.
+    if ! git cat-file -e "${CI_COMMIT_RANGE_START}^{commit}" 2> /dev/null; then
       CI_LINT_DIFF_ERROR+="Commit CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START not found; clone more deeply.\n"
     fi
   fi
   if [ -z "$CI_COMMIT_RANGE_END" ]; then
     CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE_END is not set.\n"
   else
-    if ! git cat-file -e "${CI_COMMIT_RANGE_END}^{commit}"; then
+    # Discard git's own "fatal:" message; the message below is friendlier.
+    if ! git cat-file -e "${CI_COMMIT_RANGE_END}^{commit}" 2> /dev/null; then
       CI_LINT_DIFF_ERROR+="Commit CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END not found; clone more deeply.\n"
     fi
   fi
 fi
 
 set +e
-diff_file=$(mktemp /tmp/diff-XXXXXX.txt)
-echo "echo ${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file"
-git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2>&1
+diff_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-XXXXXX.txt")
+diff_err_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-err-XXXXXX.txt")
+cleanup() {
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "${SCRIPT_NAME}: retaining $diff_file and $diff_err_file"
+  else
+    rm -f "$diff_file" "$diff_err_file"
+  fi
+}
+trap cleanup EXIT
+echo "${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file"
+# Keep stderr out of $diff_file, which is parsed as a diff by `lint-diff.py`.
+git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2> "$diff_err_file"
 git_status=$?
 if [ $git_status -gt 1 ]; then
-  CI_LINT_DIFF_ERROR+="git diff exited with status $git_status"
-  sed -e 's/^/echo /' "$diff_file"
-  git --no-pager diff --exit-code "$CI_COMMIT_RANGE" | sed -e 's/^/echo /'
-  git --no-pager branch -a | sed -e 's/^/echo /'
-  git --no-pager diff "$CI_COMMIT_RANGE" | sed -e 's/^/echo /'
+  CI_LINT_DIFF_ERROR+="git diff exited with status $git_status\n"
+  echo "start of diff file:"
+  cat "$diff_file"
+  echo "end of diff file:"
+  echo "start of diff err file:"
+  cat "$diff_err_file"
+  echo "end of diff err file:"
+  git --no-pager branch -a
+  git --no-pager diff "$CI_COMMIT_RANGE"
 elif [ ! -r "$diff_file" ]; then
-  CI_LINT_DIFF_ERROR+="$diff_file does not exist"
+  CI_LINT_DIFF_ERROR+="$diff_file does not exist\n"
 fi
-if [ ! -s "$diff_file" ]; then
+# Only diagnose an empty diff if `git diff` actually succeeded.  Otherwise
+# the failure above is the real problem, and this advice is misleading.
+if [ $git_status -le 1 ] && [ ! -s "$diff_file" ]; then
   CI_LINT_DIFF_ERROR+="ERROR: Empty diff for $CI_COMMIT_RANGE.
 Try pulling base branch (often main or master) into compare branch (often your feature branch).
 Other causes of an empty diff include:
   * The commit range is a no-op, such as a commit and its revert.
   * HEAD is a merge commit and the merge took all its changes from its second argument.
   * Your compare branch does not differ from your base branch.
+  * Your clone is shallow, so git-changes could not determine the start of the
+    commit range (HEAD^1 does not exist) and used HEAD, making the range empty.
+    Clone more deeply.
 "
 fi
 
@@ -148,6 +177,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo git rev-parse "remotes/origin/$CI_COMMIT_RANGE_END"
   git rev-parse "remotes/origin/$CI_COMMIT_RANGE_END" || true
   echo
+  # This fetch mutates the clone, to determine whether the clone is too shallow.
   echo git fetch
   git fetch
   echo
@@ -171,8 +201,11 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   git --no-pager diff --exit-code "$CI_COMMIT_RANGE"
   echo
   echo "Second re-execution of diff command:"
-  echo "git --no-pager diff --exit-code $CI_COMMIT_RANGE > /tmp/tmp.tmp && cat /tmp/tmp.tmp"
-  git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > /tmp/tmp.tmp && cat /tmp/tmp.tmp
+  diff_retry_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-retry-XXXXXX.txt")
+  echo "git --no-pager diff $CI_COMMIT_RANGE > $diff_retry_file && cat $diff_retry_file"
+  git --no-pager diff "$CI_COMMIT_RANGE" > "$diff_retry_file"
+  cat "$diff_retry_file"
+  rm -f "$diff_retry_file"
   echo
   echo "Endpoints of commit range ($CI_COMMIT_RANGE_START and $CI_COMMIT_RANGE_END):"
   git --no-pager show "$CI_COMMIT_RANGE_START"
@@ -181,14 +214,17 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "Current directory:"
   pwd
   echo
-  echo "Listing of /tmp:"
-  ls -l /tmp/
+  echo "Listing of ${TMPDIR:-/tmp}:"
+  ls -l "${TMPDIR:-/tmp}"
   echo
-  echo "Contents of /tmp:"
-  cat /tmp/*
-  echo
-  echo "Environment:"
-  env | sort
+  # The environment is printed only under --debug, because CI logs are often
+  # public and the environment may contain access tokens (such as GITHUB_PAT).
+  if [ "$DEBUG" = "--debug" ]; then
+    echo "Environment:"
+    env | sort
+  else
+    echo "Re-run with --debug to also print the environment."
+  fi
   echo
   echo "Now, repeating the error; it appears before and after diagnostics."
   echo "*****"
