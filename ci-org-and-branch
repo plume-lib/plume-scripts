@@ -77,6 +77,13 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# Writes its argument, quoted so that the client's `eval` reads it back as one
+# word.  A value may contain a shell metacharacter:  a git branch name may
+# contain any of `$`, backquote, `;`, `&`, `|`, and `'`.
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
 ### Organization and branch
 
 # `set-ci-org-and-branch` does all the work.  It writes everything but the
@@ -92,5 +99,5 @@ CI_DEBUG="${DEBUG}"
 
 ### Print it out
 
-echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
-echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
+echo "CI_ORGANIZATION=$(shell_quote "$CI_ORGANIZATION"); export CI_ORGANIZATION;"
+echo "CI_BRANCH=$(shell_quote "$CI_BRANCH"); export CI_BRANCH;"

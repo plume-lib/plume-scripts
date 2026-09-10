@@ -1,0 +1,478 @@
+#!/bin/sh
+
+# Sets the start and end commits for a CI job, as shell variables.
+# Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+#
+# This script is *sourced* by the client, which is why its name starts
+# with "set-".  It is preferable to `git-changes`, which computes the
+# same information, but the client `eval`s its output.
+
+# `local` is not in POSIX, but every shell that can source this file supports it.
+# shellcheck disable=SC3043
+
+# Typical use:
+#
+#   if [ -d /tmp/plume-scripts ] ; then
+#     git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+#   else
+#     mkdir -p /tmp && git -C /tmp clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   fi
+#   PLUME_SCRIPTS=/tmp/plume-scripts
+#   CI_DEFAULT_ORGANIZATION=MY-DEFAULT-ORGANIZATION
+#   . "$PLUME_SCRIPTS"/set-git-changes
+#
+# Alternatively, to use a specific version of this script rather than the latest:
+#
+#   if [ ! -d /tmp/$USER/plume-scripts ] ; then
+#     mkdir -p /tmp/$USER
+#     git -C /tmp/$USER clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   fi
+#   PLUME_SCRIPTS=/tmp/$USER/plume-scripts
+#   CI_DEFAULT_ORGANIZATION=MY-DEFAULT-ORGANIZATION
+#   . "$PLUME_SCRIPTS"/set-git-changes
+
+# Either snippet of code sets these variables:
+# CI_COMMIT_RANGE: An argument to `git diff` with the range of commit IDs.
+#    (Don't use it with `git log`, which interprets its argument differently.)
+# CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID/SHA.
+# CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID/SHA.
+# It also sets everything that `set-ci-org-and-branch`, which it sources, sets:
+# CI_ORGANIZATION, CI_BRANCH, CI_DEFAULT_BRANCH_NAME, and CI_PULL_JSON.
+#
+# It sets no other variables and leaves no functions defined.  It returns 0 on
+# success, or 2 if it cannot determine the information.
+#
+# If called not under CI, or under CI but not in the main or toplevel
+# clone, then gets information from the local repository.
+
+# The client configures this script by setting variables rather than by passing
+# command-line arguments.
+# PLUME_SCRIPTS: the directory that contains these scripts; the default is
+#   /tmp/plume-scripts.  A sourced file cannot portably determine its own
+#   location -- under dash, "$0" is the client's name -- so the client must say
+#   where to find `set-ci-org-and-branch`, which this script sources.
+# CI_DEFAULT_ORGANIZATION: use this organization if none can be determined.  Optional.
+# CI_VERBOSE: if non-empty, report progress.  Optional.
+# CI_DEBUG: if non-empty, report voluminous debugging information.  Implies
+#   CI_VERBOSE.  Optional.
+# If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
+# called, it is used as GitHub Personal Access Token when making GitHub API
+# calls.  This can avoid "403 rate limit exceeded" failures.
+#
+# All reporting is to standard error, so that sourcing this script cannot
+# corrupt output that the client is producing.
+
+# Requires the `jq` program, either `curl` or `wget`, and the script
+# `set-ci-org-and-branch` in ${PLUME_SCRIPTS}.
+
+# PROBLEM: The directory from which this script is running must override environment
+# variables, because a CI job may itself call "git clone" and then later call
+# this script from that clone.  Idea: check the directory name.
+
+# When this file is sourced, "$0" is the client's name rather than this file's
+# name; so if "$0" is this file's name, the client ran it instead of sourcing it.
+case $0 in
+  */set-git-changes | set-git-changes)
+    echo "set-git-changes must be sourced (\`. set-git-changes\`), not run." >&2
+    echo "To run a script instead, use \`eval \"\$(git-changes)\"\`." >&2
+    exit 2
+    ;;
+esac
+
+### Organization and branch
+
+: "${PLUME_SCRIPTS:=/tmp/plume-scripts}"
+if [ ! -r "${PLUME_SCRIPTS}/set-ci-org-and-branch" ]; then
+  echo "set-git-changes: cannot read ${PLUME_SCRIPTS}/set-ci-org-and-branch." >&2
+  echo "Set variable PLUME_SCRIPTS to the directory that contains these scripts." >&2
+  return 2
+fi
+# Source it here rather than within a function, so that its `return` cannot be
+# mistaken for a return from that function.  It saves and restores the client's
+# shell options itself, and it sets CI_DEFAULT_BRANCH_NAME and CI_PULL_JSON,
+# which the commit-range code below uses.
+# shellcheck source=set-ci-org-and-branch
+. "${PLUME_SCRIPTS}"/set-ci-org-and-branch || return $?
+
+### Functions
+
+# Returns either `git rev-parse HEAD^1` if HEAD^1 exists, or `git rev-parse HEAD`.
+# HEAD^1 does not exist if the clone was created with `git clone --depth=1`.
+_gc_head1() {
+  if git rev-parse --verify --quiet HEAD^1 > /dev/null 2>&1; then
+    git rev-parse HEAD^1
+  else
+    git rev-parse HEAD
+  fi
+}
+
+# Converts a shallow clone into a complete one.
+_gc_unshallow() {
+  if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+    git fetch --unshallow origin
+  fi
+}
+
+# Fetches $base_branch, the branch that a pull request is against, and sets
+# $base_tip to its commit.  Does nothing on a second call, because fetching a
+# branch fetches its complete history, so once is enough.
+# $base_branch, $base_branch_fetched, and $base_tip are locals of the caller;
+# `local` is dynamically scoped, so this function reads and writes the caller's.
+_gc_fetch_base_branch() {
+  if [ -z "$base_branch_fetched" ] && [ -n "$base_branch" ]; then
+    base_branch_fetched="true"
+    git fetch -q origin "$base_branch"
+    # Remember the tip, because a later fetch overwrites FETCH_HEAD.
+    base_tip=$(git rev-parse --verify -q FETCH_HEAD)
+  fi
+}
+
+# Returns true if `git diff ${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}`
+# would work.  That command diffs from the merge base of the two commits, so it
+# is not enough for both commits to be in the clone; their common ancestor must
+# be as well, which is not the case in a clone that is too shallow.
+_gc_commit_range_is_usable() {
+  git merge-base "$CI_COMMIT_RANGE_START" "$CI_COMMIT_RANGE_END" > /dev/null 2>&1
+}
+
+# Does all the work.  Its caller protects the client from its shell options.
+_gc_set_git_changes_body() {
+  local SCRIPT_NAME="set-git-changes"
+  local verbose="$CI_VERBOSE"
+  local debug="$CI_DEBUG"
+  local base_branch=""
+  local base_branch_fetched=""
+  local base_tip=""
+  local DEFAULT_CI_COMMIT_RANGE_START
+
+  if [ -n "$debug" ]; then
+    verbose="$debug"
+  fi
+
+  # Compute the values from scratch, rather than reusing values that the client
+  # or a previous sourcing of this script left in the environment.
+  CI_COMMIT_RANGE=""
+  CI_COMMIT_RANGE_START=""
+  CI_COMMIT_RANGE_END=""
+
+  ### Commit range
+
+  if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
+    ## Azure Pipelines pull request
+    # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
+    # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that because
+    # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
+    CI_COMMIT_RANGE_START=$(_gc_head1)
+    CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
+    CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
+  elif [ -n "$BUILD_SOURCEBRANCH" ]; then
+    # Azure Pipelines build for a branch (possibly master).
+    if [ "$BUILD_SOURCEBRANCHNAME" = "$CI_DEFAULT_BRANCH_NAME" ]; then
+      DEFAULT_CI_COMMIT_RANGE_START=$(_gc_head1)
+
+      # If a build fails, we would like to continue failing subsequent
+      # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
+      # does not do that, because there could have been multiple pushes
+      # since the last successful CI job.
+      # Pass argument to ci-last-success.py, because in a pull request
+      # we are only interested in the last success on the master branch,
+      # not on the feature branch!  The feature branch might have many
+      # succeeding jobs and then ci-last-success.py will return just
+      # part of the pull request's diffs.
+
+      ## # ci-last-success.py currently doesn't work because api.github.com returns "state: pending".
+      # # TODO: wrap all this in a ci-last-commit.sh shell script.
+      # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
+      #   # echo "Python requests package is already installed" >&2
+      #   :
+      # else
+      #   (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
+      # fi
+      # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
+      #   CI_COMMIT_RANGE_START=$(${PLUME_SCRIPTS}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START})
+      #   if [ -z "$CI_COMMIT_RANGE_START" ] ; then
+      #     echo "WARNING: ci-last-success.py script failed; just considering last commit." >&2
+      #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+      #   elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
+      #     # The commit is not in the repository.  Maybe it is older than the
+      #     # commits pulled into this repository.  This can happen when
+      #     # api.github.com incorrectly returns "state: pending" for successful
+      #     # jobs.
+      #     echo "WARNING: ci-last-success.py script returned commit not in repository; using last commit." >&2
+      #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+      #   else
+      #     echo "ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START." >&2
+      #   fi
+      # else
+      #   echo "WARNING: Could not run ci-last-success.py script; just considering last commit." >&2
+      #   CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+      # fi
+
+      ## Use this because ci-last-success.py currently doesn't work.
+      CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
+    else
+      git fetch origin "$CI_DEFAULT_BRANCH_NAME"
+      CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
+    fi
+    CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
+    CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
+  elif [ "$TRAVIS" = "true" ]; then
+    ## Travis CI
+    # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
+    CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
+
+  elif [ -n "$CIRCLECI" ] && [ -n "$CIRCLE_PR_NUMBER" ]; then
+    ## CircleCI pull request
+    # Every value that the GitHub API provides has a fallback that is computed
+    # locally, because the request is unauthenticated and thus may be throttled.
+    # "// empty" maps JSON null to the empty string; the redirection discards
+    # jq's complaint if the response is not JSON at all (as when throttling
+    # yields an HTML error page).
+    CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.base.sha // empty' 2> /dev/null)
+    CI_COMMIT_RANGE_END=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.sha // empty' 2> /dev/null)
+    # The branch that the pull request is against.  It is usually the default
+    # branch, but a pull request may be against any branch.
+    base_branch=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.base.ref // empty' 2> /dev/null)
+    if [ -z "$base_branch" ]; then
+      base_branch=$CI_DEFAULT_BRANCH_NAME
+    fi
+    if [ -z "$CI_COMMIT_RANGE_END" ] \
+      || ! git rev-parse --verify -q "${CI_COMMIT_RANGE_END}^{commit}" > /dev/null; then
+      # Either the GitHub API request supplied no head commit, or it supplied
+      # one that is not in this clone (as happens when the pull request branch
+      # was pushed to after this job checked it out).  Use the commit that this
+      # job is actually testing.
+      CI_COMMIT_RANGE_END=${CIRCLE_SHA1:-$(git rev-parse HEAD)}
+    fi
+
+    if [ -n "$CI_COMMIT_RANGE_START" ] && ! _gc_commit_range_is_usable; then
+      # Fetch the branch that the commit is on.  Fetching by commit ID would be
+      # cheaper, but not every server permits it; `git fetch --depth` would be
+      # futile, because the commit is on a branch that this clone may not track
+      # at all, and it would shorten a complete clone's history.
+      _gc_fetch_base_branch
+      if ! _gc_commit_range_is_usable; then
+        if git rev-parse --verify -q "${CI_COMMIT_RANGE_START}^{commit}" > /dev/null; then
+          # The commit is here, but this clone's history stops after the fork
+          # point.  Completing the clone is the only way to reach it.
+          _gc_unshallow
+        fi
+        if ! _gc_commit_range_is_usable; then
+          # The commit is unreachable in origin, as after a force-push, or it is
+          # absent from this clone and the `_gc_unshallow` above was skipped
+          # because of that.  Do not distinguish the two cases: the fallback
+          # below computes the fork point, a better range start than either.
+          echo "${SCRIPT_NAME}: cannot use commit range start ${CI_COMMIT_RANGE_START} from the GitHub API." >&2
+          CI_COMMIT_RANGE_START=""
+        fi
+      fi
+    fi
+
+    if [ -z "$CI_COMMIT_RANGE_START" ]; then
+      # Either the GitHub API request failed, or its answer is unusable.  Use
+      # the fork point from the base branch instead.  Say so, because otherwise
+      # the log gives no way to tell which of the two was used.
+      echo "${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}." >&2
+      _gc_fetch_base_branch
+      if [ -n "$base_tip" ]; then
+        CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
+        if [ -z "$CI_COMMIT_RANGE_START" ]; then
+          # In a shallow clone, `git merge-base` either gives the right answer
+          # or no answer, so completing the clone is needed only now.  The base
+          # branch does not need to be fetched again; only this clone's own
+          # history was missing.
+          _gc_unshallow
+          CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
+        fi
+      fi
+      if [ -z "$CI_COMMIT_RANGE_START" ]; then
+        # Last resort.  Under CircleCI, HEAD is the pull request's head branch,
+        # so HEAD^1 is the pull request's next-to-last commit and the range
+        # omits every earlier commit of the pull request.  Warn, because the
+        # range is valid and non-empty, so no client will complain about it.
+        CI_COMMIT_RANGE_START=$(_gc_head1)
+        echo "${SCRIPT_NAME}: WARNING: cannot find the fork point from ${base_branch:-the default branch}, so the commit range covers only the last commit." >&2
+      fi
+    fi
+    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+
+  elif [ -n "${GITHUB_HEAD_REF}" ]; then
+    # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
+    # At this point, these two are the same:
+    # git rev-parse HEAD
+    # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
+    if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
+      if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
+        if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
+          if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${CI_DEFAULT_BRANCH_NAME}" 2> /dev/null); then
+            # Last resort: the pull request description that `set-ci-org-and-branch` obtained.
+            if ! CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -e -r '.base.sha // empty' 2> /dev/null); then
+              {
+                echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${CI_DEFAULT_BRANCH_NAME}"
+                echo '---------------- start of set'
+                set
+                echo '---------------- end of set'
+                echo "git log --graph:"
+                git log --graph | head --lines=1000
+                echo "git show:"
+                git --no-pager show | head --lines=1000
+              } >&2
+              CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
+            fi
+          fi
+        fi
+      fi
+    fi
+    # These are the same: `sha`=`echo $GITHUB_SHA`=`git rev-parse remotes/pull/"${GITHUB_REF_NAME}"`.
+    CI_COMMIT_RANGE_END=${GITHUB_SHA}
+    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+
+    # If this elif is reached, it's not a pull request (except maybe a re-run Azure Pipelines pull request).
+  elif [ -n "$GITHUB_ACTIONS" ]; then
+    # GitHub Actions, non-pull-request.
+    CI_COMMIT_RANGE_END="${GITHUB_SHA}"
+  fi
+
+  if [ -n "$debug" ]; then
+    {
+      echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
+      echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
+      echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
+    } >&2
+  fi
+
+  ## The above may not have set CI_COMMIT_RANGE.  Set it.
+
+  # Separate from "It's not a pull request" because sometimes this is not set for Travis.
+  if [ -z "$CI_COMMIT_RANGE" ]; then
+    if [ -n "$debug" ]; then
+      echo "Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH" >&2
+    fi
+    if [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
+      if git show --summary HEAD | grep -q ^Merge:; then
+        CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
+      else
+        CI_COMMIT_RANGE_START=$(_gc_head1)
+      fi
+      CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
+    else
+      # "origin/$CI_DEFAULT_BRANCH_NAME" is accurate when the pull request was
+      # created, but it doesn't change when force-push occurs (as Renovate does),
+      # making it out of date.
+      case $CI_BRANCH in
+        renovate/*) CI_COMMIT_RANGE_START=$(_gc_head1) ;;
+        *)
+          if git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
+            CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
+            if [ -n "$debug" ]; then
+              echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$CI_DEFAULT_BRANCH_NAME" >&2
+            fi
+          else
+            if git show --summary HEAD | grep -q ^Merge:; then
+              CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
+            else
+              CI_COMMIT_RANGE_START=$(_gc_head1)
+            fi
+          fi
+          ;;
+      esac
+      CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH")
+    fi
+    CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
+    if [ -n "$debug" ]; then
+      {
+        echo "CI_BRANCH=${CI_BRANCH}"
+        echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
+        echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
+        echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
+      } >&2
+    fi
+  fi
+
+  if [ -z "$CI_COMMIT_RANGE_START" ]; then
+    if [ -n "$debug" ]; then
+      echo "Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
+    fi
+    CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
+    CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
+    if [ -z "$CI_COMMIT_RANGE_START" ]; then
+      CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_END}
+    fi
+  fi
+
+  # Avoid errors regarding empty range
+  if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
+    if [ -n "$verbose" ]; then
+      echo "Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
+    fi
+    if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
+      CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
+    else
+      if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1; then
+        CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
+      fi
+    fi
+    # The start and end commits could still be the same, if the current branch was cloned with
+    # --depth=1.
+    CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+  fi
+
+  if [ -n "$verbose" ]; then
+    {
+      echo '---------------- start of first 10000 lines of diff:'
+      git --no-pager diff "${CI_COMMIT_RANGE}" | head --lines=10000
+      echo '---------------- end of first 10000 lines of diff.'
+    } >&2
+  fi
+
+  # The diff might be empty if the last commit is the revert of the one before it.
+
+  ### Set it
+
+  export CI_COMMIT_RANGE_START
+  export CI_COMMIT_RANGE_END
+  export CI_COMMIT_RANGE
+  if [ -n "$verbose" ]; then
+    {
+      echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
+      echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
+      echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
+    } >&2
+  fi
+}
+
+# Give the body shell options that suit it, then restore the client's options.
+# The client's `set -u` would abort on the many CI variables that are unset
+# outside their own CI service, and its `set -e` would abort on a command whose
+# failure this script handles itself.
+# Only the two options that this script changes are saved, and they are read
+# from "$-" rather than from `set +o`:  bash and BusyBox ash turn errexit off
+# inside the command substitution that capturing `set +o` requires, so a
+# captured `set +o` would report errexit as off and turn it off in the client.
+case $- in
+  *e*) _gc_had_errexit="true" ;;
+  *) _gc_had_errexit="" ;;
+esac
+case $- in
+  *u*) _gc_had_nounset="true" ;;
+  *) _gc_had_nounset="" ;;
+esac
+set +e +u
+
+_gc_set_git_changes_body
+_gc_status=$?
+
+# Clean up before restoring `set -e`, which makes the shell exit here if the
+# client uses `set -e` and this script failed.
+unset -f _gc_set_git_changes_body _gc_head1 _gc_unshallow _gc_fetch_base_branch \
+  _gc_commit_range_is_usable
+if [ -n "$_gc_had_errexit" ]; then
+  set -e
+fi
+if [ -n "$_gc_had_nounset" ]; then
+  set -u
+fi
+unset _gc_had_errexit _gc_had_nounset
+# Unset the last of this script's variables and return, in a single command
+# because unsetting the variable would otherwise lose the status.
+eval "unset _gc_status; return ${_gc_status}"

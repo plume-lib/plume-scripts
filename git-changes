@@ -2,6 +2,11 @@
 
 # Determines the start and end commits for a CI job.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+#
+# The client `eval`s this script's output.  Script `set-git-changes` computes
+# the same information, but the client sources it.  Prefer to use
+# `set-git-changes` instead:  this script's exit status is lost by the `eval`,
+# which reports the status of the text it evaluated rather than of this script.
 
 # Typical use:
 #
@@ -36,16 +41,13 @@
 # Diagnostics requested by --verbose or --debug are written to standard error,
 # so that only the variable settings appear on standard output.
 
-# Requires the `jq` program, either `curl` or `wget`, and the script
-# `set-ci-org-and-branch` in the same directory as this script.
+# Requires the `jq` program, either `curl` or `wget`, and the scripts
+# `set-git-changes` and `set-ci-org-and-branch` in the same directory as this
+# script.
 #
 # If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
-
-# PROBLEM: The directory from which git-changes is running must override environment
-# variables, because a CI job may itself call "git clone" and then later call
-# git-changes from that clone.  Idea: check the directory name.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
@@ -79,346 +81,31 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-### Organization and branch
+# Writes its argument, quoted so that the client's `eval` reads it back as one
+# word.  A value may contain a shell metacharacter:  a git branch name may
+# contain any of `$`, backquote, `;`, `&`, `|`, and `'`.
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
 
-# `set-ci-org-and-branch` sets CI_ORGANIZATION and CI_BRANCH; it also sets
-# CI_DEFAULT_BRANCH_NAME and CI_PULL_JSON, which this script uses below.  It
-# writes everything else to standard error, so it does not disturb the variable
-# settings that this script writes to standard output.  It checks for the `jq`,
-# `curl`, and `wget` programs, so this script need not do so.
+### Compute the values
+
+# `set-git-changes` does all the work.  It writes everything but the variable
+# values to standard error, so it does not disturb the variable settings that
+# this script writes to standard output.
 # The command-line argument wins, but an inherited CI_DEFAULT_ORGANIZATION is
 # honored if there is no argument, so that the two interfaces agree.
+PLUME_SCRIPTS="${SCRIPT_DIR}"
 CI_DEFAULT_ORGANIZATION="${DEFAULT_ORGANIZATION:-${CI_DEFAULT_ORGANIZATION}}"
 CI_VERBOSE="${VERBOSE}"
 CI_DEBUG="${DEBUG}"
-# shellcheck source=set-ci-org-and-branch
-. "${SCRIPT_DIR}"/set-ci-org-and-branch || exit $?
-
-### Functions
-
-# Returns either `git rev-parse HEAD^1` if HEAD^1 exists, or `git rev-parse HEAD`.
-# HEAD^1 does not exist if the clone was created with `git clone --depth=1`.
-head1() {
-  if git rev-parse --verify --quiet HEAD^1 > /dev/null 2>&1; then
-    git rev-parse HEAD^1
-  else
-    git rev-parse HEAD
-  fi
-}
-
-# Converts a shallow clone into a complete one.
-unshallow() {
-  if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-    git fetch --unshallow origin
-  fi
-}
-
-# Fetches $base_branch, the branch that a pull request is against, and sets
-# $base_tip to its commit.  Does nothing on a second call, because fetching a
-# branch fetches its complete history, so once is enough.
-base_branch=""
-base_branch_fetched=""
-base_tip=""
-fetch_base_branch() {
-  if [ -z "$base_branch_fetched" ] && [ -n "$base_branch" ]; then
-    base_branch_fetched="true"
-    git fetch -q origin "$base_branch"
-    # Remember the tip, because a later fetch overwrites FETCH_HEAD.
-    base_tip=$(git rev-parse --verify -q FETCH_HEAD)
-  fi
-}
-
-# Returns true if `git diff ${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}`
-# would work.  That command diffs from the merge base of the two commits, so it
-# is not enough for both commits to be in the clone; their common ancestor must
-# be as well, which is not the case in a clone that is too shallow.
-commit_range_is_usable() {
-  git merge-base "$CI_COMMIT_RANGE_START" "$CI_COMMIT_RANGE_END" > /dev/null 2>&1
-}
-
-### Commit range
-
-if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
-  ## Azure Pipelines pull request
-  # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
-  # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that because
-  # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
-  CI_COMMIT_RANGE_START=$(head1)
-  CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
-  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
-elif [ -n "$BUILD_SOURCEBRANCH" ]; then
-  # Azure Pipelines build for a branch (possibly master).
-  if [ "$BUILD_SOURCEBRANCHNAME" = "$CI_DEFAULT_BRANCH_NAME" ]; then
-    DEFAULT_CI_COMMIT_RANGE_START=$(head1)
-
-    # If a build fails, we would like to continue failing subsequent
-    # builds until the problem is fixed.  Using `git rev-parse HEAD^1`
-    # does not do that, because there could have been multiple pushes
-    # since the last successful CI job.
-    # Pass argument to ci-last-success.py, because in a pull request
-    # we are only interested in the last success on the master branch,
-    # not on the feature branch!  The feature branch might have many
-    # succeeding jobs and then ci-last-success.py will return just
-    # part of the pull request's diffs.
-
-    ## # ci-last-success.py currently doesn't work because api.github.com returns "state: pending".
-    # # TODO: wrap all this in a ci-last-commit.sh shell script.
-    # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-    #   # echo "echo \"Python requests package is already installed\";"
-    #   :
-    # else
-    #   (sudo pip3 install requests || pip3 install --user requests || true) > /dev/null 2>&1
-    # fi
-    # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
-    #   CI_COMMIT_RANGE_START=$(${SCRIPT_DIR}/ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} ${DEFAULT_CI_COMMIT_RANGE_START})
-    #   if [ -z "$CI_COMMIT_RANGE_START" ] ; then
-    #     echo "echo \"WARNING: ci-last-success.py script failed; just considering last commit.\";"
-    #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
-    #   elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
-    #     # The commit is not in the repository.  Maybe it is older than the
-    #     # commits pulled into this repository.  This can happen when
-    #     # api.github.com incorrectly returns "state: pending" for successful
-    #     # jobs.
-    #     echo "echo \"WARNING: ci-last-success.py script returned commit not in repository; using last commit.\";"
-    #     CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
-    #   else
-    #     echo "echo \"ci-last-success.py ${CI_ORGANIZATION} ${CI_REPO} succeeded with $CI_COMMIT_RANGE_START.\";"
-    #   fi
-    # else
-    #   echo "echo \"WARNING: Could not run ci-last-success.py script; just considering last commit.\";"
-    #   CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
-    # fi
-
-    ## Use this because ci-last-success.py currently doesn't work.
-    CI_COMMIT_RANGE_START=${DEFAULT_CI_COMMIT_RANGE_START}
-  else
-    git fetch origin "$CI_DEFAULT_BRANCH_NAME"
-    CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
-  fi
-  CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
-  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
-elif [ "$TRAVIS" = "true" ]; then
-  ## Travis CI
-  # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
-  CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
-
-elif [ -n "$CIRCLECI" ] && [ -n "$CIRCLE_PR_NUMBER" ]; then
-  ## CircleCI pull request
-  # Every value that the GitHub API provides has a fallback that is computed
-  # locally, because the request is unauthenticated and thus may be throttled.
-  # "// empty" maps JSON null to the empty string; the redirection discards
-  # jq's complaint if the response is not JSON at all (as when throttling
-  # yields an HTML error page).
-  CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.base.sha // empty' 2> /dev/null)
-  CI_COMMIT_RANGE_END=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.sha // empty' 2> /dev/null)
-  # The branch that the pull request is against.  It is usually the default
-  # branch, but a pull request may be against any branch.
-  base_branch=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.base.ref // empty' 2> /dev/null)
-  if [ -z "$base_branch" ]; then
-    base_branch=$CI_DEFAULT_BRANCH_NAME
-  fi
-  if [ -z "$CI_COMMIT_RANGE_END" ] \
-    || ! git rev-parse --verify -q "${CI_COMMIT_RANGE_END}^{commit}" > /dev/null; then
-    # Either the GitHub API request supplied no head commit, or it supplied
-    # one that is not in this clone (as happens when the pull request branch
-    # was pushed to after this job checked it out).  Use the commit that this
-    # job is actually testing.
-    CI_COMMIT_RANGE_END=${CIRCLE_SHA1:-$(git rev-parse HEAD)}
-  fi
-
-  if [ -n "$CI_COMMIT_RANGE_START" ] && ! commit_range_is_usable; then
-    # Fetch the branch that the commit is on.  Fetching by commit ID would be
-    # cheaper, but not every server permits it; `git fetch --depth` would be
-    # futile, because the commit is on a branch that this clone may not track
-    # at all, and it would shorten a complete clone's history.
-    fetch_base_branch
-    if ! commit_range_is_usable; then
-      if git rev-parse --verify -q "${CI_COMMIT_RANGE_START}^{commit}" > /dev/null; then
-        # The commit is here, but this clone's history stops after the fork
-        # point.  Completing the clone is the only way to reach it.
-        unshallow
-      fi
-      if ! commit_range_is_usable; then
-        # The commit is unreachable in origin, as after a force-push, or it is
-        # absent from this clone and the `unshallow` above was skipped because
-        # of that.  Do not distinguish the two cases: the fallback below
-        # computes the fork point, which is a better range start than either.
-        echo "${SCRIPT_NAME}: cannot use commit range start ${CI_COMMIT_RANGE_START} from the GitHub API." >&2
-        CI_COMMIT_RANGE_START=""
-      fi
-    fi
-  fi
-
-  if [ -z "$CI_COMMIT_RANGE_START" ]; then
-    # Either the GitHub API request failed, or its answer is unusable.  Use
-    # the fork point from the base branch instead.  Say so, because otherwise
-    # the log gives no way to tell which of the two was used.
-    echo "${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}." >&2
-    fetch_base_branch
-    if [ -n "$base_tip" ]; then
-      CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-      if [ -z "$CI_COMMIT_RANGE_START" ]; then
-        # In a shallow clone, `git merge-base` either gives the right answer
-        # or no answer, so completing the clone is needed only now.  The base
-        # branch does not need to be fetched again; only this clone's own
-        # history was missing.
-        unshallow
-        CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-      fi
-    fi
-    if [ -z "$CI_COMMIT_RANGE_START" ]; then
-      # Last resort.  Under CircleCI, HEAD is the pull request's head branch,
-      # so HEAD^1 is the pull request's next-to-last commit and the range
-      # omits every earlier commit of the pull request.  Warn, because the
-      # range is valid and non-empty, so no client will complain about it.
-      CI_COMMIT_RANGE_START=$(head1)
-      echo "${SCRIPT_NAME}: WARNING: cannot find the fork point from ${base_branch:-the default branch}, so the commit range covers only the last commit." >&2
-    fi
-  fi
-  CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
-
-elif [ -n "${GITHUB_HEAD_REF}" ]; then
-  # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
-  # At this point, these two are the same:
-  # git rev-parse HEAD
-  # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
-  if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
-    if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
-      if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
-        if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${CI_DEFAULT_BRANCH_NAME}" 2> /dev/null); then
-          # Last resort: the pull request description that `set-ci-org-and-branch` obtained.
-          if ! CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -e -r '.base.sha // empty' 2> /dev/null); then
-            {
-              echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${CI_DEFAULT_BRANCH_NAME}"
-              echo '---------------- start of set'
-              set
-              echo '---------------- end of set'
-              echo "git log --graph:"
-              git log --graph | head --lines=1000
-              echo "git show:"
-              git --no-pager show | head --lines=1000
-            } >&2
-            CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
-          fi
-        fi
-      fi
-    fi
-  fi
-  # These are the same: `sha`=`echo $GITHUB_SHA`=`git rev-parse remotes/pull/"${GITHUB_REF_NAME}"`.
-  CI_COMMIT_RANGE_END=${GITHUB_SHA}
-  CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
-
-  # If this elif is reached, it's not a pull request (except maybe a re-run Azure Pipelines pull request).
-elif [ -n "$GITHUB_ACTIONS" ]; then
-  # GitHub Actions, non-pull-request.
-  CI_COMMIT_RANGE_END="${GITHUB_SHA}"
-fi
-
-if [ "$DEBUG" = "--debug" ]; then
-  {
-    echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
-    echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
-    echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
-  } >&2
-fi
-
-## The above may not have set CI_COMMIT_RANGE.  Set it.
-
-# Separate from "It's not a pull request" because sometimes this is not set for Travis.
-if [ -z "$CI_COMMIT_RANGE" ]; then
-  if [ "$DEBUG" = "--debug" ]; then
-    echo "Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH" >&2
-  fi
-  if [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
-    if git show --summary HEAD | grep -q ^Merge:; then
-      CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
-    else
-      CI_COMMIT_RANGE_START=$(head1)
-    fi
-    CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
-  else
-    # "origin/$CI_DEFAULT_BRANCH_NAME" is accurate when the pull request was
-    # created, but it doesn't change when force-push occurs (as Renovate does),
-    # making it out of date.
-    case $CI_BRANCH in
-      renovate/*) CI_COMMIT_RANGE_START=$(head1) ;;
-      *)
-        if git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
-          CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
-          if [ "$DEBUG" = "--debug" ]; then
-            echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$CI_DEFAULT_BRANCH_NAME" >&2
-          fi
-        else
-          if git show --summary HEAD | grep -q ^Merge:; then
-            CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
-          else
-            CI_COMMIT_RANGE_START=$(head1)
-          fi
-        fi
-        ;;
-    esac
-    CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH")
-  fi
-  CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
-  if [ "$DEBUG" = "--debug" ]; then
-    {
-      echo "CI_BRANCH=${CI_BRANCH}"
-      echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
-      echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
-      echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
-    } >&2
-  fi
-fi
-
-if [ -z "$CI_COMMIT_RANGE_START" ]; then
-  if [ "$DEBUG" = "--debug" ]; then
-    echo "Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
-  fi
-  CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
-  CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
-  if [ -z "$CI_COMMIT_RANGE_START" ]; then
-    CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_END}
-  fi
-fi
-
-# Avoid errors regarding empty range
-if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
-  if [ "$VERBOSE" = "--verbose" ]; then
-    echo "Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
-  fi
-  if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
-    CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
-  else
-    if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1; then
-      CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
-    fi
-  fi
-  # The start and end commits could still be the same, if the current branch was cloned with
-  # --depth=1.
-  CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
-fi
-
-if [ "$VERBOSE" = "--verbose" ]; then
-  {
-    echo '---------------- start of first 10000 lines of diff:'
-    git --no-pager diff "${CI_COMMIT_RANGE}" | head --lines=10000
-    echo '---------------- end of first 10000 lines of diff.'
-  } >&2
-fi
-
-# The diff might be empty if the last commit is the revert of the one before it.
+# shellcheck source=set-git-changes
+. "${SCRIPT_DIR}"/set-git-changes || exit $?
 
 ### Print it out
 
-if [ "$VERBOSE" = "--verbose" ]; then
-  {
-    echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
-    echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
-    echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
-  } >&2
-fi
-echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
-echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
-echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
-echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
-echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
+echo "CI_ORGANIZATION=$(shell_quote "$CI_ORGANIZATION"); export CI_ORGANIZATION;"
+echo "CI_BRANCH=$(shell_quote "$CI_BRANCH"); export CI_BRANCH;"
+echo "CI_COMMIT_RANGE_START=$(shell_quote "$CI_COMMIT_RANGE_START"); export CI_COMMIT_RANGE_START;"
+echo "CI_COMMIT_RANGE_END=$(shell_quote "$CI_COMMIT_RANGE_END"); export CI_COMMIT_RANGE_END;"
+echo "CI_COMMIT_RANGE=$(shell_quote "$CI_COMMIT_RANGE"); export CI_COMMIT_RANGE;"
