@@ -2,7 +2,7 @@
 
 all: test
 
-test: test-words test-reldir test-guessstrip test-javaexception
+test: test-words test-reldir test-guessstrip test-javaexception test-incomparable
 
 
 # "words" test
@@ -66,8 +66,19 @@ javaexception-lint-pruned.txt: ../../lint-diff.py javaexception.diff javaexcepti
 	../../lint-diff.py --guess-strip javaexception.diff javaexception-lint.txt > $@ || true
 
 
+# "incomparable" test
+
+# The lint tool reports some paths relative to a module and others relative to
+# the repository, so the candidate strip values are not pointwise comparable.
+test-incomparable: incomparable-lint-pruned.txt-goal incomparable-lint-pruned.txt
+	diff $^
+
+incomparable-lint-pruned.txt: incomparable.diff incomparable-lint.txt ../../lint-diff.py
+	../../lint-diff.py --guess-strip --context=0 incomparable.diff incomparable-lint.txt > $@ || true
+
+
 # Miscellaneous targets
 
 # The `clean` target would be simpler if all generated files were put in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt
+	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt
