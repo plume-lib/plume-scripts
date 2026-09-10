@@ -44,6 +44,30 @@
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
 
+# Writes its argument, quoted so that the client's `eval` reads it back as one
+# word.  A value may contain a shell metacharacter:  a git branch name may
+# contain any of `$`, backquote, `;`, `&`, `|`, and `'`.
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# emit_echo TEXT: writes a command that prints TEXT when the client `eval`s
+# this script's output.  TEXT is quoted, so a value interpolated into it is
+# printed rather than executed.  Much of what this script reports -- a branch
+# name, a GitHub API response -- is chosen by whoever opened the pull request
+# being tested, so an unquoted value would be a command injection into the
+# client.
+emit_echo() {
+  echo "echo $(shell_quote "$1");"
+}
+
+# Copies standard input to standard output, turning each line into a command
+# that prints that line when the client `eval`s this script's output.  The
+# quoting is as in `emit_echo`, and for the same reason.
+emit_echo_lines() {
+  sed -e "s/'/'\\\\''/g" -e "s/^/echo '/" -e "s/\$/';/"
+}
+
 DEBUG=""
 DEFAULT_ORGANIZATION=""
 while [ "$#" -gt 0 ]; do
@@ -58,7 +82,7 @@ while [ "$#" -gt 0 ]; do
     *)
       if [ -n "${DEFAULT_ORGANIZATION}" ]; then
         usage="Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
-        echo "echo \"$usage\";"
+        emit_echo "$usage"
         echo "$usage" >&2
         echo "exit 2"
         exit 2
@@ -96,31 +120,31 @@ redact_tokens() {
 
 if [ "$DEBUG" = "--debug" ]; then
   # `env` only prints EXPORTED variables, so `set` is usually more useful.
-  echo "echo ${SCRIPT_NAME} is running in $(pwd)"
+  emit_echo "${SCRIPT_NAME} is running in $(pwd)"
   echo
-  echo 'echo ---------------- start of env'
-  env -0 | sort -z | tr '\0' '\n' | redact_tokens | sed -e 's/^/echo /'
-  echo 'echo ---------------- end of env'
+  emit_echo '---------------- start of env'
+  env -0 | sort -z | tr '\0' '\n' | redact_tokens | emit_echo_lines
+  emit_echo '---------------- end of env'
   echo
-  echo 'echo ---------------- start of set'
-  set | redact_tokens | sed -e 's/^/echo /'
-  echo 'echo ---------------- end of set'
+  emit_echo '---------------- start of set'
+  set | redact_tokens | emit_echo_lines
+  emit_echo '---------------- end of set'
   echo
-  echo 'echo ---------------- start of git status'
-  git --no-pager status | sed -e 's/^/echo /'
-  echo 'echo ---------------- end of git status'
+  emit_echo '---------------- start of git status'
+  git --no-pager status | emit_echo_lines
+  emit_echo '---------------- end of git status'
   echo
-  echo 'echo ---------------- start of all branches'
-  git --no-pager branch -a | sed -e 's/^/echo /'
-  echo 'echo ---------------- end of all branches'
+  emit_echo '---------------- start of all branches'
+  git --no-pager branch -a | emit_echo_lines
+  emit_echo '---------------- end of all branches'
   echo
-  echo 'echo ---------------- start of all remote branches'
-  git --no-pager branch -r | sed -e 's/^/echo /'
-  echo 'echo ---------------- end of all branches'
+  emit_echo '---------------- start of all remote branches'
+  git --no-pager branch -r | emit_echo_lines
+  emit_echo '---------------- end of all branches'
   echo
-  echo 'echo ---------------- start of 1000 lines of git log'
-  git --no-pager log --graph | head --lines=1000 | sed -e 's/^/echo /'
-  echo 'echo ---------------- end of 1000 lines of git log'
+  emit_echo '---------------- start of 1000 lines of git log'
+  git --no-pager log --graph | head --lines=1000 | emit_echo_lines
+  emit_echo '---------------- end of 1000 lines of git log'
   echo
 fi
 
@@ -144,7 +168,7 @@ if [ -n "$(command -v curl 2> /dev/null)" ]; then
 elif [ -n "$(command -v wget 2> /dev/null)" ]; then
   http_get_tool="wget"
 else
-  echo "echo Neither curl nor wget is installed"
+  emit_echo "Neither curl nor wget is installed"
   exit 2
 fi
 
@@ -169,7 +193,7 @@ get_url() {
 }
 
 if [ -z "$(command -v jq 2> /dev/null)" ]; then
-  echo "echo jq is not installed"
+  emit_echo "jq is not installed"
   exit 2
 fi
 
@@ -209,7 +233,7 @@ fetch_base_branch() {
       # Remember the tip, because a later fetch overwrites FETCH_HEAD.
       base_tip=$(git rev-parse --verify -q FETCH_HEAD)
     else
-      echo "echo \"${SCRIPT_NAME}: cannot fetch ${base_branch} from origin.\";"
+      emit_echo "${SCRIPT_NAME}: cannot fetch ${base_branch} from origin."
     fi
   fi
 }
@@ -237,14 +261,13 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
     pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
     SLUG=$(printf '%s' "${pull_json}" | jq .head.label | sed 's/"//g')
     if [ -z "$SLUG" ]; then
-      echo "echo ${SCRIPT_NAME} error: bad output for ${url}"
+      emit_echo "${SCRIPT_NAME} error: bad output for ${url}"
       if [ -n "$auth_token" ]; then
-        echo "echo auth_token is set."
+        emit_echo "auth_token is set."
       fi
-      echo "echo ---- start of wget output ----"
-      # shellcheck disable=SC2001
-      printf '%s' "${pull_json}" | sed -e 's/^/echo /'
-      echo "echo ---- end of wget output ----"
+      emit_echo "---- start of wget output ----"
+      printf '%s\n' "${pull_json}" | emit_echo_lines
+      emit_echo "---- end of wget output ----"
       exit 2
     fi
     CI_ORGANIZATION=${SLUG%:*}
@@ -264,9 +287,9 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
   CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq -r '.head.repo.owner.login')
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
-    echo "echo GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
-    echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
+    emit_echo "GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
+    emit_echo "GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
+    emit_echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
 fi
 
@@ -288,7 +311,7 @@ if [ -z "$CI_ORGANIZATION" ]; then
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
-  echo "echo CI_ORGANIZATION=${CI_ORGANIZATION}"
+  emit_echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
 fi
 
 ### Other information (besides organization)
@@ -297,20 +320,20 @@ fi
 # DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
 DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
 if [ "$DEBUG" = "--debug" ]; then
-  echo "echo remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME;"
+  emit_echo "remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME"
   if [ -n "${URL}" ]; then
-    echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | sed -e 's/^/echo /'
+    echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | emit_echo_lines
   else
-    echo "echo URL is empty (is set only for non-CI runs);"
+    emit_echo "URL is empty (is set only for non-CI runs)"
   fi
-  echo "echo current branch: $(git branch --show-current);"
-  echo "echo current repo: $(git config --get remote.origin.url);"
+  emit_echo "current branch: $(git branch --show-current)"
+  emit_echo "current repo: $(git config --get remote.origin.url)"
 fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
   ## Azure Pipelines pull request
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH;"
+    emit_echo "Azure Pipelines pull request $SYSTEM_PULLREQUEST_TARGETBRANCH"
   fi
   # WARNING!  $BUILD_SOURCEBRANCHNAME is just a name, not a full ref path.  For example,
   # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge".
@@ -324,8 +347,8 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
 elif [ -n "$BUILD_SOURCEBRANCH" ]; then
   # Azure Pipelines build for a branch (possibly master).
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo Azure Pipelines build for a branch $BUILD_SOURCEBRANCH;"
-    echo "echo SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH;"
+    emit_echo "Azure Pipelines build for a branch $BUILD_SOURCEBRANCH"
+    emit_echo "SYSTEM_PULLREQUEST_TARGETBRANCH=$SYSTEM_PULLREQUEST_TARGETBRANCH is not set but BUILD_SOURCEBRANCH=$BUILD_SOURCEBRANCH"
   fi
   # In Azure Pipelines:  BUILD_SOURCEBRANCH is a full ref path like "refs/heads/mybranch";
   # BUILD_SOURCEBRANCHNAME is a short name like "mybranch"; $BUILD_SOURCEVERSION is a commit ID.
@@ -383,20 +406,20 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
 elif [ "$TRAVIS" = "true" ]; then
   ## Travis CI
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo Travis CI $TRAVIS;"
+    emit_echo "Travis CI $TRAVIS"
   fi
   CI_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
   if [ "$VERBOSE" = "--verbose" ]; then
-    echo "echo TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH;"
-    echo "echo TRAVIS_BRANCH=$TRAVIS_BRANCH;"
-    echo "echo CI_BRANCH=$CI_BRANCH;"
+    emit_echo "TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH"
+    emit_echo "TRAVIS_BRANCH=$TRAVIS_BRANCH"
+    emit_echo "CI_BRANCH=$CI_BRANCH"
   fi
   # $TRAVIS_COMMIT_RANGE is empty for builds triggered by the initial commit of a new branch.
   CI_COMMIT_RANGE=$TRAVIS_COMMIT_RANGE
 
 elif [ -n "$CIRCLECI" ]; then
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo CircleCI, CIRCLE_PULL_REQUEST=$CIRCLE_PULL_REQUEST;"
+    emit_echo "CircleCI, CIRCLE_PULL_REQUEST=$CIRCLE_PULL_REQUEST"
   fi
   if [ -n "$CIRCLE_PR_NUMBER" ]; then
     # TODO: Can I implement this without a GitHub API request?
@@ -444,7 +467,7 @@ elif [ -n "$CIRCLECI" ]; then
         if ! commit_range_is_usable; then
           # The commit is unreachable in origin, as after a force-push, so no
           # amount of fetching will produce it.
-          echo "echo \"${SCRIPT_NAME}: cannot use commit range start ${CI_COMMIT_RANGE_START} from the GitHub API.\";"
+          emit_echo "${SCRIPT_NAME}: cannot use commit range start ${CI_COMMIT_RANGE_START} from the GitHub API."
           CI_COMMIT_RANGE_START=""
         fi
       fi
@@ -454,7 +477,7 @@ elif [ -n "$CIRCLECI" ]; then
       # Either the GitHub API request failed, or its answer is unusable.  Use
       # the fork point from the base branch instead.  Say so, because otherwise
       # the log gives no way to tell which of the two was used.
-      echo "echo \"${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}.\";"
+      emit_echo "${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}."
       fetch_base_branch
       if [ -n "$base_tip" ]; then
         CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
@@ -473,7 +496,7 @@ elif [ -n "$CIRCLECI" ]; then
         # omits every earlier commit of the pull request.  Warn, because the
         # range is valid and non-empty, so no client will complain about it.
         CI_COMMIT_RANGE_START=$(head1)
-        echo "echo \"${SCRIPT_NAME}: WARNING: cannot find the fork point from ${base_branch:-the default branch}, so the commit range covers only the last commit.\";"
+        emit_echo "${SCRIPT_NAME}: WARNING: cannot find the fork point from ${base_branch:-the default branch}, so the commit range covers only the last commit."
       fi
     fi
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
@@ -484,12 +507,12 @@ elif [ -n "$CIRCLECI" ]; then
 elif [ -n "${GITHUB_HEAD_REF}" ]; then
   # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER};"
-    echo "echo   GITHUB_BASE_REF=${GITHUB_BASE_REF};"
-    echo "echo   GITHUB_REF_NAME=${GITHUB_REF_NAME};"
-    echo "echo   GITHUB_SHA=${GITHUB_SHA};"
+    emit_echo "GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER}"
+    emit_echo "  GITHUB_BASE_REF=${GITHUB_BASE_REF}"
+    emit_echo "  GITHUB_REF_NAME=${GITHUB_REF_NAME}"
+    emit_echo "  GITHUB_SHA=${GITHUB_SHA}"
     # GITHUB_HEAD_REF is in the PR fork which is not available.
-    echo "echo   GITHUB_HEAD_REF=${GITHUB_HEAD_REF};"
+    emit_echo "  GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
   fi
   # At this point, these two are the same:
   # git rev-parse HEAD
@@ -504,24 +527,24 @@ elif [ -n "${GITHUB_HEAD_REF}" ]; then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${DEFAULT_BRANCH_NAME}" 2> /dev/null); then
           pull_json="$(get_url "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}" | tr -d '[:cntrl:]')"
           if ! CI_COMMIT_RANGE_START=$(printf '%s' "${pull_json}" | jq -e -r '.base.sha // empty'); then
-            echo "echo ${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH_NAME}"
+            emit_echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${DEFAULT_BRANCH_NAME}"
             # This is a routine failure in a shallow single-branch checkout,
             # so dump the state only when asked.  `set` prints the whole
             # environment, and CI logs are often readable by anyone who can
             # see the job.
             if [ "$DEBUG" = "--debug" ]; then
-              echo 'echo ---------------- start of set'
-              set | redact_tokens | sed -e 's/^/echo /'
-              echo 'echo ---------------- end of set'
-              # echo "echo git branch:"
-              # git --no-pager branch -a | cut -c 3- | sed -e 's/^/echo "echo /' -e 's/$/"/'
-              echo "echo git log --graph:"
-              git log --graph | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
-              echo "echo git show:"
-              git --no-pager show | head --lines=1000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
+              emit_echo '---------------- start of set'
+              set | redact_tokens | emit_echo_lines
+              emit_echo '---------------- end of set'
+              # emit_echo "git branch:"
+              # git --no-pager branch -a | cut -c 3- | emit_echo_lines
+              emit_echo "git log --graph:"
+              git log --graph | head --lines=1000 | emit_echo_lines
+              emit_echo "git show:"
+              git --no-pager show | head --lines=1000 | emit_echo_lines
             fi
             CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
-            # echo "echo exiting"
+            # emit_echo "exiting"
             # # exit 2
             # exit
           fi
@@ -537,11 +560,11 @@ elif [ -n "${GITHUB_HEAD_REF}" ]; then
 elif [ -n "$GITHUB_ACTIONS" ]; then
   # GitHub Actions, non-pull-request.
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD);"
+    emit_echo "GitHub Actions, not a pull request, GITHUB_REF_NAME=${GITHUB_REF_NAME}, GITHUB_SHA=${GITHUB_SHA}, head=$(git rev-parse HEAD)"
   fi
 
   if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-    echo "echo GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
+    emit_echo "GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
     exit 2
   fi
 
@@ -560,7 +583,7 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
 else
 
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo Else clause: no CI environment detected;"
+    emit_echo "Else clause: no CI environment detected"
   fi
   # git 2.22 and later has `git branch --show-current`; CircleCI doesn't have that version yet.
   CI_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -573,10 +596,10 @@ else
 fi
 
 if [ "$DEBUG" = "--debug" ]; then
-  echo "echo CI_BRANCH=${CI_BRANCH};"
-  echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START};"
-  echo "echo CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END};"
-  echo "echo CI_COMMIT_RANGE=${CI_COMMIT_RANGE};"
+  emit_echo "CI_BRANCH=${CI_BRANCH}"
+  emit_echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
+  emit_echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
+  emit_echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
 fi
 
 ## The above may not have set CI_COMMIT_RANGE.  Set it.
@@ -584,7 +607,7 @@ fi
 # Separate from "It's not a pull request" because sometimes this is not set for Travis.
 if [ -z "$CI_COMMIT_RANGE" ]; then
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH;"
+    emit_echo "Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH"
   fi
   if [ "$CI_BRANCH" = "$DEFAULT_BRANCH_NAME" ]; then
     if git show --summary HEAD | grep -q ^Merge:; then
@@ -603,7 +626,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
         if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
           CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
           if [ "$DEBUG" = "--debug" ]; then
-            echo "echo Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$DEFAULT_BRANCH_NAME;"
+            emit_echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$DEFAULT_BRANCH_NAME"
           fi
         else
           if git show --summary HEAD | grep -q ^Merge:; then
@@ -618,16 +641,16 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
   fi
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo CI_BRANCH=${CI_BRANCH};"
-    echo "echo CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START};"
-    echo "echo CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END};"
-    echo "echo CI_COMMIT_RANGE=${CI_COMMIT_RANGE};"
+    emit_echo "CI_BRANCH=${CI_BRANCH}"
+    emit_echo "CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_START}"
+    emit_echo "CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE_END}"
+    emit_echo "CI_COMMIT_RANGE=${CI_COMMIT_RANGE}"
   fi
 fi
 
 if [ -z "$CI_COMMIT_RANGE_START" ]; then
   if [ "$DEBUG" = "--debug" ]; then
-    echo "echo Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+    emit_echo "Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
   fi
   CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
   CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
@@ -639,7 +662,7 @@ fi
 # Avoid errors regarding empty range
 if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   if [ "$VERBOSE" = "--verbose" ]; then
-    echo "echo Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+    emit_echo "Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
   fi
   if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
     CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
@@ -658,16 +681,16 @@ if [ "$VERBOSE" = "--verbose" ]; then
   # so test whether the response really does describe a pull request.
   if [ -n "${pull_json}" ] \
     && printf '%s' "${pull_json}" | jq -e -r '.head.sha // empty' > /dev/null 2>&1; then
-    echo "echo CI_ACCESSED_GITHUB_API=true;"
+    emit_echo "CI_ACCESSED_GITHUB_API=true"
   else
-    echo "echo CI_ACCESSED_GITHUB_API=false;"
+    emit_echo "CI_ACCESSED_GITHUB_API=false"
   fi
 fi
 
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo 'echo ---------------- start of first 10000 lines of diff:'
-  git --no-pager diff "${CI_COMMIT_RANGE}" | head --lines=10000 | sed -e 's/^/echo "echo /' -e 's/$/"/'
-  echo 'echo ---------------- end of first 10000 lines of diff.'
+  emit_echo '---------------- start of first 10000 lines of diff:'
+  git --no-pager diff "${CI_COMMIT_RANGE}" | head --lines=10000 | emit_echo_lines
+  emit_echo '---------------- end of first 10000 lines of diff.'
 fi
 
 # The diff might be empty if the last commit is the revert of the one before it.
@@ -675,22 +698,22 @@ fi
 ### Print it out
 
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_ORGANIZATION=$CI_ORGANIZATION;"
+  emit_echo "CI_ORGANIZATION=$CI_ORGANIZATION"
 fi
-echo "CI_ORGANIZATION=$CI_ORGANIZATION; export CI_ORGANIZATION;"
+echo "CI_ORGANIZATION=$(shell_quote "$CI_ORGANIZATION"); export CI_ORGANIZATION;"
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_BRANCH=$CI_BRANCH;"
+  emit_echo "CI_BRANCH=$CI_BRANCH"
 fi
-echo "CI_BRANCH=$CI_BRANCH; export CI_BRANCH;"
+echo "CI_BRANCH=$(shell_quote "$CI_BRANCH"); export CI_BRANCH;"
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START;"
+  emit_echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
 fi
-echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START; export CI_COMMIT_RANGE_START;"
+echo "CI_COMMIT_RANGE_START=$(shell_quote "$CI_COMMIT_RANGE_START"); export CI_COMMIT_RANGE_START;"
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END;"
+  emit_echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
 fi
-echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END; export CI_COMMIT_RANGE_END;"
+echo "CI_COMMIT_RANGE_END=$(shell_quote "$CI_COMMIT_RANGE_END"); export CI_COMMIT_RANGE_END;"
 if [ "$VERBOSE" = "--verbose" ]; then
-  echo "echo CI_COMMIT_RANGE=$CI_COMMIT_RANGE;"
+  emit_echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
 fi
-echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE; export CI_COMMIT_RANGE;"
+echo "CI_COMMIT_RANGE=$(shell_quote "$CI_COMMIT_RANGE"); export CI_COMMIT_RANGE;"
