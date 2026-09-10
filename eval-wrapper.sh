@@ -117,6 +117,16 @@ CI_DEFAULT_ORGANIZATION="${_ew_default_organization:-${CI_DEFAULT_ORGANIZATION}}
 CI_VERBOSE="${_ew_verbose}"
 # shellcheck disable=SC2034
 CI_DEBUG="${_ew_debug}"
+# `.` on a file that does not exist is an error in a special builtin, so the
+# shell would abort here, without reaching the `exit` below and without
+# writing anything on standard output.  The client's `eval` would then succeed
+# with no values.  See the same check in the client.
+# shellcheck disable=SC2154
+if [ ! -r "${_ew_script_dir}/${_ew_helper}" ]; then
+  echo "exit 2"
+  echo "${_ew_script_name}: cannot read ${_ew_script_dir}/${_ew_helper}" >&2
+  exit 2
+fi
 # The file name is computed, so shellcheck cannot check the sourced file from
 # here; it checks each "set-" script on its own.
 # shellcheck source=/dev/null

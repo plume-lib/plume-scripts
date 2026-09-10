@@ -58,5 +58,18 @@ _ew_variables="CI_ORGANIZATION CI_BRANCH CI_COMMIT_RANGE_START CI_COMMIT_RANGE_E
 # `eval-wrapper.sh` parses the arguments, runs `set-git-range`, and prints the
 # variables.  `ci-org-and-branch` shares it, so that the two scripts cannot
 # drift apart.
+#
+# `.` on a file that does not exist is an error in a special builtin, so the
+# shell aborts at once, without running anything below and without writing
+# anything on standard output.  The client's `eval` would then succeed, with no
+# value (or a stale value) for each variable -- the silent success that the
+# `exit` commands in `eval-wrapper.sh` exist to prevent.  A client that copies
+# individual scripts rather than cloning this repository can easily be missing
+# this one, because it is new.
+if [ ! -r "${_ew_script_dir}/eval-wrapper.sh" ]; then
+  echo "exit 2"
+  echo "$0: cannot read ${_ew_script_dir}/eval-wrapper.sh" >&2
+  exit 2
+fi
 # shellcheck source=eval-wrapper.sh
 . "${_ew_script_dir}"/eval-wrapper.sh

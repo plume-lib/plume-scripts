@@ -1,6 +1,19 @@
 #!/bin/sh
 
 # This script is obsolete.  Use `ci-org-and-branch` and `git-changes` instead.
+#
+# This script duplicates what `set-ci-org-and-branch` and `set-git-range` do.
+# The duplication is deliberate:  this script is frozen except for bug fixes,
+# so extracting the shared code into a file that both it and the "set-" scripts
+# source would constrain those scripts for the sake of a script that no one
+# should be using.  Keep a bug fix in step across the copies, and prefer the
+# "set-" scripts' behavior where they differ, as they do in two places:
+#  * When the GitHub API request for an Azure Pipelines pull request fails,
+#    this script gives up; `set-ci-org-and-branch` falls back to
+#    $SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI.
+#  * This script derives the organization from the leading components of the
+#    origin URL without checking that the URL names GitHub, so for a local or
+#    non-GitHub origin it yields a fragment of a path rather than nothing.
 
 # Determines the start and end commits for a CI job.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
@@ -68,6 +81,18 @@ emit_echo_lines() {
   sed -e "s/'/'\\\\''/g" -e "s/^/echo '/" -e "s/\$/';/"
 }
 
+# emit_exit STATUS: writes a command that makes the client's `eval` exit with
+# STATUS, then exits with STATUS.  The client's `eval` reports the status of
+# the text it evaluated rather than this script's, so exiting without writing
+# that command would leave the client with status 0 and with no value (or a
+# stale value) for each variable.  The client would then act on the silent
+# success -- running, say, `git diff ${CI_COMMIT_RANGE}` with CI_COMMIT_RANGE
+# unset, which diffs the working tree rather than the pull request.
+emit_exit() {
+  echo "exit $1"
+  exit "$1"
+}
+
 DEBUG=""
 DEFAULT_ORGANIZATION=""
 while [ "$#" -gt 0 ]; do
@@ -84,8 +109,7 @@ while [ "$#" -gt 0 ]; do
         usage="Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
         emit_echo "$usage"
         echo "$usage" >&2
-        echo "exit 2"
-        exit 2
+        emit_exit 2
       else
         DEFAULT_ORGANIZATION="$1"
       fi
@@ -169,7 +193,7 @@ elif [ -n "$(command -v wget 2> /dev/null)" ]; then
   http_get_tool="wget"
 else
   emit_echo "Neither curl nor wget is installed"
-  exit 2
+  emit_exit 2
 fi
 
 # get_url URL: fetch URL to standard output, sending an Authorization header
@@ -194,7 +218,7 @@ get_url() {
 
 if [ -z "$(command -v jq 2> /dev/null)" ]; then
   emit_echo "jq is not installed"
-  exit 2
+  emit_exit 2
 fi
 
 ### Functions
@@ -265,10 +289,10 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
       if [ -n "$auth_token" ]; then
         emit_echo "auth_token is set."
       fi
-      emit_echo "---- start of wget output ----"
+      emit_echo "---- start of ${http_get_tool} output ----"
       printf '%s\n' "${pull_json}" | emit_echo_lines
-      emit_echo "---- end of wget output ----"
-      exit 2
+      emit_echo "---- end of ${http_get_tool} output ----"
+      emit_exit 2
     fi
     CI_ORGANIZATION=${SLUG%:*}
   else
@@ -595,7 +619,7 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
 
   if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
     emit_echo "GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME}"
-    exit 2
+    emit_exit 2
   fi
 
   # GITHUB_REF_NAME is the name of the branch or tag being built, except in a

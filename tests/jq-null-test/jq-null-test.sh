@@ -155,6 +155,37 @@ report() {
   fi
 }
 
+# check_exit SCRIPT DESCRIPTION EXPECTED_STATUS VAR=VALUE...: runs SCRIPT the
+# way `check` does and in the same kind of environment, but checks that the
+# client's `eval` of its output exits with EXPECTED_STATUS.  This is for a
+# script that cannot answer the question and says so.  Writing an `exit`
+# command on standard output is the only way for it to tell the client:  the
+# client's `eval` reports the status of the text it evaluated rather than the
+# script's, so a script that merely exits leaves the client with status 0 and
+# with the variables unset.
+#
+# Here, unlike in `check`, a nonzero status is the point, so this checks for
+# the one status the script promises rather than accepting any failure.
+check_exit() {
+  script="$1"
+  description="$2"
+  expected_status="$3"
+  shift 3
+  actual_status=0
+  # shellcheck disable=SC2016
+  env -i PATH="$work/bin:$PATH" HOME="$HOME" "$@" sh -c '
+    cd "$1" || exit 125
+    eval "$("$2/$3" testorg 2> /dev/null)" > /dev/null 2>&1
+  ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" || actual_status=$?
+  if [ "$actual_status" -ne "$expected_status" ]; then
+    echo "FAIL: $script under $description: the client's eval exited with status $actual_status"
+    echo "  expected: $expected_status"
+    status=1
+  else
+    echo "PASS: $script under $description: the client's eval exits with status $actual_status"
+  fi
+}
+
 # The environments below include everything that the scripts need in order to
 # succeed once they have handled the error response.  Without GITHUB_SHA and
 # GITHUB_BASE_REF, for example, `git-changes` fails before it ever asks the
@@ -202,11 +233,12 @@ check ci-info "GitHub Actions" - feature \
   GITHUB_REF_NAME=42/merge GITHUB_REPOSITORY=testorg/testrepo \
   GITHUB_SHA="$(git rev-parse HEAD)"
 # `ci-info`'s Azure arm reports the bad response and gives up rather than
-# falling back, so it sets neither variable.  Its `exit 2` does not reach the
-# client, because the client's `eval` reports the status of the text it
-# evaluated rather than the script's; that is one of the reasons `ci-info` is
-# obsolete, and it is why the expected status here is still 0.
-check ci-info "Azure Pipelines" "" "" \
+# falling back, as `set-ci-org-and-branch` does.  Giving up must still reach
+# the client:  a client that saw status 0 with CI_ORGANIZATION and
+# CI_COMMIT_RANGE unset would go on to diff the working tree rather than the
+# pull request.  So the check is that the client's `eval` fails, not that the
+# variables have particular values.
+check_exit ci-info "Azure Pipelines" 2 \
   AZURE_HTTP_USER_AGENT=VSTS_00000000-0000-0000-0000-000000000000 \
   BUILD_REASON=PullRequest BUILD_REPOSITORY_NAME=testorg/testrepo \
   SYSTEM_PULLREQUEST_PULLREQUESTNUMBER=42
