@@ -114,15 +114,71 @@ _scoab_redact_tokens() {
   '
 }
 
-# _scoab_org_from_url URL: prints the GitHub organization of a repository URL.
-# It strips the leading part of the two forms that a URL may take:
-#   https://github.com/mernst/annotation-tools
-#   git@github.com:mernst/annotation-tools.git
+# _scoab_org_from_url URL: prints the GitHub organization of a repository URL,
+# or nothing if the argument is not a GitHub repository URL.  The caller treats
+# no output as "unknown" and falls back to $CI_DEFAULT_ORGANIZATION, so it is
+# better to print nothing than to print a guess.
+# These are the forms that git accepts and that can name GitHub:
+#   https://github.com/mernst/annotation-tools[.git]
+#   https://USER[:TOKEN]@github.com/mernst/annotation-tools[.git]
+#   http://github.com/mernst/annotation-tools[.git]
+#   git://github.com/mernst/annotation-tools[.git]
+#   ssh://git@github.com[:PORT]/mernst/annotation-tools[.git]
+#   git@github.com:mernst/annotation-tools[.git]   (git's scp-like syntax)
+# A local path such as "../plume-scripts" is not one of them; neither is a URL
+# for some other forge.  Printing the leading component of those would yield an
+# organization that does not exist -- and, for a URL that embeds a credential,
+# would copy the credential into $CI_ORGANIZATION and thence into the log.
 _scoab_org_from_url() {
-  local slug
-  slug=${1#https://github.com/}
-  slug=${slug#git@github.com:}
-  printf '%s\n' "${slug%/*}"
+  local rest="$1"
+  local host
+  local path
+
+  case $rest in
+    ssh://* | git://* | http://* | https://*)
+      rest=${rest#*://}
+      # The host is everything before the first "/", which must be present:
+      # these forms have no path-less spelling.
+      case $rest in
+        */*)
+          host=${rest%%/*}
+          path=${rest#*/}
+          ;;
+        *) return 0 ;;
+      esac
+      ;;
+    *://*)
+      # Some other scheme, such as git's file://.
+      return 0
+      ;;
+    *:*)
+      # The scp-like syntax, [USER@]HOST:PATH.  It has no "//", so the case
+      # above has already ruled out every URL with a scheme.  A Windows path
+      # such as "C:/repo" also matches, but git treats that as scp-like syntax
+      # too, so this function is no more wrong about it than git is.
+      host=${rest%%:*}
+      path=${rest#*:}
+      ;;
+    *)
+      # A local path, or a bare name.
+      return 0
+      ;;
+  esac
+
+  # Discard any userinfo ("git@", "USER:TOKEN@") and any port.
+  host=${host##*@}
+  host=${host%%:*}
+  case $host in
+    github.com | www.github.com) : ;;
+    *) return 0 ;;
+  esac
+
+  # The organization is the first component of the path.  Requiring a second
+  # component rejects a URL that names no repository.
+  path=${path#/}
+  case $path in
+    */*) printf '%s\n' "${path%%/*}" ;;
+  esac
 }
 
 # Does all the work.  Its caller gives it the shell options it needs, and

@@ -32,6 +32,47 @@ SCRIPT_NAME="$(basename -- "$0")"
 DEBUG=""
 CI_LINT_DIFF_ERROR=""
 
+# Prints the environment, one variable per line, with the value of each
+# variable whose name suggests a credential replaced.  A plain `env` dump would
+# write secrets into the CI log, which is often readable by anyone who can see
+# the job.  Matching by name pattern rather than by an allowlist of names also
+# covers secrets that this script does not know about; GitHub Actions, for
+# example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
+# `set-ci-org-and-branch` and `set-git-range` each contain a copy of the
+# redaction code, because each of them unsets its functions before returning.
+print_redacted_environment() {
+  # Print the environment with awk's ENVIRON array rather than with
+  # `env -0 | sort -z`:  the `-0` and `-z` options are GNU extensions that
+  # BusyBox and BSD lack, so on those platforms this dump would be empty.
+  # Each variable becomes exactly one line, with newlines in its value shown as
+  # "\n"; a multi-line value would otherwise scramble the sort and slip its
+  # continuation lines past the redaction below.  The escaping is done by
+  # concatenation because a backslash in `gsub`'s replacement text is not
+  # portable:  BusyBox awk and GNU awk interpret it differently.
+  awk '
+    BEGIN {
+      for (name in ENVIRON) {
+        parts = split(ENVIRON[name], part, /\n/)
+        value = part[1]
+        for (i = 2; i <= parts; i++) {
+          value = value "\\n" part[i]
+        }
+        print name "=" value
+      }
+    }
+  ' | sort | awk '
+    {
+      name = $0
+      sub(/=.*/, "", name)
+      if (toupper(name) ~ /TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|APIKEY|API_KEY|PRIVATE_KEY|_PAT$|^PAT$/) {
+        print name "=<redacted>"
+        next
+      }
+      print
+    }
+  '
+}
+
 if [ "$#" -eq 0 ]; then
   echo "Usage: ${SCRIPT_NAME} [--debug] WARNINGS-FILE" >&2
   exit 2
@@ -63,7 +104,7 @@ fi
 set -e
 
 if [ "$DEBUG" = "--debug" ]; then
-  env | sort
+  print_redacted_environment
   git log --graph | head -n 10000
 fi
 
@@ -251,11 +292,12 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "Listing of ${TMPDIR:-/tmp}:"
   ls -l "${TMPDIR:-/tmp}"
   echo
-  # The environment is printed only under --debug, because CI logs are often
-  # public and the environment may contain access tokens (such as GITHUB_PAT).
+  # The environment is printed only under --debug, and even then with
+  # credentials redacted, because CI logs are often public and the environment
+  # may contain access tokens (such as GITHUB_PAT).
   if [ "$DEBUG" = "--debug" ]; then
     echo "Environment:"
-    env | sort
+    print_redacted_environment
   else
     echo "Re-run with --debug to also print the environment."
   fi
