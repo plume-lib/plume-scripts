@@ -193,6 +193,7 @@ _scoab_set_org_and_branch_body() {
   local SLUG
   local origin_url
   local GITHUB_PR_NUMBER
+  local pr_number
   local local_head_ref
 
   if [ -n "$debug" ]; then
@@ -501,13 +502,29 @@ _scoab_set_org_and_branch_body() {
       return 2
     fi
 
-    # GITHUB_REF_NAME may be a branch name or "40/merge".
-    if [ -n "$(git branch --list "${GITHUB_REF_NAME}")" ]; then
+    # GITHUB_REF_NAME is the name of the branch or tag being built, except in a
+    # pull request, where it is like "40/merge" and names no branch.  Tell the
+    # two apart by the ref name's syntax.  Don't instead ask `git branch
+    # --list` whether the name is a local branch:  a job that checked out a
+    # detached HEAD or a different `ref` has no local branch of that name
+    # either, and then a branch or tag name would be used as a pull request
+    # number, giving a 404 and an empty CI_BRANCH.
+    pr_number=""
+    case "${GITHUB_REF_NAME}" in
+      */merge)
+        # A pull request number is a nonempty string of digits.  A branch may
+        # be named "release/merge", which is not a pull request.
+        case "${GITHUB_REF_NAME%/merge}" in
+          '' | *[!0-9]*) ;;
+          *) pr_number="${GITHUB_REF_NAME%/merge}" ;;
+        esac
+        ;;
+    esac
+    if [ -z "$pr_number" ]; then
       CI_BRANCH="${GITHUB_REF_NAME}"
     else
       # TODO: Can I implement this without a GitHub API request?
-      # GITHUB_REF_NAME is like "40/merge" here, so strip "/merge" for the PR number.
-      api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_REF_NAME%/merge}"
+      api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}"
       CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
       CI_BRANCH=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.ref // empty' 2> /dev/null)
     fi

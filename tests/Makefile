@@ -5,6 +5,7 @@
 # recipe.
 TEST_DIRS = \
 	eval-quoting-test \
+	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
 	lint-diff-test \
 	sort-compiler-output-test \
