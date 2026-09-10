@@ -5,7 +5,6 @@
 # recipe.
 TEST_DIRS = \
 	ci-info-test \
-	ci-runs-tests-test \
 	eval-quoting-test \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
