@@ -52,6 +52,7 @@ WARNINGSFILE=$1
 # diff.  (`lint-diff.py` also exits early on an empty warnings file, but this
 # script would fail before reaching it if the diff is empty.)
 if [ ! -s "$WARNINGSFILE" ]; then
+  echo "${SCRIPT_NAME}: $WARNINGSFILE is empty; nothing to report."
   exit 0
 fi
 
@@ -100,8 +101,8 @@ else
 fi
 
 set +e
-diff_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-XXXXXX.txt")
-diff_err_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-err-XXXXXX.txt")
+diff_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-XXXXXX.txt") || exit 2
+diff_err_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-err-XXXXXX.txt") || exit 2
 cleanup() {
   if [ "$DEBUG" = "--debug" ]; then
     echo "${SCRIPT_NAME}: retaining $diff_file and $diff_err_file"
@@ -119,9 +120,6 @@ if [ $git_status -gt 1 ]; then
   echo "start of diff file:"
   cat "$diff_file"
   echo "end of diff file:"
-  echo "start of diff err file:"
-  cat "$diff_err_file"
-  echo "end of diff err file:"
   git --no-pager branch -a
   git --no-pager diff "$CI_COMMIT_RANGE"
 elif [ ! -r "$diff_file" ]; then
@@ -156,6 +154,10 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "---- git-changes output ----"
   echo "$git_changes_output"
   echo "---- end of git-changes output ----"
+  echo
+  echo "---- stderr of git diff $CI_COMMIT_RANGE ----"
+  cat "$diff_err_file"
+  echo "---- end of stderr of git diff $CI_COMMIT_RANGE ----"
   echo
   # This is not very effective because environment variables were set by
   # the previous invocation of git-changes.
@@ -201,7 +203,7 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   git --no-pager diff --exit-code "$CI_COMMIT_RANGE"
   echo
   echo "Second re-execution of diff command:"
-  diff_retry_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-retry-XXXXXX.txt")
+  diff_retry_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-retry-XXXXXX.txt") || exit 2
   echo "git --no-pager diff $CI_COMMIT_RANGE > $diff_retry_file && cat $diff_retry_file"
   git --no-pager diff "$CI_COMMIT_RANGE" > "$diff_retry_file"
   cat "$diff_retry_file"
