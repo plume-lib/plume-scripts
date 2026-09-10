@@ -119,9 +119,9 @@ git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2> "$diff_err_
 git_status=$?
 if [ $git_status -gt 1 ]; then
   CI_LINT_DIFF_ERROR+="git diff exited with status $git_status\n"
-  echo "start of diff file:"
-  cat "$diff_file"
-  echo "end of diff file:"
+  echo "start of git diff stderr:"
+  cat "$diff_err_file"
+  echo "end of git diff stderr:"
   git --no-pager branch -a
   git --no-pager diff "$CI_COMMIT_RANGE"
 elif [ ! -r "$diff_file" ]; then
@@ -212,11 +212,17 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   git --no-pager diff --exit-code "$CI_COMMIT_RANGE"
   echo
   echo "Second re-execution of diff command:"
-  diff_retry_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-retry-XXXXXX.txt") || exit 2
-  echo "git --no-pager diff $CI_COMMIT_RANGE > $diff_retry_file && cat $diff_retry_file"
-  git --no-pager diff "$CI_COMMIT_RANGE" > "$diff_retry_file"
-  cat "$diff_retry_file"
-  rm -f "$diff_retry_file"
+  # On failure, skip just this section rather than exiting, so that the
+  # remaining diagnostics (and the repeated error message) are still printed.
+  diff_retry_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-retry-XXXXXX.txt") || diff_retry_file=""
+  if [ -n "$diff_retry_file" ]; then
+    echo "git --no-pager diff $CI_COMMIT_RANGE > $diff_retry_file; cat $diff_retry_file"
+    git --no-pager diff "$CI_COMMIT_RANGE" > "$diff_retry_file"
+    cat "$diff_retry_file"
+    rm -f "$diff_retry_file"
+  else
+    echo "Skipped: could not create a temporary file in ${TMPDIR:-/tmp}."
+  fi
   echo
   echo "Endpoints of commit range ($CI_COMMIT_RANGE_START and $CI_COMMIT_RANGE_END):"
   git --no-pager show "$CI_COMMIT_RANGE_START"
