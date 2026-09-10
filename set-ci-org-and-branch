@@ -69,14 +69,14 @@ esac
 
 ### Functions
 
-# _ci_get_url URL: fetch URL to standard output, sending an Authorization header
+# _scoab_get_url URL: fetch URL to standard output, sending an Authorization header
 # if $auth_token is set.  The header is passed as a single argument rather than
 # being word-split out of a command string; that avoids mangling the header and
 # leaking the token into stray connection attempts.
 # The timeouts bound how long a CI job waits when the network or the GitHub API
 # is unresponsive; without them, one request can hang until the job's own limit.
 # For `wget`, the short options are used because BusyBox wget accepts only those.
-_ci_get_url() {
+_scoab_get_url() {
   if [ "$http_get_tool" = "curl" ]; then
     if [ -n "$auth_token" ]; then
       curl -s --connect-timeout 10 --max-time 30 --header "Authorization: token $auth_token" "$1"
@@ -97,7 +97,7 @@ _ci_get_url() {
 # token into the CI log, which is often readable by anyone who can see the job.
 # `set` prints a function's local variables too, so $auth_token needs masking
 # even though it is not in the environment.
-_ci_redact_tokens() {
+_scoab_redact_tokens() {
   sed -e 's/^GITHUB_PAT=.*/GITHUB_PAT=<redacted>/' \
     -e 's/^GH_TOKEN=.*/GH_TOKEN=<redacted>/' \
     -e 's/^auth_token=.*/auth_token=<redacted>/'
@@ -105,7 +105,7 @@ _ci_redact_tokens() {
 
 # Does all the work.  Its caller gives it the shell options it needs, and
 # restores the client's options afterward.
-_ci_set_org_and_branch_body() {
+_scoab_set_org_and_branch_body() {
   local SCRIPT_NAME="set-ci-org-and-branch"
   local verbose="$CI_VERBOSE"
   local debug="$CI_DEBUG"
@@ -134,11 +134,11 @@ _ci_set_org_and_branch_body() {
       echo
       # `env` only prints EXPORTED variables, so `set` is usually more useful.
       echo '---------------- start of env'
-      env -0 | sort -z | tr '\0' '\n' | _ci_redact_tokens
+      env -0 | sort -z | tr '\0' '\n' | _scoab_redact_tokens
       echo '---------------- end of env'
       echo
       echo '---------------- start of set'
-      set | _ci_redact_tokens
+      set | _scoab_redact_tokens
       echo '---------------- end of set'
       echo
       echo '---------------- start of git status'
@@ -201,7 +201,7 @@ _ci_set_org_and_branch_body() {
     # TODO: Can I implement this without a GitHub API request?
     if [ "$BUILD_REASON" = "PullRequest" ]; then
       api_url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-      CI_PULL_JSON="$(_ci_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
+      CI_PULL_JSON="$(_scoab_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
       # "// empty" maps JSON null to the empty string, so jq does not yield the string "null".
       SLUG=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.label // empty' 2> /dev/null)
       if [ -z "$SLUG" ]; then
@@ -236,7 +236,7 @@ _ci_set_org_and_branch_body() {
     # Is GITHUB_ACTOR equal to CI_ORGANIZATION, maybe??  (Need to observe beyond mernst.)
     GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
     api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
-    CI_PULL_JSON="$(_ci_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
+    CI_PULL_JSON="$(_scoab_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
     # "// empty" maps JSON null to the empty string, so that a response that
     # does not describe a pull request (as when the request was throttled)
     # falls through to the fallbacks below instead of yielding "null".
@@ -332,7 +332,7 @@ _ci_set_org_and_branch_body() {
       # jq's complaint if the response is not JSON at all (as when throttling
       # yields an HTML error page).
       api_url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
-      CI_PULL_JSON="$(_ci_get_url "${api_url}" | tr -d '[:cntrl:]')"
+      CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
       CI_BRANCH=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.ref // empty' 2> /dev/null)
       if [ -z "$CI_BRANCH" ]; then
         # For a pull request, this is like "pull/1234" rather than a branch name.
@@ -383,7 +383,7 @@ _ci_set_org_and_branch_body() {
       # TODO: Can I implement this without a GitHub API request?
       # GITHUB_REF_NAME is like "40/merge" here, so strip "/merge" for the PR number.
       api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_REF_NAME%/merge}"
-      CI_PULL_JSON="$(_ci_get_url "${api_url}" | tr -d '[:cntrl:]')"
+      CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
       CI_BRANCH=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.ref // empty' 2> /dev/null)
     fi
 
@@ -428,28 +428,28 @@ _ci_set_org_and_branch_body() {
 # inside the command substitution that capturing `set +o` requires, so a
 # captured `set +o` would report errexit as off and turn it off in the client.
 case $- in
-  *e*) _ci_had_errexit="true" ;;
-  *) _ci_had_errexit="" ;;
+  *e*) _scoab_had_errexit="true" ;;
+  *) _scoab_had_errexit="" ;;
 esac
 case $- in
-  *u*) _ci_had_nounset="true" ;;
-  *) _ci_had_nounset="" ;;
+  *u*) _scoab_had_nounset="true" ;;
+  *) _scoab_had_nounset="" ;;
 esac
 set +e +u
 
-_ci_set_org_and_branch_body
-_ci_status=$?
+_scoab_set_org_and_branch_body
+_scoab_status=$?
 
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
-unset -f _ci_set_org_and_branch_body _ci_get_url _ci_redact_tokens
-if [ -n "$_ci_had_errexit" ]; then
+unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_redact_tokens
+if [ -n "$_scoab_had_errexit" ]; then
   set -e
 fi
-if [ -n "$_ci_had_nounset" ]; then
+if [ -n "$_scoab_had_nounset" ]; then
   set -u
 fi
-unset _ci_had_errexit _ci_had_nounset
+unset _scoab_had_errexit _scoab_had_nounset
 # Unset the last of this script's variables and return, in a single command
 # because unsetting the variable would otherwise lose the status.
-eval "unset _ci_status; return ${_ci_status}"
+eval "unset _scoab_status; return ${_scoab_status}"
