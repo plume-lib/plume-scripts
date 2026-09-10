@@ -8,6 +8,7 @@ tests/jacoco-coverage-ratchet-test/out31.txt
 tests/lint-diff-test/guessstrip-lint-pruned.txt
 tests/lint-diff-test/incomparable-lint-pruned.txt
 tests/lint-diff-test/javaexception-lint-pruned.txt
+tests/lint-diff-test/mixedpaths-lint-pruned.txt
 tests/lint-diff-test/reldir-lint-pruned.txt
 tests/lint-diff-test/words-lint.txt
 tests/lint-diff-test/words1.txt
