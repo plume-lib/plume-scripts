@@ -30,12 +30,24 @@
 # sourcing this file; the `eval` at the bottom assigns $_ew_value; and the
 # "set-" script that this file sources reads $PLUME_SCRIPTS, $CI_VERBOSE, and
 # $CI_DEBUG -- but its name is computed, so shellcheck cannot follow it and
-# does not see those reads.  The tests do check that the variable names here
-# agree with the ones that the clients and the "set-" scripts use:  a
-# misspelling makes the printed value empty, which `eval-quoting-test` and
-# `github-ref-name-test` detect.
-# shellcheck disable=SC2034
-# shellcheck disable=SC2154
+# does not see those reads.
+#
+# Each such report is suppressed on the one line that provokes it, rather than
+# for the whole file.  A file-wide `disable=SC2154` would also hide a
+# misspelling of this file's own variables:  writing `${_ew_verbos}` for
+# `${_ew_verbose}` would silently make `--verbose` and `--debug` do nothing.
+# No test would catch that, because no test runs with those flags -- and a
+# diagnostic that never appears is not something a test can compare against.
+# Line-specific directives leave that report in place.
+#
+# $_ew_default_organization is the exception:  it is read only as
+# `${_ew_default_organization:-...}`, and shellcheck does not report an
+# unassigned variable that has a default, so no directive here hides a
+# misspelling of it.  `eval-quoting-test` catches that one, by requiring that
+# the DEFAULT-ORGANIZATION argument reach $CI_ORGANIZATION in some case.
+#
+# (A comment line here must not begin with the word that starts a shellcheck
+# directive, because shellcheck would try to parse the line as one.)
 
 # When this file is sourced, "$0" is the client's name rather than this file's
 # name; so if "$0" is this file's name, someone ran it instead of sourcing it.
@@ -98,13 +110,17 @@ done
 # PLUME_SCRIPTS tells `set-git-range` where to find the script that it sources;
 # it is set unconditionally, because it is harmless for a "set-" script that
 # does not read it.
+# shellcheck disable=SC2034,SC2154
 PLUME_SCRIPTS="${_ew_script_dir}"
 CI_DEFAULT_ORGANIZATION="${_ew_default_organization:-${CI_DEFAULT_ORGANIZATION}}"
+# shellcheck disable=SC2034
 CI_VERBOSE="${_ew_verbose}"
+# shellcheck disable=SC2034
 CI_DEBUG="${_ew_debug}"
 # The file name is computed, so shellcheck cannot check the sourced file from
 # here; it checks each "set-" script on its own.
 # shellcheck source=/dev/null
+# shellcheck disable=SC2154
 . "${_ew_script_dir}/${_ew_helper}"
 _ew_status=$?
 if [ "${_ew_status}" -ne 0 ]; then
@@ -121,8 +137,9 @@ fi
 
 # ${_ew_variables} is unquoted on purpose, so that the shell splits it into
 # variable names.
-# shellcheck disable=SC2086
+# shellcheck disable=SC2086,SC2154
 for _ew_variable in ${_ew_variables}; do
   eval "_ew_value=\${${_ew_variable}}"
+  # shellcheck disable=SC2154
   echo "${_ew_variable}=$(_ew_shell_quote "${_ew_value}"); export ${_ew_variable};"
 done

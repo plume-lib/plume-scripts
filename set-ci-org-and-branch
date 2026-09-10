@@ -352,8 +352,41 @@ _scoab_set_org_and_branch_body() {
     GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
     api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
     CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
-    # "// empty" maps JSON null to the empty string, so jq does not yield the string "null".
+    # "// empty" maps JSON null to the empty string, so that a response that
+    # does not describe a pull request (as when the request was throttled)
+    # falls through to the fallbacks below instead of yielding "null".
     CI_ORGANIZATION=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
+    if [ -z "$CI_ORGANIZATION" ]; then
+      # Warn and fall back, rather than failing:  a throttled request should
+      # not fail the whole job.
+      {
+        echo "${SCRIPT_NAME} warning: bad output for ${api_url}"
+        if [ -n "$auth_token" ]; then
+          echo "auth_token is set."
+        fi
+        echo "---- start of ${http_get_tool} output ----"
+        printf '%s\n' "${CI_PULL_JSON}"
+        echo "---- end of ${http_get_tool} output ----"
+      } >&2
+      # GitHub Actions writes the event payload to the file named by
+      # $GITHUB_EVENT_PATH, and for a pull request event that payload describes
+      # the same pull request that the API request asked about -- including the
+      # head repository, which is the fork if the pull request is from one.
+      # Prefer it to the fallbacks below, which yield this clone's origin --
+      # the base repository, a wrong answer that a client cloning a companion
+      # repository would act on without noticing.
+      if [ -r "${GITHUB_EVENT_PATH}" ]; then
+        CI_ORGANIZATION=$(jq -r '.pull_request.head.repo.owner.login // empty' "${GITHUB_EVENT_PATH}" 2> /dev/null)
+      fi
+      if [ -n "$CI_ORGANIZATION" ]; then
+        echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from ${GITHUB_EVENT_PATH}." >&2
+      else
+        {
+          echo "${SCRIPT_NAME}: using the organization of this clone's origin instead,"
+          echo "which is the base repository if this is a pull request from a fork."
+        } >&2
+      fi
+    fi
     if [ -n "$debug" ]; then
       {
         echo "GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
