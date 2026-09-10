@@ -49,7 +49,11 @@ set -e
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
 if grep -q "$PATTERN" $TRACE; then
-  grep -v "$PATTERN" $TRACE > $ERR
+  # `|| true` because `grep -v` exits with status 1 when it selects no lines,
+  # which happens whenever stderr consists only of trace lines.  Without it,
+  # `set -e` would abort the script here, before it produces its report,
+  # exits with the wrapped command's status, and removes its temporary files.
+  grep -v "$PATTERN" $TRACE > $ERR || true
 else
   ERR=$TRACE
 fi
