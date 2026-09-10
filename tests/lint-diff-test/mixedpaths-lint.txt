@@ -1,0 +1,4 @@
+src/Foo.java:3: warning: [class] no doc comment for Foo
+src/Foo.java:4: warning: [field] no doc comment for newFooField
+/home/user/repo/util/src/Bar.java:4: warning: [field] no doc comment for newBarField
+/home/user/repo/util/src/Bar.java:5: warning: [method] no doc comment for n

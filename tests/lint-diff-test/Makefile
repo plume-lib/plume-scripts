@@ -2,7 +2,8 @@
 
 all: test
 
-test: test-words test-reldir test-guessstrip test-javaexception test-incomparable
+test: test-words test-reldir test-guessstrip test-javaexception test-incomparable \
+  test-mixedpaths
 
 
 # "words" test
@@ -77,8 +78,21 @@ incomparable-lint-pruned.txt: incomparable.diff incomparable-lint.txt ../../lint
 	../../lint-diff.py --guess-strip --context=0 incomparable.diff incomparable-lint.txt > $@ || true
 
 
+# "mixedpaths" test
+
+# The lint tool reports some paths relative to the repository and others as
+# absolute paths, so they have no common prefix.
+test-mixedpaths: mixedpaths-lint-pruned.txt-goal mixedpaths-lint-pruned.txt
+	diff $^
+
+# Discard standard error, which contains an expected warning that the diff uses
+# relative paths but the lint output uses absolute paths.
+mixedpaths-lint-pruned.txt: mixedpaths.diff mixedpaths-lint.txt ../../lint-diff.py
+	../../lint-diff.py --guess-strip --context=0 mixedpaths.diff mixedpaths-lint.txt > $@ 2>/dev/null || true
+
+
 # Miscellaneous targets
 
 # The `clean` target would be simpler if all generated files were put in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt
+	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt mixedpaths-lint-pruned.txt

@@ -335,19 +335,34 @@ def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str,
 def commonpath(files: collections.abc.Iterable[str]) -> str:
     """Return the common prefix of the given paths.
 
-    Argument is a set or list of paths.
+    Argument is a set or list of paths.  Absolute and relative paths have no
+    common prefix, so if the argument mixes them, the result is "".
 
     Returns:
-         the common prefix of the given paths.
+         the common prefix of the given paths, or "" if they have none.
     """
-    if not files:
+    # Remove leading null characters.
+    files_list = [file.lstrip("\0") for file in files]
+    if not files_list:
+        return ""
+    # `os.path.commonpath` throws `ValueError` on a mix of absolute and
+    # relative paths, which a lint tool may produce for different files.
+    if len({Path(file).is_absolute() for file in files_list}) != 1:
         return ""
     try:
-        # Remove leading null characters.
-        files_list = [file.lstrip("\0") for file in files]
         return os.path.commonpath(files_list)
     except ValueError as err:
         raise ValueError(str(files)) from err
+
+
+## Tests:
+"""
+assert commonpath([]) == ""
+assert commonpath(["/a/b/c", "/a/b/d"]) == "/a/b"
+assert commonpath(["a/b/c", "a/b/d"]) == "a/b"
+# Absolute and relative paths have no common prefix.
+assert commonpath(["/a/b/c", "a/b/d"]) == ""
+"""
 
 
 ### Main routine
