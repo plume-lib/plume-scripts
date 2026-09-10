@@ -101,15 +101,18 @@ fi
 
 set +e
 diff_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-XXXXXX.txt") || exit 2
-diff_err_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-err-XXXXXX.txt") || exit 2
+diff_err_file=""
 cleanup() {
   if [ "$DEBUG" = "--debug" ]; then
-    echo "${SCRIPT_NAME}: retaining $diff_file and $diff_err_file"
+    echo "${SCRIPT_NAME}: retaining $diff_file $diff_err_file"
   else
     rm -f "$diff_file" "$diff_err_file"
   fi
 }
+# Install the trap before creating the second file, so that the first file is
+# removed even if the second `mktemp` fails.
 trap cleanup EXIT
+diff_err_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-err-XXXXXX.txt") || exit 2
 echo "${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file"
 # Keep stderr out of $diff_file, which is parsed as a diff by `lint-diff.py`.
 git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2> "$diff_err_file"
