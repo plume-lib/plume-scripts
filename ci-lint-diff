@@ -21,7 +21,7 @@
 #    by pulling upstream.
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
-# Requires the scripts `set-git-changes` and `set-ci-org-and-branch` in the
+# Requires the scripts `set-git-range` and `set-ci-org-and-branch` in the
 # same directory as this script.
 
 # This script is a thin wrapper around `lint-diff.py`.
@@ -56,7 +56,7 @@ if [ "$DEBUG" = "--debug" ]; then
   git log --graph | head --lines=10000
 fi
 
-# `set-git-changes` sets CI_COMMIT_RANGE and the other CI_* variables.  Source
+# `set-git-range` sets CI_COMMIT_RANGE and the other CI_* variables.  Source
 # it rather than `eval`ing the output of `git-changes`:  `eval` discards the
 # exit status, and it mangles a value that contains a shell metacharacter (a
 # branch name may contain one).
@@ -68,9 +68,9 @@ CI_DEBUG=""
 # "set -e" needs no adjustment here:  a command in an `if` condition does not
 # trigger it.  That lets a failure be handled here rather than aborting this
 # script, which would skip the diagnostics below.
-# shellcheck source=set-git-changes
-if ! . "${SCRIPT_DIR}"/set-git-changes; then
-  echo "set-git-changes failed; it reported the reason on standard error, above."
+# shellcheck source=set-git-range
+if ! . "${SCRIPT_DIR}"/set-git-range; then
+  echo "set-git-range failed; it reported the reason on standard error, above."
   exit 2
 fi
 
@@ -128,25 +128,25 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
-  echo "---- values from set-git-changes ----"
+  echo "---- values from set-git-range ----"
   echo "CI_ORGANIZATION=$CI_ORGANIZATION"
   echo "CI_BRANCH=$CI_BRANCH"
   echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
   echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
   echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
-  echo "---- end of values from set-git-changes ----"
+  echo "---- end of values from set-git-range ----"
   echo
   # Run in a separate process, so that recomputing the values cannot change the
   # ones that the diagnostics below report.  Unlike a repeated invocation of the
-  # old `git-changes`, this one is meaningful, because `set-git-changes`
+  # old `git-changes`, this one is meaningful, because `set-git-range`
   # computes its values from scratch rather than reusing what the environment
   # holds.
   # Its diagnostics go to standard error; redirect them so that they appear
   # between the two markers rather than somewhere above.
-  echo "---------------- start of ${SCRIPT_DIR}/set-git-changes with CI_DEBUG"
+  echo "---------------- start of ${SCRIPT_DIR}/set-git-range with CI_DEBUG"
   CI_DEBUG="--debug" PLUME_SCRIPTS="${SCRIPT_DIR}" \
-    sh -c '. "${PLUME_SCRIPTS}"/set-git-changes' 2>&1 || true
-  echo "---------------- end of ${SCRIPT_DIR}/set-git-changes with CI_DEBUG"
+    sh -c '. "${PLUME_SCRIPTS}"/set-git-range' 2>&1 || true
+  echo "---------------- end of ${SCRIPT_DIR}/set-git-range with CI_DEBUG"
   echo
 
   echo git rev-parse \$CI_COMMIT_RANGE_START

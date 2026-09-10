@@ -1,16 +1,12 @@
 #!/bin/sh
 
 # Sets the GitHub organization and branch for a CI job, as shell variables.
-# Other information about the CI job can be computed, but it is beyond the
-# scope of this simple script.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 #
 # This script is *sourced* by the client, which is why its name starts with
 # "set-".
 
-# `local` is not in POSIX, but every shell that can source this file supports
-# it, and it is what keeps this script's variables (among them a GitHub
-# authorization token) out of the client's shell.
+# `local` is not in POSIX, but every shell that can source this file supports it.
 # shellcheck disable=SC3043
 
 # Typical use:
@@ -37,30 +33,25 @@
 #   Variable CI_DEFAULT_ORGANIZATION is used if no organization can be determined.
 # CI_BRANCH: The name of the source/head branch (in a PR) or of the branch being tested.
 # CI_DEFAULT_BRANCH_NAME: The default branch of the "origin" remote, such as
-#   "master" or "main".  Computing it requires contacting the remote, so this
-#   script provides it rather than making each client compute it again.
+#   "master" or "main".  Provided so that clients don't have to compute it again.
 # CI_PULL_JSON: The GitHub API's description of the pull request, if this script
-#   requested one; otherwise empty.  A client that needs more information about
-#   the pull request should read this rather than repeat the request, which
-#   might be throttled.  Unlike the other three variables, it is not exported,
-#   because it is large and no subprocess needs it.
+#   requested one; otherwise empty.  Provided so that clients don't have to make
+#   another network request, which might get throttled.  Unlike the other three
+#   variables, it is not exported, because it is large and no subprocess needs
+#   it.
 #
 # The script sets no other variables and leaves no functions defined.  It
 # returns 0 on success, or 2 if it cannot determine the information; in the
 # latter case all four variables are set to the empty string.
 
-# The client configures this script by setting variables rather than by passing
-# command-line arguments.
-# CI_DEFAULT_ORGANIZATION: use this organization if none can be determined.  Optional.
-# CI_VERBOSE: if non-empty, report progress.  Optional.
-# CI_DEBUG: if non-empty, report voluminous debugging information.  Implies
-#   CI_VERBOSE.  Optional.
+# The client configures this script by setting optional variables rather than
+# by passing command-line arguments.
+# CI_DEFAULT_ORGANIZATION: use this organization if the script cannot determine one.
+# CI_VERBOSE: if non-empty, report progress.
+# CI_DEBUG: if non-empty, report voluminous debugging information.
 # If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
-#
-# All reporting is to standard error, so that sourcing this script cannot
-# corrupt output that the client is producing.
 
 # Requires the `jq` program and either `curl` or `wget`.
 
@@ -72,7 +63,6 @@
 case $0 in
   */set-ci-org-and-branch | set-ci-org-and-branch)
     echo "set-ci-org-and-branch must be sourced (\`. set-ci-org-and-branch\`), not run." >&2
-    echo "To run a script instead, use \`eval \"\$(ci-org-and-branch)\"\`." >&2
     exit 2
     ;;
 esac
@@ -113,16 +103,17 @@ _ci_redact_tokens() {
     -e 's/^auth_token=.*/auth_token=<redacted>/'
 }
 
-# Does all the work.  Its caller protects the client from its shell options.
+# Does all the work.  Its caller gives it the shell options it needs, and
+# restores the client's options afterward.
 _ci_set_org_and_branch_body() {
   local SCRIPT_NAME="set-ci-org-and-branch"
   local verbose="$CI_VERBOSE"
   local debug="$CI_DEBUG"
   local auth_token
   local http_get_tool
-  local url
+  local api_url
   local SLUG
-  local URL
+  local origin_url
   local GITHUB_PR_NUMBER
 
   if [ -n "$debug" ]; then
@@ -138,6 +129,7 @@ _ci_set_org_and_branch_body() {
 
   if [ -n "$debug" ]; then
     {
+      # All this output is to stderr.
       echo "${SCRIPT_NAME} is running in $(pwd)"
       echo
       # `env` only prints EXPORTED variables, so `set` is usually more useful.
@@ -208,11 +200,9 @@ _ci_set_org_and_branch_body() {
   elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
     # TODO: Can I implement this without a GitHub API request?
     if [ "$BUILD_REASON" = "PullRequest" ]; then
-      url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
-      CI_PULL_JSON="$(_ci_get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
-      # "// empty" maps JSON null to the empty string, so that the test below
-      # detects a response that does not describe a pull request; without it,
-      # jq yields the string "null" and the test passes.
+      api_url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
+      CI_PULL_JSON="$(_ci_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
+      # "// empty" maps JSON null to the empty string, so jq does not yield the string "null".
       SLUG=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.label // empty' 2> /dev/null)
       if [ -z "$SLUG" ]; then
         # Warn and fall through to the fallbacks below, rather than failing:  a
@@ -220,7 +210,7 @@ _ci_set_org_and_branch_body() {
         # the organization of this clone's origin, which for a pull request
         # from a fork is the base repository rather than the head; say so.
         {
-          echo "${SCRIPT_NAME} warning: bad output for ${url}"
+          echo "${SCRIPT_NAME} warning: bad output for ${api_url}"
           echo "${SCRIPT_NAME}: using the organization of this clone's origin instead,"
           echo "which is the base repository if this is a pull request from a fork."
           if [ -n "$auth_token" ]; then
@@ -245,8 +235,8 @@ _ci_set_org_and_branch_body() {
     # TODO: Can I implement this without a GitHub API request?
     # Is GITHUB_ACTOR equal to CI_ORGANIZATION, maybe??  (Need to observe beyond mernst.)
     GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
-    url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
-    CI_PULL_JSON="$(_ci_get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
+    api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
+    CI_PULL_JSON="$(_ci_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
     # "// empty" maps JSON null to the empty string, so that a response that
     # does not describe a pull request (as when the request was throttled)
     # falls through to the fallbacks below instead of yielding "null".
@@ -262,11 +252,11 @@ _ci_set_org_and_branch_body() {
 
   ## Git clone
   if [ -z "$CI_ORGANIZATION" ]; then
-    URL=$(git config --get remote.origin.url)
+    origin_url=$(git config --get remote.origin.url)
     # This removes the leading part of two possible forms for a URL:
     #   https://github.com/mernst/annotation-tools
     #   git@github.com:mernst/annotation-tools.git
-    SLUG=${URL#https://github.com/}
+    SLUG=${origin_url#https://github.com/}
     SLUG=${SLUG#git@github.com:}
     CI_ORGANIZATION=${SLUG%/*}
     # TODO: Maybe add a sanity check here.
@@ -290,10 +280,10 @@ _ci_set_org_and_branch_body() {
   if [ -n "$debug" ]; then
     {
       echo "remote's CI_DEFAULT_BRANCH_NAME=$CI_DEFAULT_BRANCH_NAME"
-      if [ -n "${URL}" ]; then
-        echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1
+      if [ -n "${origin_url}" ]; then
+        echo "HEAD of ${origin_url} = $(git ls-remote --symref "${origin_url}" HEAD)" 2>&1
       else
-        echo "URL is empty (is set only for non-CI runs)"
+        echo "origin_url is empty (is set only for non-CI runs)"
       fi
       echo "current branch: $(git branch --show-current)"
       echo "current repo: $(git config --get remote.origin.url)"
@@ -341,8 +331,8 @@ _ci_set_org_and_branch_body() {
       # "// empty" maps JSON null to the empty string; the redirection discards
       # jq's complaint if the response is not JSON at all (as when throttling
       # yields an HTML error page).
-      url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
-      CI_PULL_JSON="$(_ci_get_url "${url}" | tr -d '[:cntrl:]')"
+      api_url="https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/pulls/${CIRCLE_PR_NUMBER}"
+      CI_PULL_JSON="$(_ci_get_url "${api_url}" | tr -d '[:cntrl:]')"
       CI_BRANCH=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.ref // empty' 2> /dev/null)
       if [ -z "$CI_BRANCH" ]; then
         # For a pull request, this is like "pull/1234" rather than a branch name.
@@ -354,6 +344,10 @@ _ci_set_org_and_branch_body() {
 
   elif [ -n "${GITHUB_HEAD_REF}" ]; then
     # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
+    # Set this here rather than relying on the organization code above to have
+    # done so:  that if/elif chain tests different variables in a different
+    # order, so it does not always take the arm that corresponds to this one.
+    GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
     if [ -n "$debug" ]; then
       {
         echo "GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER}"
@@ -367,8 +361,6 @@ _ci_set_org_and_branch_body() {
     # At this point, these two are the same:
     # git rev-parse HEAD
     # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
-
-    GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
 
     CI_BRANCH="${GITHUB_HEAD_REF}"
 
@@ -390,8 +382,8 @@ _ci_set_org_and_branch_body() {
     else
       # TODO: Can I implement this without a GitHub API request?
       # GITHUB_REF_NAME is like "40/merge" here, so strip "/merge" for the PR number.
-      url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_REF_NAME%/merge}"
-      CI_PULL_JSON="$(_ci_get_url "${url}" | tr -d '[:cntrl:]')"
+      api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_REF_NAME%/merge}"
+      CI_PULL_JSON="$(_ci_get_url "${api_url}" | tr -d '[:cntrl:]')"
       CI_BRANCH=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.ref // empty' 2> /dev/null)
     fi
 
@@ -412,17 +404,6 @@ _ci_set_org_and_branch_body() {
 
   if [ -n "$debug" ]; then
     echo "CI_BRANCH=${CI_BRANCH}" >&2
-  fi
-
-  if [ -n "$verbose" ]; then
-    # A throttled or otherwise failed request also has a non-empty response body,
-    # so test whether the response really does describe a pull request.
-    if [ -n "${CI_PULL_JSON}" ] \
-      && printf '%s' "${CI_PULL_JSON}" | jq -e -r '.head.sha // empty' > /dev/null 2>&1; then
-      echo "CI_ACCESSED_GITHUB_API=true" >&2
-    else
-      echo "CI_ACCESSED_GITHUB_API=false" >&2
-    fi
   fi
 
   ### Set it

@@ -3,9 +3,9 @@
 # Determines the start and end commits for a CI job.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 #
-# The client `eval`s this script's output.  Script `set-git-changes` computes
+# The client `eval`s this script's output.  Script `set-git-range` computes
 # the same information, but the client sources it.  Prefer to use
-# `set-git-changes` instead:  this script's exit status is lost by the `eval`,
+# `set-git-range` instead:  this script's exit status is lost by the `eval`,
 # which reports the status of the text it evaluated rather than of this script.
 
 # Typical use:
@@ -42,7 +42,7 @@
 # so that only the variable settings appear on standard output.
 
 # Requires the `jq` program, either `curl` or `wget`, and the scripts
-# `set-git-changes` and `set-ci-org-and-branch` in the same directory as this
+# `set-git-range` and `set-ci-org-and-branch` in the same directory as this
 # script.
 #
 # If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
@@ -90,7 +90,7 @@ shell_quote() {
 
 ### Compute the values
 
-# `set-git-changes` does all the work.  It writes everything but the variable
+# `set-git-range` does all the work.  It writes everything but the variable
 # values to standard error, so it does not disturb the variable settings that
 # this script writes to standard output.
 # The command-line argument wins, but an inherited CI_DEFAULT_ORGANIZATION is
@@ -99,8 +99,8 @@ PLUME_SCRIPTS="${SCRIPT_DIR}"
 CI_DEFAULT_ORGANIZATION="${DEFAULT_ORGANIZATION:-${CI_DEFAULT_ORGANIZATION}}"
 CI_VERBOSE="${VERBOSE}"
 CI_DEBUG="${DEBUG}"
-# shellcheck source=set-git-changes
-. "${SCRIPT_DIR}"/set-git-changes || exit $?
+# shellcheck source=set-git-range
+. "${SCRIPT_DIR}"/set-git-range || exit $?
 
 ### Print it out
 

@@ -104,16 +104,16 @@ Outputs shell script code that sets variables `CI_COMMIT_RANGE`,
 `CI_COMMIT_RANGE_START`, and `CI_COMMIT_RANGE_END` to the start and end commits
 for a CI job, and `CI_ORGANIZATION` and `CI_BRANCH` as `ci-org-and-branch` does.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
-As a general rule, prefer `set-git-changes` over this script.
+As a general rule, prefer `set-git-range` over this script.
 [Documentation](git-changes) at top of file.
 
-### set-git-changes
+### set-git-range
 
 When sourced, sets variables `CI_COMMIT_RANGE`, `CI_COMMIT_RANGE_START`, and
 `CI_COMMIT_RANGE_END` holding the start and end commits for a CI job, along
 with everything that `set-ci-org-and-branch`, which it sources, sets.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
-[Documentation](set-git-changes) at top of file.
+[Documentation](set-git-range) at top of file.
 
 ## Search and replace
 
