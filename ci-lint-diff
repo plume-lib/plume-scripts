@@ -21,6 +21,8 @@
 #    by pulling upstream.
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
+# Requires the scripts `set-git-changes` and `set-ci-org-and-branch` in the
+# same directory as this script.
 
 # This script is a thin wrapper around `lint-diff.py`.
 
@@ -54,22 +56,23 @@ if [ "$DEBUG" = "--debug" ]; then
   git log --graph | head --lines=10000
 fi
 
-# Temporarily disable "set -e" so a failure of git-changes is handled below
-# rather than aborting this script (which would skip the diagnostics).
-set +e
-git_changes_output="$("${SCRIPT_DIR}"/git-changes)"
-git_changes_status_code=$?
-set -e
-if [ "$git_changes_status_code" -ne 0 ]; then
-  echo "git-changes failed with status $git_changes_status_code"
-  echo "git-changes reported the reason on standard error, above."
-  echo "---- git-changes standard output ----"
-  echo "$git_changes_output"
-  echo "---- end of git-changes standard output ----"
+# `set-git-changes` sets CI_COMMIT_RANGE and the other CI_* variables.  Source
+# it rather than `eval`ing the output of `git-changes`:  `eval` discards the
+# exit status, and it mangles a value that contains a shell metacharacter (a
+# branch name may contain one).
+# Set the variables that configure it, rather than letting the environment do
+# so, so that this script behaves the same way in every job.
+PLUME_SCRIPTS="${SCRIPT_DIR}"
+CI_VERBOSE=""
+CI_DEBUG=""
+# "set -e" needs no adjustment here:  a command in an `if` condition does not
+# trigger it.  That lets a failure be handled here rather than aborting this
+# script, which would skip the diagnostics below.
+# shellcheck source=set-git-changes
+if ! . "${SCRIPT_DIR}"/set-git-changes; then
+  echo "set-git-changes failed; it reported the reason on standard error, above."
   exit 2
 fi
-
-eval "$git_changes_output"
 
 if [ -z "$CI_COMMIT_RANGE" ]; then
   CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE is not set.\n"
@@ -125,17 +128,25 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
-  echo "---- git-changes standard output ----"
-  echo "$git_changes_output"
-  echo "---- end of git-changes standard output ----"
+  echo "---- values from set-git-changes ----"
+  echo "CI_ORGANIZATION=$CI_ORGANIZATION"
+  echo "CI_BRANCH=$CI_BRANCH"
+  echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
+  echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
+  echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
+  echo "---- end of values from set-git-changes ----"
   echo
-  # This is not very effective because environment variables were set by
-  # the previous invocation of git-changes.
-  # `git-changes` writes its diagnostics to standard error; redirect them so
-  # that they appear between the two markers rather than somewhere above.
-  echo "---------------- start of ${SCRIPT_DIR}/git-changes --debug"
-  "${SCRIPT_DIR}"/git-changes --debug 2>&1
-  echo "---------------- end of ${SCRIPT_DIR}/git-changes --debug"
+  # Run in a separate process, so that recomputing the values cannot change the
+  # ones that the diagnostics below report.  Unlike a repeated invocation of the
+  # old `git-changes`, this one is meaningful, because `set-git-changes`
+  # computes its values from scratch rather than reusing what the environment
+  # holds.
+  # Its diagnostics go to standard error; redirect them so that they appear
+  # between the two markers rather than somewhere above.
+  echo "---------------- start of ${SCRIPT_DIR}/set-git-changes with CI_DEBUG"
+  CI_DEBUG="--debug" PLUME_SCRIPTS="${SCRIPT_DIR}" \
+    sh -c '. "${PLUME_SCRIPTS}"/set-git-changes' 2>&1 || true
+  echo "---------------- end of ${SCRIPT_DIR}/set-git-changes with CI_DEBUG"
   echo
 
   echo git rev-parse \$CI_COMMIT_RANGE_START
