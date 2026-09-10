@@ -1,12 +1,17 @@
-.PHONY: test clean all
+.PHONY: test clean all diff-test bad-input-test
 
 all: test
 
-test: lines1.output lines1.output2 lines2.output blank.output
+test: diff-test bad-input-test
+
+diff-test: lines1.output lines1.output2 lines2.output blank.output
 	diff -u lines1.output-goal lines1.output
 	diff -u lines1.output-goal lines1.output2
 	diff -u lines2.output-goal lines2.output
 	test ! -s blank.output
+
+bad-input-test: ../../squeeze-blank-lines bad-input-test.sh
+	./bad-input-test.sh
 
 lines1.output: ../../squeeze-blank-lines lines1.txt
 	../../squeeze-blank-lines < lines1.txt > $@
