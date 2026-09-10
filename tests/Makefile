@@ -1,17 +1,20 @@
 .PHONY: test clean all
 
+# One line per test directory, iterated over below.  A loop rather than one
+# recipe line per directory, because `checkmake` permits at most 5 lines in a
+# recipe.
+TEST_DIRS = \
+	eval-quoting-test \
+	jacoco-coverage-ratchet-test \
+	lint-diff-test \
+	sort-compiler-output-test \
+	sort-directory-order-test \
+	squeeze-blank-lines-test
+
 all: test
 
 test:
-	${MAKE} -C jacoco-coverage-ratchet-test test
-	${MAKE} -C lint-diff-test test
-	${MAKE} -C sort-compiler-output-test test
-	${MAKE} -C sort-directory-order-test test
-	${MAKE} -C squeeze-blank-lines-test test
+	for dir in ${TEST_DIRS} ; do ${MAKE} -C $$dir test || exit $$? ; done
 
 clean:
-	${MAKE} -C jacoco-coverage-ratchet-test clean
-	${MAKE} -C lint-diff-test clean
-	${MAKE} -C sort-compiler-output-test clean
-	${MAKE} -C sort-directory-order-test clean
-	${MAKE} -C squeeze-blank-lines-test clean
+	for dir in ${TEST_DIRS} ; do ${MAKE} -C $$dir clean || exit $$? ; done
