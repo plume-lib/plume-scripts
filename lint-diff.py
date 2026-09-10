@@ -214,31 +214,33 @@ assert min_strips("/a/b/c/d", "/e/f/g/h") == (1000, 1000, "/a/b/c/d", "/e/f/g/h"
 """
 
 
-def pair_min(
-    pair1: tuple[int, int, str, str], pair2: tuple[int, int, str, str]
-) -> tuple[int, int, str, str]:
-    """Given two tuples, returns the one that is pointwise lesser in its first two elements.
+def pair_key(pair: tuple[int, int, str, str]) -> tuple[int, int, str, str]:
+    """Given a tuple as produced by `min_strips`, returns a sort key for it.
 
-    Fails if neither is lesser.
+    Strip-pairs are not always pointwise comparable: the diff and the warnings
+    may disagree about the relative depth of two different files, as when a
+    lint tool reports some paths relative to a module and others relative to
+    the repository.  This key totally orders them, preferring the pair that
+    strips the fewest directories overall.
 
     Returns:
-        the argument that is pointwise lesser in its first two elements.
+        a sort key that totally orders the tuples produced by `min_strips`.
     """
-    if pair1[0] <= pair2[0] and pair1[1] <= pair2[1]:
-        return pair1
-    if pair1[0] >= pair2[0] and pair1[1] >= pair2[1]:
-        return pair2
-    msg = f"incomparable pairs: {pair1} {pair2}"
-    raise Exception(msg)
+    # The last two elements make the ordering deterministic when two pairs
+    # strip the same number of directories.  They are not otherwise meaningful.
+    return (pair[0] + pair[1], pair[0], pair[2], pair[3])
 
 
 ## Tests:
 """
 import os
-assert pair_min((3,4,"a","b"), (5,6,"c","d")) == (3,4,"a","b")
-assert pair_min((4,3,"a","b"), (6,5,"c","d")) == (4,3,"a","b")
-assert pair_min((30,40,"a","b"), (5,6,"c","d")) == (5,6,"c","d")
-assert pair_min((40,30,"a","b"), (6,5,"c","d")) == (6,5,"c","d")
+assert min([(3,4,"a","b"), (5,6,"c","d")], key=pair_key) == (3,4,"a","b")
+assert min([(4,3,"a","b"), (6,5,"c","d")], key=pair_key) == (4,3,"a","b")
+assert min([(30,40,"a","b"), (5,6,"c","d")], key=pair_key) == (5,6,"c","d")
+assert min([(40,30,"a","b"), (6,5,"c","d")], key=pair_key) == (6,5,"c","d")
+# Incomparable pairs: neither is pointwise lesser than the other.
+assert min([(3,1,"a","b"), (2,2,"c","d")], key=pair_key) == (2,2,"c","d")
+assert min([(2,2,"c","d"), (3,1,"a","b")], key=pair_key) == (2,2,"c","d")
 """
 
 
@@ -287,11 +289,14 @@ def guess_strip_filenames(
     Returns:
         A 4-tuple of 2 integers and 2 strings, as for `min_strips`.
     """
-    result = (1000, 1000, "no files seen yet", "no files seen yet")
-    for diff_filename in diff_filenames:
-        for warning_filename in warning_filenames:
-            result = pair_min(result, min_strips(diff_filename, warning_filename))
-    return result
+    candidates = [
+        min_strips(diff_filename, warning_filename)
+        for diff_filename in diff_filenames
+        for warning_filename in warning_filenames
+    ]
+    if not candidates:
+        return (1000, 1000, "no files seen yet", "no files seen yet")
+    return min(candidates, key=pair_key)
 
 
 def guess_strip_files(diff_file: str, warning_file: str) -> tuple[int, int, str, str]:

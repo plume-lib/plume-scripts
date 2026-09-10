@@ -1,0 +1,2 @@
+src/Foo.java:4: warning: [field] no doc comment for newFooField
+src/Bar.java:4: warning: [field] no doc comment for newBarField
