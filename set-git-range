@@ -204,6 +204,7 @@ _sgr_set_git_range_body() {
   local base_tip=""
   local default_commit_range_start
   local keep_end
+  local pr_head_sha
 
   if [ -n "$debug" ]; then
     verbose="$debug"
@@ -374,13 +375,37 @@ _sgr_set_git_range_body() {
 
   elif [ -n "${GITHUB_HEAD_REF}" ]; then
     # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
-    # At this point, these three are the same:
+    # For a `pull_request` event, these three are the same:
     # git rev-parse HEAD
     # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
     # ${GITHUB_SHA}
     # Set the end of the range first, so that the checks below can ask whether
     # a candidate start would give `git diff` a range it can use.
     CI_COMMIT_RANGE_END=${GITHUB_SHA}
+    if [ "${GITHUB_EVENT_NAME}" = "pull_request_target" ]; then
+      # GITHUB_HEAD_REF is set for `pull_request_target` too, but there
+      # GITHUB_SHA is the base branch's tip rather than the pull request, and
+      # the default checkout is the base branch.  Using GITHUB_SHA as the range
+      # end would silently diff a base branch commit instead of the pull
+      # request.  Use the pull request's head commit, which is in the clone
+      # only if the workflow checked it out explicitly.
+      pr_head_sha=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.sha // empty' 2> /dev/null)
+      if [ -z "$pr_head_sha" ] && [ -r "${GITHUB_EVENT_PATH}" ]; then
+        # The API request failed or was throttled; the event payload, which is
+        # a local file, describes the same pull request.
+        pr_head_sha=$(jq -r '.pull_request.head.sha // empty' "${GITHUB_EVENT_PATH}" 2> /dev/null)
+      fi
+      if [ -n "$pr_head_sha" ] && git rev-parse --verify -q "${pr_head_sha}^{commit}" > /dev/null; then
+        CI_COMMIT_RANGE_END=$pr_head_sha
+      else
+        # Leave the range end empty; the check at the end of this function
+        # turns that into a failure.  Diffing the base branch against itself
+        # would be worse:  it reports changes that are not the pull request's,
+        # and no client can tell that the answer is wrong.
+        echo "${SCRIPT_NAME} in $(pwd): this ${GITHUB_EVENT_NAME} job's clone does not contain the pull request's head commit ${pr_head_sha:-<unknown>}.  Check out the pull request's head, or use the \`pull_request\` event." >&2
+        CI_COMMIT_RANGE_END=""
+      fi
+    fi
     if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
