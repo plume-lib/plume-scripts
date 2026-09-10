@@ -71,9 +71,18 @@ Prints "yes" if this process is running under CI.  Prints nothing otherwise.
 
 ### ci-org-and-branch
 
-Outputs the head GitHub organization and branch for a CI job.
+Outputs shell script code that sets variables `CI_ORGANIZATION` and `CI_BRANCH`
+to the head GitHub organization and branch for a CI job.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+As a general rule, prefer `set-ci-org-and-branch` over this script.
 [Documentation](ci-org-and-branch) at top of file.
+
+### set-ci-org-and-branch
+
+When sourced, sets variables `CI_ORGANIZATION` and `CI_BRANCH`
+holding the head GitHub organization and branch for a CI job.
+Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+[Documentation](set-ci-org-and-branch) at top of file.
 
 <!--
 ### ci-lint-diff
@@ -91,9 +100,20 @@ Prints the SHA commit id corresponding to the most recent successful CI job.
 
 ### git-changes
 
-Determines the start and end commits for a CI job.
+Outputs shell script code that sets variables `CI_COMMIT_RANGE`,
+`CI_COMMIT_RANGE_START`, and `CI_COMMIT_RANGE_END` to the start and end commits
+for a CI job, and `CI_ORGANIZATION` and `CI_BRANCH` as `ci-org-and-branch` does.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+As a general rule, prefer `set-git-range` over this script.
 [Documentation](git-changes) at top of file.
+
+### set-git-range
+
+When sourced, sets variables `CI_COMMIT_RANGE`, `CI_COMMIT_RANGE_START`, and
+`CI_COMMIT_RANGE_END` holding the start and end commits for a CI job, along
+with everything that `set-ci-org-and-branch`, which it sources, sets.
+Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
+[Documentation](set-git-range) at top of file.
 
 ## Search and replace
 

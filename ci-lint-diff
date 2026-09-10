@@ -21,6 +21,8 @@
 #    by pulling upstream.
 #
 # Requires the `jq` program to be installed, when used in Azure Pipelines jobs.
+# Requires the scripts `set-git-range` and `set-ci-org-and-branch` in the
+# same directory as this script.
 
 # This script is a thin wrapper around `lint-diff.py`.
 
@@ -29,6 +31,47 @@ SCRIPT_NAME="$(basename -- "$0")"
 
 DEBUG=""
 CI_LINT_DIFF_ERROR=""
+
+# Prints the environment, one variable per line, with the value of each
+# variable whose name suggests a credential replaced.  A plain `env` dump would
+# write secrets into the CI log, which is often readable by anyone who can see
+# the job.  Matching by name pattern rather than by an allowlist of names also
+# covers secrets that this script does not know about; GitHub Actions, for
+# example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
+# `set-ci-org-and-branch` and `set-git-range` each contain a copy of the
+# redaction code, because each of them unsets its functions before returning.
+print_redacted_environment() {
+  # Print the environment with awk's ENVIRON array rather than with
+  # `env -0 | sort -z`:  the `-0` and `-z` options are GNU extensions that
+  # BusyBox and BSD lack, so on those platforms this dump would be empty.
+  # Each variable becomes exactly one line, with newlines in its value shown as
+  # "\n"; a multi-line value would otherwise scramble the sort and slip its
+  # continuation lines past the redaction below.  The escaping is done by
+  # concatenation because a backslash in `gsub`'s replacement text is not
+  # portable:  BusyBox awk and GNU awk interpret it differently.
+  awk '
+    BEGIN {
+      for (name in ENVIRON) {
+        parts = split(ENVIRON[name], part, /\n/)
+        value = part[1]
+        for (i = 2; i <= parts; i++) {
+          value = value "\\n" part[i]
+        }
+        print name "=" value
+      }
+    }
+  ' | sort | awk '
+    {
+      name = $0
+      sub(/=.*/, "", name)
+      if (toupper(name) ~ /TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|APIKEY|API_KEY|PRIVATE_KEY|_PAT$|^PAT$/) {
+        print name "=<redacted>"
+        next
+      }
+      print
+    }
+  '
+}
 
 if [ "$#" -eq 0 ]; then
   echo "Usage: ${SCRIPT_NAME} [--debug] WARNINGS-FILE" >&2
@@ -51,32 +94,37 @@ WARNINGSFILE=$1
 # If there are no warnings, there is nothing to report, so don't compute the
 # diff.
 if [ ! -s "$WARNINGSFILE" ]; then
-  echo "${SCRIPT_NAME}: $WARNINGSFILE is empty; nothing to report."
+  # Report on standard error, because `lint-diff.py` writes the warnings that
+  # this script exists to produce on standard output, and a client may test
+  # whether that output is empty.
+  echo "${SCRIPT_NAME}: $WARNINGSFILE is empty; nothing to report." >&2
   exit 0
 fi
 
 set -e
 
 if [ "$DEBUG" = "--debug" ]; then
-  env | sort
+  print_redacted_environment
   git log --graph | head -n 10000
 fi
 
-# Temporarily disable "set -e" so a failure of git-changes is handled below
-# rather than aborting this script (which would skip the diagnostics).
-set +e
-git_changes_output="$("${SCRIPT_DIR}"/git-changes)"
-git_changes_status_code=$?
-set -e
-if [ "$git_changes_status_code" -ne 0 ]; then
-  echo "git-changes failed with status $git_changes_status_code"
-  echo "---- git-changes output ----"
-  echo "$git_changes_output"
-  echo "---- end of git-changes output ----"
+# `set-git-range` sets CI_COMMIT_RANGE and the other CI_* variables.  Source
+# it rather than `eval`ing the output of `git-changes`:  `eval` discards the
+# exit status, and it mangles a value that contains a shell metacharacter (a
+# branch name may contain one).
+# Set the variables that configure it, rather than letting the environment do
+# so, so that this script behaves the same way in every job.
+PLUME_SCRIPTS="${SCRIPT_DIR}"
+CI_VERBOSE=""
+CI_DEBUG=""
+# "set -e" needs no adjustment here:  a command in an `if` condition does not
+# trigger it.  That lets a failure be handled here rather than aborting this
+# script, which would skip the diagnostics below.
+# shellcheck source=set-git-range
+if ! . "${SCRIPT_DIR}"/set-git-range; then
+  echo "set-git-range failed; it reported the reason on standard error, above." >&2
   exit 2
 fi
-
-eval "$git_changes_output"
 
 if [ -z "$CI_COMMIT_RANGE" ]; then
   CI_LINT_DIFF_ERROR+="CI_COMMIT_RANGE is not set.\n"
@@ -104,7 +152,7 @@ diff_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-XXXXXX.txt") || exit 2
 diff_err_file=""
 cleanup() {
   if [ "$DEBUG" = "--debug" ]; then
-    echo "${SCRIPT_NAME}: retaining $diff_file $diff_err_file"
+    echo "${SCRIPT_NAME}: retaining $diff_file $diff_err_file" >&2
   else
     rm -f "$diff_file" "$diff_err_file"
   fi
@@ -113,7 +161,7 @@ cleanup() {
 # removed even if the second `mktemp` fails.
 trap cleanup EXIT
 diff_err_file=$(mktemp "${TMPDIR:-/tmp}/ci-lint-diff-err-XXXXXX.txt") || exit 2
-echo "${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file"
+echo "${SCRIPT_NAME} running: git diff $CI_COMMIT_RANGE > $diff_file" >&2
 # Keep stderr out of $diff_file, which is parsed as a diff by `lint-diff.py`.
 git --no-pager diff --exit-code "$CI_COMMIT_RANGE" > "$diff_file" 2> "$diff_err_file"
 git_status=$?
@@ -136,7 +184,7 @@ Other causes of an empty diff include:
   * The commit range is a no-op, such as a commit and its revert.
   * HEAD is a merge commit and the merge took all its changes from its second argument.
   * Your compare branch does not differ from your base branch.
-  * Your clone is shallow, so git-changes could not determine the start of the
+  * Your clone is shallow, so set-git-range could not determine the start of the
     commit range (HEAD^1 does not exist) and used HEAD, making the range empty.
     Clone more deeply.
 "
@@ -153,25 +201,35 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "${SCRIPT_NAME} will print diagnostic information, then exit."
   echo
 
-  echo "---- git-changes output ----"
-  echo "$git_changes_output"
-  echo "---- end of git-changes output ----"
+  echo "---- values from set-git-range ----"
+  echo "CI_ORGANIZATION=$CI_ORGANIZATION"
+  echo "CI_BRANCH=$CI_BRANCH"
+  echo "CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START"
+  echo "CI_COMMIT_RANGE_END=$CI_COMMIT_RANGE_END"
+  echo "CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
+  echo "---- end of values from set-git-range ----"
   echo
   echo "---- stderr of git diff $CI_COMMIT_RANGE ----"
   cat "$diff_err_file"
   echo "---- end of stderr of git diff $CI_COMMIT_RANGE ----"
   echo
-  # `git-changes --debug` dumps the environment, so run it only under --debug,
-  # because CI logs are often public and the environment may contain access
-  # tokens (such as GITHUB_PAT).
-  # This is not very effective because environment variables were set by
-  # the previous invocation of git-changes.
+  # `set-git-range` under CI_DEBUG dumps the environment, so run it only under
+  # --debug, because CI logs are often public and the environment may contain
+  # access tokens besides the GITHUB_PAT and GH_TOKEN that it redacts.
+  # Run it in a separate process, so that recomputing the values cannot change
+  # the ones that the diagnostics above report.  Unlike a repeated invocation of
+  # the old `git-changes`, this one is meaningful, because `set-git-range`
+  # computes its values from scratch rather than reusing what the environment
+  # holds.  It must be sourced, so run a shell that sources it.
+  # Its diagnostics go to standard error; redirect them so that they appear
+  # between the two markers rather than somewhere above.
   if [ "$DEBUG" = "--debug" ]; then
-    echo "---------------- start of ${SCRIPT_DIR}/git-changes --debug"
-    "${SCRIPT_DIR}"/git-changes --debug
-    echo "---------------- end of ${SCRIPT_DIR}/git-changes --debug"
+    echo "---------------- start of ${SCRIPT_DIR}/set-git-range with CI_DEBUG"
+    CI_DEBUG="--debug" PLUME_SCRIPTS="${SCRIPT_DIR}" \
+      sh -c '. "${PLUME_SCRIPTS}"/set-git-range' 2>&1 || true
+    echo "---------------- end of ${SCRIPT_DIR}/set-git-range with CI_DEBUG"
   else
-    echo "Re-run with --debug to also print the output of ${SCRIPT_DIR}/git-changes --debug."
+    echo "Re-run with --debug to also print the output of ${SCRIPT_DIR}/set-git-range with CI_DEBUG."
   fi
   echo
 
@@ -234,11 +292,12 @@ if [ -n "$CI_LINT_DIFF_ERROR" ]; then
   echo "Listing of ${TMPDIR:-/tmp}:"
   ls -l "${TMPDIR:-/tmp}"
   echo
-  # The environment is printed only under --debug, because CI logs are often
-  # public and the environment may contain access tokens (such as GITHUB_PAT).
+  # The environment is printed only under --debug, and even then with
+  # credentials redacted, because CI logs are often public and the environment
+  # may contain access tokens (such as GITHUB_PAT).
   if [ "$DEBUG" = "--debug" ]; then
     echo "Environment:"
-    env | sort
+    print_redacted_environment
   else
     echo "Re-run with --debug to also print the environment."
   fi
