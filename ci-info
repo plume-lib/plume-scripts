@@ -235,7 +235,10 @@ elif [ -n "$AZURE_HTTP_USER_AGENT" ]; then
   if [ "$BUILD_REASON" = "PullRequest" ]; then
     url="https://api.github.com/repos/${BUILD_REPOSITORY_NAME}/pulls/${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER}"
     pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
-    SLUG=$(printf '%s' "${pull_json}" | jq .head.label | sed 's/"//g')
+    # "// empty" maps JSON null to the empty string, so jq does not yield the
+    # string "null" for a response that does not describe a pull request (as
+    # when the request was throttled or the pull request does not exist).
+    SLUG=$(printf '%s' "${pull_json}" | jq -r '.head.label // empty' 2> /dev/null)
     if [ -z "$SLUG" ]; then
       emit_echo "${SCRIPT_NAME} error: bad output for ${url}"
       if [ -n "$auth_token" ]; then
@@ -261,7 +264,10 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
-  CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq -r '.head.repo.owner.login')
+  # "// empty" maps JSON null to the empty string, so that a response that
+  # does not describe a pull request (as when the request was throttled) falls
+  # through to the fallbacks below instead of yielding "null".
+  CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
   if [ "$DEBUG" = "--debug" ]; then
     emit_echo "GitHub Actions pull request, GITHUB_HEAD_REF=${GITHUB_HEAD_REF}"
     emit_echo "GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"

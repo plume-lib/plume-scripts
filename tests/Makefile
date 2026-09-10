@@ -6,6 +6,7 @@
 TEST_DIRS = \
 	eval-quoting-test \
 	jacoco-coverage-ratchet-test \
+	jq-null-test \
 	lint-diff-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
