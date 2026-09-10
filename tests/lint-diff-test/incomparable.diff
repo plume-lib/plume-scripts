@@ -1,0 +1,33 @@
+diff --git a/core/src/Foo.java b/core/src/Foo.java
+index 1234567..89abcde 100644
+--- a/core/src/Foo.java
++++ b/core/src/Foo.java
+@@ -1,5 +1,6 @@
+ package core;
+ 
+ public class Foo {
++  public int newFooField;
+   public void m() {}
+ }
+diff --git a/util/src/Bar.java b/util/src/Bar.java
+index 1234567..89abcde 100644
+--- a/util/src/Bar.java
++++ b/util/src/Bar.java
+@@ -1,5 +1,6 @@
+ package util;
+ 
+ public class Bar {
++  public int newBarField;
+   public void n() {}
+ }
+diff --git a/x/Baz.java b/x/Baz.java
+index 1234567..89abcde 100644
+--- a/x/Baz.java
++++ b/x/Baz.java
+@@ -1,5 +1,6 @@
+ package x;
+ 
+ public class Baz {
++  public int newBazField;
+   public void p() {}
+ }
