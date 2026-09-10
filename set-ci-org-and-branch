@@ -439,6 +439,15 @@ set +e +u
 
 _scoab_set_org_and_branch_body
 _scoab_status=$?
+if [ "$_scoab_status" -ne 0 ]; then
+  # Honor the documented contract:  on failure all four variables are empty.
+  # The body returns early from several places, some of them after it has
+  # already set a variable; clearing here covers every one of them.
+  CI_ORGANIZATION=""
+  CI_BRANCH=""
+  CI_DEFAULT_BRANCH_NAME=""
+  CI_PULL_JSON=""
+fi
 
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.

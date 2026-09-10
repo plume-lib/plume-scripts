@@ -177,9 +177,16 @@ base_tip=""
 fetch_base_branch() {
   if [ -z "$base_branch_fetched" ] && [ -n "$base_branch" ]; then
     base_branch_fetched="true"
-    git fetch -q origin "$base_branch"
-    # Remember the tip, because a later fetch overwrites FETCH_HEAD.
-    base_tip=$(git rev-parse --verify -q FETCH_HEAD)
+    # Test the fetch's status rather than reading FETCH_HEAD unconditionally:  a
+    # fetch that fails before writing FETCH_HEAD (as when the network is down)
+    # leaves the previous fetch's commit there, which would silently yield a
+    # commit range computed from an unrelated branch.
+    if git fetch -q origin "$base_branch"; then
+      # Remember the tip, because a later fetch overwrites FETCH_HEAD.
+      base_tip=$(git rev-parse --verify -q FETCH_HEAD)
+    else
+      echo "echo \"${SCRIPT_NAME}: cannot fetch ${base_branch} from origin.\";"
+    fi
   fi
 }
 
