@@ -99,18 +99,31 @@ CI_PULL_JSON=""
 
 ### Organization and branch
 
-: "${PLUME_SCRIPTS:=/tmp/plume-scripts}"
-if [ ! -r "${PLUME_SCRIPTS}/set-ci-org-and-branch" ]; then
-  echo "set-git-range: cannot read ${PLUME_SCRIPTS}/set-ci-org-and-branch." >&2
+# Use a private variable rather than defaulting PLUME_SCRIPTS itself, so that
+# this script leaves no variable set in a client that did not set one.
+_sgr_plume_scripts="${PLUME_SCRIPTS:-/tmp/plume-scripts}"
+if [ ! -r "${_sgr_plume_scripts}/set-ci-org-and-branch" ]; then
+  echo "set-git-range: cannot read ${_sgr_plume_scripts}/set-ci-org-and-branch." >&2
   echo "Set variable PLUME_SCRIPTS to the directory that contains these scripts." >&2
+  unset _sgr_plume_scripts
   return 2
 fi
 # Source it here rather than within a function, so that its `return` cannot be
 # mistaken for a return from that function.  It saves and restores the client's
 # shell options itself, and it sets CI_DEFAULT_BRANCH_NAME and CI_PULL_JSON,
 # which the commit-range code below uses.
+# `|| ...` rather than a bare command, so that a client's `set -e` does not
+# make the shell exit before the cleanup below runs.
+_sgr_status=0
 # shellcheck source=set-ci-org-and-branch
-. "${PLUME_SCRIPTS}"/set-ci-org-and-branch || return $?
+. "${_sgr_plume_scripts}"/set-ci-org-and-branch || _sgr_status=$?
+unset _sgr_plume_scripts
+if [ "$_sgr_status" -ne 0 ]; then
+  # Unset the variable and return in a single command, because unsetting it
+  # afterward would lose the status.
+  eval "unset _sgr_status; return ${_sgr_status}"
+fi
+unset _sgr_status
 
 ### Functions
 
@@ -361,16 +374,29 @@ _sgr_set_git_range_body() {
 
   elif [ -n "${GITHUB_HEAD_REF}" ]; then
     # GitHub Actions pull request (no special handling is required for non-PR GitHub Actions jobs).
-    # At this point, these two are the same:
+    # At this point, these three are the same:
     # git rev-parse HEAD
     # git rev-parse remotes/pull/"${GITHUB_REF_NAME}"
+    # ${GITHUB_SHA}
+    # Set the end of the range first, so that the checks below can ask whether
+    # a candidate start would give `git diff` a range it can use.
+    CI_COMMIT_RANGE_END=${GITHUB_SHA}
     if ! CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_BASE_REF}" 2> /dev/null); then
       if ! CI_COMMIT_RANGE_START=$(git rev-parse remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
         if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${GITHUB_BASE_REF}" 2> /dev/null); then
           if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${CI_DEFAULT_BRANCH_NAME}" 2> /dev/null); then
-            # Last resort: the pull request description that `set-ci-org-and-branch` obtained.
-            if ! CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -e -r '.base.sha // empty' 2> /dev/null); then
-              echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${CI_DEFAULT_BRANCH_NAME}" >&2
+            # No ref names the base branch, as in a shallow single-branch
+            # checkout.  Try the base commit from the pull request description
+            # that `set-ci-org-and-branch` obtained, but only if `git diff`
+            # could use it:  it is the base tip as of when the pull request was
+            # created, which such a checkout is the least likely to contain.
+            CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.base.sha // empty' 2> /dev/null)
+            if [ -n "$CI_COMMIT_RANGE_START" ] && ! _sgr_commit_range_is_usable; then
+              echo "${SCRIPT_NAME}: cannot use commit range start ${CI_COMMIT_RANGE_START} from the GitHub API." >&2
+              CI_COMMIT_RANGE_START=""
+            fi
+            if [ -z "$CI_COMMIT_RANGE_START" ]; then
+              echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${CI_DEFAULT_BRANCH_NAME} and the pull request description" >&2
               # This is a routine failure in a shallow single-branch checkout,
               # so dump the state only when asked.  `set` prints the whole
               # environment, and CI logs are often readable by anyone who can
@@ -392,8 +418,6 @@ _sgr_set_git_range_body() {
         fi
       fi
     fi
-    # These are the same: `sha`=`echo $GITHUB_SHA`=`git rev-parse remotes/pull/"${GITHUB_REF_NAME}"`.
-    CI_COMMIT_RANGE_END=${GITHUB_SHA}
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
 
     # If this elif is reached, it's not a pull request (except maybe a re-run Azure Pipelines pull request).

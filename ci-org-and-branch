@@ -95,7 +95,17 @@ CI_DEFAULT_ORGANIZATION="${DEFAULT_ORGANIZATION:-${CI_DEFAULT_ORGANIZATION}}"
 CI_VERBOSE="${VERBOSE}"
 CI_DEBUG="${DEBUG}"
 # shellcheck source=set-ci-org-and-branch
-. "${SCRIPT_DIR}"/set-ci-org-and-branch || exit $?
+. "${SCRIPT_DIR}"/set-ci-org-and-branch
+scoab_status=$?
+if [ "$scoab_status" -ne 0 ]; then
+  # The client's `eval` reports the status of the text it evaluated, not of
+  # this script, so exiting silently would leave the client with status 0 and
+  # with no value (or a stale value) for each variable.  Writing `exit` on
+  # standard output makes the client fail.  `set-ci-org-and-branch` already
+  # reported the reason on standard error.
+  echo "exit ${scoab_status}"
+  exit "${scoab_status}"
+fi
 
 ### Print it out
 
