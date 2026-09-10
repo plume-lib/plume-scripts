@@ -84,9 +84,16 @@ esac
 # before the early returns below, rather than in `_sgr_set_git_range_body`:
 # those returns happen without the body ever running, and they must not leave a
 # stale range behind for a client that tests the variables instead of the status.
+# The four variables that `set-ci-org-and-branch` sets are cleared here as well:
+# the `return 2` below happens before that script is sourced, so nothing else
+# would clear them, and they would keep a previous sourcing's values.
 CI_COMMIT_RANGE=""
 CI_COMMIT_RANGE_START=""
 CI_COMMIT_RANGE_END=""
+CI_ORGANIZATION=""
+CI_BRANCH=""
+CI_DEFAULT_BRANCH_NAME=""
+CI_PULL_JSON=""
 
 ### Organization and branch
 
@@ -106,13 +113,25 @@ fi
 ### Functions
 
 # Copies standard input to standard output, with the value of each variable
-# that holds a GitHub token replaced.  The debug dump would otherwise write the
-# token into the CI log, which is often readable by anyone who can see the job.
+# whose name suggests a credential replaced.  The debug dump would otherwise
+# write secrets into the CI log, which is often readable by anyone who can see
+# the job.  Matching by name pattern rather than by an allowlist of names also
+# covers secrets that this script does not know about; GitHub Actions, for
+# example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
 # `set-ci-org-and-branch` has its own copy of this function, because it unsets
 # its functions before this script's body runs.
 _sgr_redact_tokens() {
-  sed -e 's/^GITHUB_PAT=.*/GITHUB_PAT=<redacted>/' \
-    -e 's/^GH_TOKEN=.*/GH_TOKEN=<redacted>/'
+  awk '
+    /^[A-Za-z_][A-Za-z0-9_]*=/ {
+      name = $0
+      sub(/=.*/, "", name)
+      if (toupper(name) ~ /TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|APIKEY|API_KEY|PRIVATE_KEY|_PAT$|^PAT$/) {
+        print name "=<redacted>"
+        next
+      }
+    }
+    { print }
+  '
 }
 
 # Returns either `git rev-parse HEAD^1` if HEAD^1 exists, or `git rev-parse HEAD`.
@@ -231,8 +250,23 @@ _sgr_set_git_range_body() {
       ## Use this because ci-last-success.py currently doesn't work.
       CI_COMMIT_RANGE_START=${default_commit_range_start}
     else
-      git fetch origin "$CI_DEFAULT_BRANCH_NAME"
-      CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
+      # Verify the ref rather than parsing it blindly.  If
+      # $CI_DEFAULT_BRANCH_NAME is empty -- as when `git ls-remote` failed
+      # because the network is down or `origin` needs credentials -- then
+      # `git fetch origin ""` succeeds (it fetches HEAD) and
+      # `git rev-parse "origin/"` fails but still prints "origin/" on standard
+      # output, which would make a commit range that no code below detects.
+      CI_COMMIT_RANGE_START=""
+      if [ -n "$CI_DEFAULT_BRANCH_NAME" ]; then
+        git fetch origin "$CI_DEFAULT_BRANCH_NAME"
+        if git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
+          CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
+        fi
+      fi
+      if [ -z "$CI_COMMIT_RANGE_START" ]; then
+        echo "${SCRIPT_NAME}: cannot resolve origin/${CI_DEFAULT_BRANCH_NAME:-<unknown default branch>}; using the previous commit instead." >&2
+        CI_COMMIT_RANGE_START=$(_sgr_head1)
+      fi
     fi
     CI_COMMIT_RANGE_END=$BUILD_SOURCEVERSION
     CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
@@ -333,9 +367,9 @@ _sgr_set_git_range_body() {
                 set | _sgr_redact_tokens
                 echo '---------------- end of set'
                 echo "git log --graph:"
-                git log --graph | head --lines=1000
+                git log --graph | head -n 1000
                 echo "git show:"
-                git --no-pager show | head --lines=1000
+                git --no-pager show | head -n 1000
               } >&2
               CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
             fi
@@ -467,7 +501,7 @@ _sgr_set_git_range_body() {
   if [ -n "$verbose" ]; then
     {
       echo '---------------- start of first 10000 lines of diff:'
-      git --no-pager diff "${CI_COMMIT_RANGE}" | head --lines=10000
+      git --no-pager diff "${CI_COMMIT_RANGE}" | head -n 10000
       echo '---------------- end of first 10000 lines of diff.'
     } >&2
   fi

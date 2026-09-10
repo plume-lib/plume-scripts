@@ -93,14 +93,36 @@ _scoab_get_url() {
 }
 
 # Copies standard input to standard output, with the value of each variable
-# that holds a GitHub token replaced.  The debug dump would otherwise write the
-# token into the CI log, which is often readable by anyone who can see the job.
-# `set` prints a function's local variables too, so $auth_token needs masking
-# even though it is not in the environment.
+# whose name suggests a credential replaced.  The debug dump would otherwise
+# write secrets into the CI log, which is often readable by anyone who can see
+# the job.  Matching by name pattern rather than by an allowlist of names also
+# covers secrets that this script does not know about; GitHub Actions, for
+# example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
+# `set` prints a function's local variables too, which is why $auth_token is
+# assigned before the debug dump runs:  the pattern masks it there as well.
 _scoab_redact_tokens() {
-  sed -e 's/^GITHUB_PAT=.*/GITHUB_PAT=<redacted>/' \
-    -e 's/^GH_TOKEN=.*/GH_TOKEN=<redacted>/' \
-    -e 's/^auth_token=.*/auth_token=<redacted>/'
+  awk '
+    /^[A-Za-z_][A-Za-z0-9_]*=/ {
+      name = $0
+      sub(/=.*/, "", name)
+      if (toupper(name) ~ /TOKEN|SECRET|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|APIKEY|API_KEY|PRIVATE_KEY|_PAT$|^PAT$/) {
+        print name "=<redacted>"
+        next
+      }
+    }
+    { print }
+  '
+}
+
+# _scoab_org_from_url URL: prints the GitHub organization of a repository URL.
+# It strips the leading part of the two forms that a URL may take:
+#   https://github.com/mernst/annotation-tools
+#   git@github.com:mernst/annotation-tools.git
+_scoab_org_from_url() {
+  local slug
+  slug=${1#https://github.com/}
+  slug=${slug#git@github.com:}
+  printf '%s\n' "${slug%/*}"
 }
 
 # Does all the work.  Its caller gives it the shell options it needs, and
@@ -127,6 +149,20 @@ _scoab_set_org_and_branch_body() {
   CI_DEFAULT_BRANCH_NAME=""
   CI_PULL_JSON=""
 
+  ### Variables
+
+  # "GITHUB_PAT" is a GitHub Personal Access Token.
+  # TODO: Should this be "Authorization: Bearer <YOUR-TOKEN>" instead?  See https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
+  # Assign this before the debug dump below, so that `set`'s copy of it is
+  # redacted there rather than being absent and looking safe.
+  if [ -n "$GITHUB_PAT" ]; then
+    auth_token="$GITHUB_PAT"
+  elif [ -n "$GH_TOKEN" ]; then
+    auth_token="$GH_TOKEN"
+  else
+    auth_token=""
+  fi
+
   if [ -n "$debug" ]; then
     {
       # All this output is to stderr.
@@ -134,7 +170,28 @@ _scoab_set_org_and_branch_body() {
       echo
       # `env` only prints EXPORTED variables, so `set` is usually more useful.
       echo '---------------- start of env'
-      env -0 | sort -z | tr '\0' '\n' | _scoab_redact_tokens
+      # Print the environment with awk's ENVIRON array rather than with
+      # `env -0 | sort -z`:  the `-0` and `-z` options are GNU extensions that
+      # BusyBox and BSD lack, so on those platforms this dump would be empty.
+      # (Under GNU awk, ENVIRON also contains awk's own AWKPATH and AWKLIBPATH,
+      # whether or not the environment defines them.)
+      # Each variable becomes exactly one line, with newlines in its value
+      # shown as "\n"; a multi-line value would otherwise scramble the sort and
+      # slip its continuation lines past the redaction below.  The escaping is
+      # done by concatenation because a backslash in `gsub`'s replacement text
+      # is not portable:  BusyBox awk and GNU awk interpret it differently.
+      awk '
+        BEGIN {
+          for (name in ENVIRON) {
+            parts = split(ENVIRON[name], part, /\n/)
+            value = part[1]
+            for (i = 2; i <= parts; i++) {
+              value = value "\\n" part[i]
+            }
+            print name "=" value
+          }
+        }
+      ' | sort | _scoab_redact_tokens
       echo '---------------- end of env'
       echo
       echo '---------------- start of set'
@@ -154,22 +211,10 @@ _scoab_set_org_and_branch_body() {
       echo '---------------- end of all branches'
       echo
       echo '---------------- start of 1000 lines of git log'
-      git --no-pager log --graph | head --lines=1000
+      git --no-pager log --graph | head -n 1000
       echo '---------------- end of 1000 lines of git log'
       echo
     } >&2
-  fi
-
-  ### Variables
-
-  # "GITHUB_PAT" is a GitHub Personal Access Token.
-  # TODO: Should this be "Authorization: Bearer <YOUR-TOKEN>" instead?  See https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
-  if [ -n "$GITHUB_PAT" ]; then
-    auth_token="$GITHUB_PAT"
-  elif [ -n "$GH_TOKEN" ]; then
-    auth_token="$GH_TOKEN"
-  else
-    auth_token=""
   fi
 
   ### Prerequisites
@@ -204,15 +249,13 @@ _scoab_set_org_and_branch_body() {
       CI_PULL_JSON="$(_scoab_get_url "${api_url}" 2>&1 | tr -d '[:cntrl:]')"
       # "// empty" maps JSON null to the empty string, so jq does not yield the string "null".
       SLUG=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.label // empty' 2> /dev/null)
-      if [ -z "$SLUG" ]; then
-        # Warn and fall through to the fallbacks below, rather than failing:  a
-        # throttled request should not fail the whole job.  The fallbacks yield
-        # the organization of this clone's origin, which for a pull request
-        # from a fork is the base repository rather than the head; say so.
+      if [ -n "$SLUG" ]; then
+        CI_ORGANIZATION=${SLUG%:*}
+      else
+        # Warn and fall back, rather than failing:  a throttled request should
+        # not fail the whole job.
         {
           echo "${SCRIPT_NAME} warning: bad output for ${api_url}"
-          echo "${SCRIPT_NAME}: using the organization of this clone's origin instead,"
-          echo "which is the base repository if this is a pull request from a fork."
           if [ -n "$auth_token" ]; then
             echo "auth_token is set."
           fi
@@ -220,8 +263,22 @@ _scoab_set_org_and_branch_body() {
           printf '%s\n' "${CI_PULL_JSON}"
           echo "---- end of ${http_get_tool} output ----"
         } >&2
-      else
-        CI_ORGANIZATION=${SLUG%:*}
+        # Azure sets $SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI to the pull
+        # request's head repository, which is the fork if the pull request is
+        # from one.  Prefer it to the fallbacks below, which yield this clone's
+        # origin -- the base repository, a wrong answer that a client cloning a
+        # companion repository would act on without noticing.
+        if [ -n "$SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI" ]; then
+          CI_ORGANIZATION=$(_scoab_org_from_url "$SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI")
+        fi
+        if [ -n "$CI_ORGANIZATION" ]; then
+          echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI=${SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI}." >&2
+        else
+          {
+            echo "${SCRIPT_NAME}: using the organization of this clone's origin instead,"
+            echo "which is the base repository if this is a pull request from a fork."
+          } >&2
+        fi
       fi
     else
       CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
@@ -253,12 +310,7 @@ _scoab_set_org_and_branch_body() {
   ## Git clone
   if [ -z "$CI_ORGANIZATION" ]; then
     origin_url=$(git config --get remote.origin.url)
-    # This removes the leading part of two possible forms for a URL:
-    #   https://github.com/mernst/annotation-tools
-    #   git@github.com:mernst/annotation-tools.git
-    SLUG=${origin_url#https://github.com/}
-    SLUG=${SLUG#git@github.com:}
-    CI_ORGANIZATION=${SLUG%/*}
+    CI_ORGANIZATION=$(_scoab_org_from_url "$origin_url")
     # TODO: Maybe add a sanity check here.
   fi
 
@@ -451,7 +503,8 @@ fi
 
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
-unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_redact_tokens
+unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_redact_tokens \
+  _scoab_org_from_url
 if [ -n "$_scoab_had_errexit" ]; then
   set -e
 fi
