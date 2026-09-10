@@ -9,6 +9,7 @@ TEST_DIRS = \
 	eval-quoting-test \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
+	jq-null-test \
 	lint-diff-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
