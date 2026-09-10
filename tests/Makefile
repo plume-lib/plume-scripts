@@ -4,6 +4,8 @@
 # recipe line per directory, because `checkmake` permits at most 5 lines in a
 # recipe.
 TEST_DIRS = \
+	ci-info-test \
+	duplicate-code-test \
 	eval-quoting-test \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
@@ -13,17 +15,6 @@ TEST_DIRS = \
 	squeeze-blank-lines-test
 
 all: test
-
-TEST_DIRS = \
-  ci-info-test \
-  jacoco-coverage-ratchet-test \
-  lint-diff-test \
-  sort-compiler-output-test \
-  sort-directory-order-test \
-  squeeze-blank-lines-test
-
-# The recipes loop over ${TEST_DIRS} rather than naming one directory per line,
-# because `checkmake` permits at most 5 lines in a recipe.
 
 test:
 	for dir in ${TEST_DIRS}; do ${MAKE} -C $$dir test || exit $$? ; done
