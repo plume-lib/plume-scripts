@@ -28,8 +28,8 @@ words-lint.txt: words.txt
 words2-lint.txt: words2.txt
 	grep -Hn 'a.*i' $< > $@ || true
 
-words2-lint-pruned.txt: words12.diff words2-lint.txt
-	../../lint-diff.py --context=0 $^ > $@ || true
+words2-lint-pruned.txt: ../../lint-diff.py words12.diff words2-lint.txt
+	../../lint-diff.py --context=0 words12.diff words2-lint.txt > $@ || true
 
 # The goal is lines from words-lint.txt that are in words2.txt but not words1.txt.
 # The perl command removes lines that match both a.*e.*t and a.*a.*e .
@@ -45,8 +45,8 @@ words2-lint-pruned.txt-goal: words-lint.txt
 test-reldir: reldir-lint-pruned.txt-goal reldir-lint-pruned.txt
 	diff $^
 
-reldir-lint-pruned.txt: reldir.diff reldir-lint.txt
-	../../lint-diff.py --strip-diff=1 --strip-lint=2 --context=0 $^ > $@ || true
+reldir-lint-pruned.txt: ../../lint-diff.py reldir.diff reldir-lint.txt
+	../../lint-diff.py --strip-diff=1 --strip-lint=2 --context=0 reldir.diff reldir-lint.txt > $@ || true
 
 
 # "guessstrip" test
@@ -54,16 +54,16 @@ reldir-lint-pruned.txt: reldir.diff reldir-lint.txt
 test-guessstrip: guessstrip-lint-pruned.txt-goal guessstrip-lint-pruned.txt
 	diff $^
 
-guessstrip-lint-pruned.txt: guessstrip.diff guessstrip-lint.txt
-	../../lint-diff.py  --guess-strip $^ > $@ || true
+guessstrip-lint-pruned.txt: ../../lint-diff.py guessstrip.diff guessstrip-lint.txt
+	../../lint-diff.py --guess-strip guessstrip.diff guessstrip-lint.txt > $@ || true
 
 # "javaexception" test
 
 test-javaexception: javaexception-lint-pruned.txt-goal javaexception-lint-pruned.txt
 	diff $^
 
-javaexception-lint-pruned.txt: javaexception.diff javaexception-lint.txt
-	../../lint-diff.py  --guess-strip $^ > $@ || true
+javaexception-lint-pruned.txt: ../../lint-diff.py javaexception.diff javaexception-lint.txt
+	../../lint-diff.py --guess-strip javaexception.diff javaexception-lint.txt > $@ || true
 
 
 # Miscellaneous targets
