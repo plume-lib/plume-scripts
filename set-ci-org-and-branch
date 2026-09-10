@@ -137,6 +137,7 @@ _scoab_set_org_and_branch_body() {
   local SLUG
   local origin_url
   local GITHUB_PR_NUMBER
+  local local_head_ref
 
   if [ -n "$debug" ]; then
     verbose="$debug"
@@ -329,6 +330,22 @@ _scoab_set_org_and_branch_body() {
   ## but only in an English locale:  `git remote show` is porcelain, so git
   ## translates its output.  `git ls-remote` is plumbing, so its output is stable.
   CI_DEFAULT_BRANCH_NAME=$(git ls-remote --symref origin HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+  if [ -z "$CI_DEFAULT_BRANCH_NAME" ]; then
+    # `git ls-remote` failed, or origin's HEAD is not a symbolic ref.  The
+    # network may be down, or origin may require credentials that this checkout
+    # does not have (a GitHub Actions job that uses `persist-credentials: false`
+    # has none, for example).  Fall back to the remote-tracking HEAD that
+    # `git clone` recorded locally.  Warn either way:  a client that silently
+    # gets an empty default branch name computes something other than what it
+    # asked for, and the resulting diagnostics blame the wrong thing.
+    local_head_ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2> /dev/null)
+    CI_DEFAULT_BRANCH_NAME=${local_head_ref#origin/}
+    if [ -n "$CI_DEFAULT_BRANCH_NAME" ]; then
+      echo "${SCRIPT_NAME}: cannot ask origin for its default branch; using ${CI_DEFAULT_BRANCH_NAME} from refs/remotes/origin/HEAD instead." >&2
+    else
+      echo "${SCRIPT_NAME}: WARNING: cannot determine the default branch name, from origin or from refs/remotes/origin/HEAD." >&2
+    fi
+  fi
   if [ -n "$debug" ]; then
     {
       echo "remote's CI_DEFAULT_BRANCH_NAME=$CI_DEFAULT_BRANCH_NAME"

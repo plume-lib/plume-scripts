@@ -40,8 +40,10 @@
 # CI_ORGANIZATION, CI_BRANCH, CI_DEFAULT_BRANCH_NAME, and CI_PULL_JSON.
 #
 # It sets no other variables and leaves no functions defined.  It returns 0 on
-# success, or 2 if it cannot determine the information; in the latter case all
-# the variables above are set to the empty string.
+# success, or 2 if it cannot determine the commit range; in the latter case
+# CI_COMMIT_RANGE, CI_COMMIT_RANGE_START, and CI_COMMIT_RANGE_END are set to
+# the empty string, and the variables that `set-ci-org-and-branch` sets hold
+# whatever it determined (they are empty if it did not run at all).
 #
 # If called not under CI, or under CI but not in the main or toplevel
 # clone, then gets information from the local repository.
@@ -361,16 +363,22 @@ _sgr_set_git_range_body() {
           if ! CI_COMMIT_RANGE_START=$(git rev-parse refs/remotes/origin/"${CI_DEFAULT_BRANCH_NAME}" 2> /dev/null); then
             # Last resort: the pull request description that `set-ci-org-and-branch` obtained.
             if ! CI_COMMIT_RANGE_START=$(printf '%s' "${CI_PULL_JSON}" | jq -e -r '.base.sha // empty' 2> /dev/null); then
-              {
-                echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${CI_DEFAULT_BRANCH_NAME}"
-                echo '---------------- start of set'
-                set | _sgr_redact_tokens
-                echo '---------------- end of set'
-                echo "git log --graph:"
-                git log --graph | head -n 1000
-                echo "git show:"
-                git --no-pager show | head -n 1000
-              } >&2
+              echo "${SCRIPT_NAME} in $(pwd): cannot find commit range start, tried ${GITHUB_BASE_REF} and remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${GITHUB_BASE_REF} and refs/remotes/origin/${CI_DEFAULT_BRANCH_NAME}" >&2
+              # This is a routine failure in a shallow single-branch checkout,
+              # so dump the state only when asked.  `set` prints the whole
+              # environment, and CI logs are often readable by anyone who can
+              # see the job.
+              if [ -n "$debug" ]; then
+                {
+                  echo '---------------- start of set'
+                  set | _sgr_redact_tokens
+                  echo '---------------- end of set'
+                  echo "git log --graph:"
+                  git log --graph | head -n 1000
+                  echo "git show:"
+                  git --no-pager show | head -n 1000
+                } >&2
+              fi
               CI_COMMIT_RANGE_START=$(git rev-parse "${GITHUB_SHA}"^)
             fi
           fi
@@ -496,6 +504,19 @@ _sgr_set_git_range_body() {
     # The start and end commits could still be the same, if the current branch was cloned with
     # --depth=1.
     CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+  fi
+
+  # Every code path above is supposed to set both endpoints, but one of them
+  # can still be empty:  for example, if this directory is not a git clone,
+  # every `git` command above failed.  Do not let an incomplete range reach the
+  # client, because git does not reject one:  `git diff '...'` means
+  # `git diff HEAD...HEAD`, which reports an empty diff rather than an error.
+  if [ -z "$CI_COMMIT_RANGE_START" ] || [ -z "$CI_COMMIT_RANGE_END" ]; then
+    echo "${SCRIPT_NAME} in $(pwd): cannot determine the commit range; CI_COMMIT_RANGE_START=\"${CI_COMMIT_RANGE_START}\" and CI_COMMIT_RANGE_END=\"${CI_COMMIT_RANGE_END}\"." >&2
+    CI_COMMIT_RANGE=""
+    CI_COMMIT_RANGE_START=""
+    CI_COMMIT_RANGE_END=""
+    return 2
   fi
 
   if [ -n "$verbose" ]; then

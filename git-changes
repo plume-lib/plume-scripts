@@ -38,6 +38,9 @@
 # If called not under CI, or under CI but not in the main or toplevel
 # clone, then gets information from the local repository.
 #
+# If it cannot determine the information, it sets none of the variables and its
+# output is `exit 2`, so that the client's `eval` exits with status 2.
+#
 # Diagnostics requested by --verbose or --debug are written to standard error,
 # so that only the variable settings appear on standard output.
 
@@ -100,7 +103,17 @@ CI_DEFAULT_ORGANIZATION="${DEFAULT_ORGANIZATION:-${CI_DEFAULT_ORGANIZATION}}"
 CI_VERBOSE="${VERBOSE}"
 CI_DEBUG="${DEBUG}"
 # shellcheck source=set-git-range
-. "${SCRIPT_DIR}"/set-git-range || exit $?
+. "${SCRIPT_DIR}"/set-git-range
+sgr_status=$?
+if [ "$sgr_status" -ne 0 ]; then
+  # The client's `eval` reports the status of the text it evaluated, not of
+  # this script, so exiting silently would leave the client with status 0 and
+  # with no value (or a stale value) for each variable.  Writing `exit` on
+  # standard output makes the client fail.  `set-git-range` already reported
+  # the reason on standard error.
+  echo "exit ${sgr_status}"
+  exit "${sgr_status}"
+fi
 
 ### Print it out
 
