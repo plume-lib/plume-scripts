@@ -35,6 +35,18 @@ BRANCH_APOSTROPHE="it's-a-branch"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
+# A hostile DEFAULT-ORGANIZATION, which exercises the quoting of
+# CI_ORGANIZATION as the branch names above exercise the quoting of CI_BRANCH.
+# Its `$(...)` and backquotes create ${CANARY} if the client's `eval` expands
+# them; a canary is used rather than a comparison of values, because the
+# scripts differ in when they use this argument and when they instead compute
+# the organization from the clone's origin.  The value has no space in it,
+# because it is passed through `env -i ... sh -c`.
+CANARY="$work/canary"
+# The `$(...)` is single-quoted on purpose:  this shell must not expand it.
+# shellcheck disable=SC2016
+HOSTILE_ORGANIZATION='org$(touch '"$CANARY"')`touch '"$CANARY"'`;x'
+
 ### A repository whose current branch has a hostile name
 
 git init -q -b main "$work/repo"
@@ -55,9 +67,45 @@ git remote set-head origin main
 git branch "$BRANCH_METACHARACTERS"
 git branch "$BRANCH_APOSTROPHE"
 
+# Stubs that make the GitHub API request of the pull request test below fail,
+# so that this test does not need the network.  Both tools are stubbed, because
+# the scripts use whichever one they find.
+mkdir "$work/bin"
+for tool in curl wget; do
+  printf '#!/bin/sh\nexit 1\n' > "$work/bin/$tool"
+  chmod +x "$work/bin/$tool"
+done
+
 ### The test
 
 status=0
+
+# report SCRIPT DESCRIPTION EXPECTED ACTUAL: reports whether the branch name
+# survived the client's `eval` intact, and whether the `eval` executed part of
+# a value.
+report() {
+  script="$1"
+  description="$2"
+  expected="$3"
+  actual="$4"
+  ok="true"
+  if [ "$actual" != "$expected" ]; then
+    echo "FAIL: $script did not quote CI_BRANCH with $description"
+    echo "  expected: $expected"
+    echo "  actual:   $actual"
+    ok=""
+  fi
+  if [ -e "$CANARY" ]; then
+    echo "FAIL: $script did not quote CI_ORGANIZATION with $description"
+    echo "  the client's \`eval\` ran a command from the organization's name"
+    ok=""
+  fi
+  if [ -n "$ok" ]; then
+    echo "PASS: $script with $description"
+  else
+    status=1
+  fi
+}
 
 # check SCRIPT BRANCH: checks out BRANCH, runs SCRIPT the way its
 # documentation says to, and checks that the branch name survived the client's
@@ -67,6 +115,9 @@ check() {
   branch="$2"
   actual=""
   git checkout -q "$branch"
+  # Remove any canary that a previous check created, so that one script's
+  # failure is not reported again for the next script.
+  rm -f "$CANARY"
   # Run with an empty environment, so that this test behaves the same whether
   # or not it is itself running under CI.  The CI variables would send the
   # script down a different code path, one that makes a GitHub API request.
@@ -76,27 +127,60 @@ check() {
     # shellcheck disable=SC2016
     env -i PATH="$PATH" HOME="$HOME" sh -c '
       cd "$1" || exit 2
-      eval "$("$2/$3" testorg 2> /dev/null)" || exit 2
+      eval "$("$2/$3" "$4" 2> /dev/null)" || exit 2
       printf "%s" "$CI_BRANCH"
-    ' sh "$work/repo" "$PLUME_SCRIPTS" "$script"
+    ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" "$HOSTILE_ORGANIZATION"
   )"; then
     echo "FAIL: $script: nonzero exit status with branch $branch"
     status=1
     return
   fi
-  if [ "$actual" = "$branch" ]; then
-    echo "PASS: $script with branch $branch"
-  else
-    echo "FAIL: $script did not quote CI_BRANCH"
-    echo "  expected: $branch"
-    echo "  actual:   $actual"
+  report "$script" "branch $branch" "$branch" "$actual"
+}
+
+# check_pr SCRIPT BRANCH: runs SCRIPT the way its documentation says to, in a
+# simulated GitHub Actions pull request whose head branch is BRANCH, and checks
+# that the branch name survived the client's `eval` intact.  This is a
+# different code path than `check` exercises:  in a pull request the scripts
+# take the branch name from GITHUB_HEAD_REF, whose value is chosen by whoever
+# opened the pull request.
+check_pr() {
+  script="$1"
+  branch="$2"
+  actual=""
+  git checkout -q main
+  rm -f "$CANARY"
+  # Run with an empty environment except for the GitHub Actions variables, so
+  # that this test behaves the same whether or not it is itself running under
+  # CI.  Another CI service's variables would send the scripts down another
+  # code path.
+  if ! actual="$(
+    # The inner script is single-quoted on purpose:  its arguments are passed
+    # positionally, so that this shell does not expand them into it.
+    # shellcheck disable=SC2016
+    env -i PATH="$work/bin:$PATH" HOME="$HOME" \
+      GITHUB_ACTIONS=true GITHUB_EVENT_NAME=pull_request \
+      GITHUB_HEAD_REF="$branch" GITHUB_BASE_REF=main \
+      GITHUB_REF_NAME=42/merge GITHUB_REPOSITORY=testorg/testrepo \
+      GITHUB_SHA="$(git rev-parse HEAD)" \
+      sh -c '
+        cd "$1" || exit 2
+        eval "$("$2/$3" "$4" 2> /dev/null)" || exit 2
+        printf "%s" "$CI_BRANCH"
+      ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" "$HOSTILE_ORGANIZATION"
+  )"; then
+    echo "FAIL: $script: nonzero exit status with pull request branch $branch"
     status=1
+    return
   fi
+  report "$script" "pull request branch $branch" "$branch" "$actual"
 }
 
 for script in ci-info ci-org-and-branch git-changes; do
   check "$script" "$BRANCH_METACHARACTERS"
   check "$script" "$BRANCH_APOSTROPHE"
+  check_pr "$script" "$BRANCH_METACHARACTERS"
+  check_pr "$script" "$BRANCH_APOSTROPHE"
 done
 
 exit "$status"
