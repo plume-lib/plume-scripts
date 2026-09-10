@@ -351,9 +351,7 @@ _scoab_set_org_and_branch_body() {
     GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
     api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
     CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
-    # "// empty" maps JSON null to the empty string, so that a response that
-    # does not describe a pull request (as when the request was throttled)
-    # falls through to the fallbacks below instead of yielding "null".
+    # "// empty" maps JSON null to the empty string, so jq does not yield the string "null".
     CI_ORGANIZATION=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
     if [ -n "$debug" ]; then
       {
