@@ -83,20 +83,34 @@ esac
 # if $auth_token is set.  The header is passed as a single argument rather than
 # being word-split out of a command string; that avoids mangling the header and
 # leaking the token into stray connection attempts.
+# The timeouts bound how long a CI job waits when the network or the GitHub API
+# is unresponsive; without them, one request can hang until the job's own limit.
+# For `wget`, the short options are used because BusyBox wget accepts only those.
 _ci_get_url() {
   if [ "$http_get_tool" = "curl" ]; then
     if [ -n "$auth_token" ]; then
-      curl -s --header "Authorization: token $auth_token" "$1"
+      curl -s --connect-timeout 10 --max-time 30 --header "Authorization: token $auth_token" "$1"
     else
-      curl -s "$1"
+      curl -s --connect-timeout 10 --max-time 30 "$1"
     fi
   else
     if [ -n "$auth_token" ]; then
-      wget -q -O - --header="Authorization: token $auth_token" "$1"
+      wget -q -O - -T 30 -t 2 --header="Authorization: token $auth_token" "$1"
     else
-      wget -q -O - "$1"
+      wget -q -O - -T 30 -t 2 "$1"
     fi
   fi
+}
+
+# Copies standard input to standard output, with the value of each variable
+# that holds a GitHub token replaced.  The debug dump would otherwise write the
+# token into the CI log, which is often readable by anyone who can see the job.
+# `set` prints a function's local variables too, so $auth_token needs masking
+# even though it is not in the environment.
+_ci_redact_tokens() {
+  sed -e 's/^GITHUB_PAT=.*/GITHUB_PAT=<redacted>/' \
+    -e 's/^GH_TOKEN=.*/GH_TOKEN=<redacted>/' \
+    -e 's/^auth_token=.*/auth_token=<redacted>/'
 }
 
 # Does all the work.  Its caller protects the client from its shell options.
@@ -128,11 +142,11 @@ _ci_set_org_and_branch_body() {
       echo
       # `env` only prints EXPORTED variables, so `set` is usually more useful.
       echo '---------------- start of env'
-      env -0 | sort -z | tr '\0' '\n'
+      env -0 | sort -z | tr '\0' '\n' | _ci_redact_tokens
       echo '---------------- end of env'
       echo
       echo '---------------- start of set'
-      set
+      set | _ci_redact_tokens
       echo '---------------- end of set'
       echo
       echo '---------------- start of git status'
@@ -201,8 +215,14 @@ _ci_set_org_and_branch_body() {
       # jq yields the string "null" and the test passes.
       SLUG=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.label // empty' 2> /dev/null)
       if [ -z "$SLUG" ]; then
+        # Warn and fall through to the fallbacks below, rather than failing:  a
+        # throttled request should not fail the whole job.  The fallbacks yield
+        # the organization of this clone's origin, which for a pull request
+        # from a fork is the base repository rather than the head; say so.
         {
-          echo "${SCRIPT_NAME} error: bad output for ${url}"
+          echo "${SCRIPT_NAME} warning: bad output for ${url}"
+          echo "${SCRIPT_NAME}: using the organization of this clone's origin instead,"
+          echo "which is the base repository if this is a pull request from a fork."
           if [ -n "$auth_token" ]; then
             echo "auth_token is set."
           fi
@@ -210,9 +230,9 @@ _ci_set_org_and_branch_body() {
           printf '%s\n' "${CI_PULL_JSON}"
           echo "---- end of ${http_get_tool} output ----"
         } >&2
-        return 2
+      else
+        CI_ORGANIZATION=${SLUG%:*}
       fi
-      CI_ORGANIZATION=${SLUG%:*}
     else
       CI_ORGANIZATION=${BUILD_REPOSITORY_NAME%/*}
       # CI_REPO=${BUILD_REPOSITORY_NAME##*/}
@@ -263,9 +283,10 @@ _ci_set_org_and_branch_body() {
 
   ### Other information (besides organization)
 
-  ## Both of these commands for CI_DEFAULT_BRANCH_NAME seem to work.
-  # CI_DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
-  CI_DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+  ## `git remote show origin | grep 'HEAD branch' | cut -d' ' -f5` also works,
+  ## but only in an English locale:  `git remote show` is porcelain, so git
+  ## translates its output.  `git ls-remote` is plumbing, so its output is stable.
+  CI_DEFAULT_BRANCH_NAME=$(git ls-remote --symref origin HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
   if [ -n "$debug" ]; then
     {
       echo "remote's CI_DEFAULT_BRANCH_NAME=$CI_DEFAULT_BRANCH_NAME"
@@ -440,7 +461,7 @@ _ci_status=$?
 
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
-unset -f _ci_set_org_and_branch_body _ci_get_url
+unset -f _ci_set_org_and_branch_body _ci_get_url _ci_redact_tokens
 if [ -n "$_ci_had_errexit" ]; then
   set -e
 fi
