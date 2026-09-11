@@ -10,9 +10,11 @@ TEST_DIRS = \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
+	latex-process-inputs-test \
 	lint-diff-test \
 	missing-file-test \
 	path-remove-test \
+	preplace-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test
