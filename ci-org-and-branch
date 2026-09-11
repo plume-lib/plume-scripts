@@ -60,7 +60,7 @@ _ew_variables="CI_ORGANIZATION CI_BRANCH"
 # `exit` commands in `eval-wrapper.sh` exist to prevent.  A client that copies
 # individual scripts rather than cloning this repository can easily be missing
 # this one, because it is new.
-if [ ! -r "${_ew_script_dir}/eval-wrapper.sh" ]; then
+if [ ! -f "${_ew_script_dir}/eval-wrapper.sh" ] || [ ! -r "${_ew_script_dir}/eval-wrapper.sh" ]; then
   echo "exit 2"
   echo "$0: cannot read ${_ew_script_dir}/eval-wrapper.sh" >&2
   exit 2

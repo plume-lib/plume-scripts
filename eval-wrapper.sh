@@ -122,7 +122,7 @@ CI_DEBUG="${_ew_debug}"
 # writing anything on standard output.  The client's `eval` would then succeed
 # with no values.  See the same check in the client.
 # shellcheck disable=SC2154
-if [ ! -r "${_ew_script_dir}/${_ew_helper}" ]; then
+if [ ! -f "${_ew_script_dir}/${_ew_helper}" ] || [ ! -r "${_ew_script_dir}/${_ew_helper}" ]; then
   echo "exit 2"
   echo "${_ew_script_name}: cannot read ${_ew_script_dir}/${_ew_helper}" >&2
   exit 2
