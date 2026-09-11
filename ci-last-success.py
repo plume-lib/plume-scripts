@@ -51,6 +51,7 @@ if DEBUG:
 
 # Check run conclusions that are not failures.  A check run that was skipped
 # or that is advisory ("neutral") does not make the commit unsuccessful.
+# However, only a "success" conclusion is evidence that a CI job actually ran.
 SUCCESS_CONCLUSIONS = frozenset(("success", "neutral", "skipped"))
 
 
@@ -97,9 +98,11 @@ def successful(sha: str) -> bool:
     for check_run in check_runs:
         if check_run["status"] != "completed":
             return False
-        if check_run["conclusion"] not in SUCCESS_CONCLUSIONS:
+        conclusion = check_run["conclusion"]
+        if conclusion not in SUCCESS_CONCLUSIONS:
             return False
-        saw_a_job = True
+        if conclusion == "success":
+            saw_a_job = True
 
     return saw_a_job
 

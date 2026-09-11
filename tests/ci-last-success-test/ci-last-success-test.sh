@@ -21,8 +21,13 @@ CHECKRUNS_FAILURE_SHA=2222222222222222222222222222222222222222
 CHECKRUNS_INCOMPLETE_SHA=3333333333333333333333333333333333333333
 STATUS_SUCCESS_SHA=4444444444444444444444444444444444444444
 NO_CI_SHA=5555555555555555555555555555555555555555
+CHECKRUNS_SKIPPED_SHA=6666666666666666666666666666666666666666
 
 status=0
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "${tmpdir}"' 0
+STDERR="${tmpdir}/stderr"
 
 # Arguments: responses file, SHA.  The SHA must be reported as successful.
 expect_success() {
@@ -40,11 +45,25 @@ expect_success() {
 }
 
 # Arguments: responses file, SHA.  The SHA must not be reported as successful.
+# Checks the exit status and the diagnostic, so that the test does not pass
+# vacuously when the script crashes (which also yields a nonzero exit status).
 expect_failure() {
   STUB_RESPONSES="${SCRIPTDIR}/$1"
   export STUB_RESPONSES
-  if out="$("${PROGRAM}" "${ORG}" "${REPO}" "$2" 2> /dev/null)"; then
-    echo "FAILED $1: exited with status 0 and printed \"${out}\", expected failure" >&2
+  out="$("${PROGRAM}" "${ORG}" "${REPO}" "$2" 2> "${STDERR}")" && exit_status=0 || exit_status=$?
+  if [ "${exit_status}" -ne 1 ]; then
+    echo "FAILED $1: exited with status ${exit_status}, expected 1" >&2
+    sed 's/^/  /' "${STDERR}" >&2
+    status=1
+    return
+  fi
+  if [ -n "${out}" ]; then
+    echo "FAILED $1: printed \"${out}\", expected no standard output" >&2
+    status=1
+  fi
+  if ! grep -q "No successful CI job found at or before $2" "${STDERR}"; then
+    echo "FAILED $1: standard error does not report \"No successful CI job found at or before $2\":" >&2
+    sed 's/^/  /' "${STDERR}" >&2
     status=1
   fi
 }
@@ -61,6 +80,10 @@ expect_failure checkruns-failure.json "${CHECKRUNS_FAILURE_SHA}"
 expect_failure checkruns-incomplete.json "${CHECKRUNS_INCOMPLETE_SHA}"
 # A commit with no CI job at all is not a commit with a successful CI job.
 expect_failure no-ci.json "${NO_CI_SHA}"
+# Check runs that were all skipped or advisory mean that no CI job actually ran
+# (job-level `if:` conditions and path filters produce such check runs), so the
+# commit does not have a successful CI job either.
+expect_failure checkruns-skipped.json "${CHECKRUNS_SKIPPED_SHA}"
 
 if [ "${status}" -eq 0 ]; then
   echo "ci-last-success-test.sh: all tests passed"

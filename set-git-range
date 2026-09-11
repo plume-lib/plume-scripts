@@ -235,8 +235,8 @@ _sgr_set_git_range_body() {
       # succeeding jobs and then ci-last-success.py will return just
       # part of the pull request's diffs.
 
-      ## # ci-last-success.py is disabled here because it makes one unauthenticated
-      ## # GitHub API request per commit, so walking back far exhausts the
+      ## # ci-last-success.py is disabled here because it makes two unauthenticated
+      ## # GitHub API requests per commit, so walking back far exhausts the
       ## # 60-requests-per-hour limit.
       # # TODO: wrap all this in a ci-last-commit.sh shell script.
       # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
