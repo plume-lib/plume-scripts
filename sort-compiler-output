@@ -7,12 +7,17 @@ Works for any tool that produces output in the standard format
 (https://www.gnu.org/prep/standards/html_node/Errors.html).
 This script is useful for compilers such as javac that process files in
 nondeterministic order.
+
+By default, duplicate messages (messages that are identical, including their
+filename, line number, and text) are printed only once.  Pass
+--keep-duplicates to print every message, including duplicates.
 """
 
 ## TODO: Maybe use the comparison from the `sort-directory-order` script.
 
 ## TODO: Need to sort *numerically*, not *lexicographically*, for line and column numbers.
 
+import argparse
 import re
 import sys
 from itertools import groupby
@@ -21,9 +26,16 @@ from pathlib import Path
 
 ## TODO: permit reading from stdin *or* a file on the command line.
 ## https://stackoverflow.com/questions/7576525/
-if len(sys.argv) != 1:
-    print(Path(__file__).name + ": Do not pass arguments, use stdin and stdout.")
-    sys.exit(1)
+arg_parser = argparse.ArgumentParser(
+    prog=Path(__file__).name,
+    description="Sort compiler errors/warnings, read from stdin, by filename.",
+)
+arg_parser.add_argument(
+    "--keep-duplicates",
+    action="store_true",
+    help="print duplicate messages rather than printing each message just once",
+)
+args = arg_parser.parse_args()
 
 error_start_without_groups_string = (
     r"("
@@ -100,7 +112,8 @@ if False:
         print(error, end="")
         print("endsortederror.")
 
-errors = list(map(itemgetter(0), groupby(errors)))
+if not args.keep_duplicates:
+    errors = list(map(itemgetter(0), groupby(errors)))
 
 
 print(prefix, end="")

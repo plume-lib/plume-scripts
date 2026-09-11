@@ -1,0 +1,43 @@
+\documentclass{article}
+\begin{document}
+Hello.  %
+An introduction.  %
+100\% of this line is retained.
+
+Some C code:
+\begin{verbatim}
+#include <stdio.h>
+int main() {
+  // Print a percentage; "%%" is a literal "%".
+  printf("100%% done\n");
+  return 0;
+}
+\end{verbatim}
+
+\begin{lstlisting}
+#include <stdio.h>
+int main() {
+  // Print a percentage; "%%" is a literal "%".
+  printf("100%% done\n");
+  return 0;
+}
+\end{lstlisting}
+
+\begin{minted}{c}
+#include <stdio.h>
+int main() {
+  // Print a percentage; "%%" is a literal "%".
+  printf("100%% done\n");
+  return 0;
+}
+\end{minted}
+
+Some LaTeX code:
+\begin{verbatim}
+% A comment in verbatim-included text is not a comment in the document.
+\input{no-such-file}
+Also 50% off.
+\end{verbatim}
+
+Bye.
+\end{document}
