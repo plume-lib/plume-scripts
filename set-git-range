@@ -12,22 +12,25 @@
 
 # Typical use:
 #
-#   if [ -d /tmp/$USER/plume-scripts ] ; then
-#     git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
+#   # Per-user, so that no other user can choose the code that you run.
+#   # `id -un` because USER is not set under cron or under some CI runners.
+#   PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
+#   if [ -d "$PLUME_SCRIPTS" ] ; then
+#     git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 #   else
-#     mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#     mkdir -p "$PLUME_SCRIPTS" \
+#       && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #   fi
-#   PLUME_SCRIPTS=/tmp/$USER/plume-scripts
 #   CI_DEFAULT_ORGANIZATION=MY-DEFAULT-ORGANIZATION
 #   . "$PLUME_SCRIPTS"/set-git-range
 #
 # Alternatively, to use a specific version of this script rather than the latest:
 #
-#   if [ ! -d /tmp/$USER/plume-scripts ] ; then
-#     mkdir -p /tmp/$USER
-#     git -C /tmp/$USER clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
+#   if [ ! -d "$PLUME_SCRIPTS" ] ; then
+#     mkdir -p "$PLUME_SCRIPTS" \
+#       && git clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #   fi
-#   PLUME_SCRIPTS=/tmp/$USER/plume-scripts
 #   CI_DEFAULT_ORGANIZATION=MY-DEFAULT-ORGANIZATION
 #   . "$PLUME_SCRIPTS"/set-git-range
 
@@ -51,7 +54,8 @@
 # The client configures this script by setting variables rather than by passing
 # command-line arguments.
 # PLUME_SCRIPTS: the directory that contains these scripts; the default is
-#   /tmp/$USER/plume-scripts.  A sourced file cannot portably determine its own
+#   /tmp/USERNAME/plume-scripts, where USERNAME is $USER or, if that is unset,
+#   the output of `id -un`.  A sourced file cannot portably determine its own
 #   location -- under dash, "$0" is the client's name -- so the client must say
 #   where to find `set-ci-org-and-branch`, which this script sources.
 # CI_DEFAULT_ORGANIZATION: if the script cannot determine the organization, use this one.  Optional
@@ -99,12 +103,29 @@ CI_PULL_JSON=""
 
 ### Organization and branch
 
-# Use a private variable rather than defaulting PLUME_SCRIPTS itself, so that
+# Use private variables rather than defaulting PLUME_SCRIPTS itself, so that
 # this script leaves no variable set in a client that did not set one.
 # The default is per-user:  a clone in a directory that every user can create
 # would let whoever creates it first choose the code that everyone else sources.
-# `id -un` because USER is not set under cron and under some CI runners.
-_sgr_plume_scripts="${PLUME_SCRIPTS:-/tmp/${USER:-$(id -un)}/plume-scripts}"
+_sgr_plume_scripts="${PLUME_SCRIPTS:-}"
+if [ -z "${_sgr_plume_scripts}" ]; then
+  # `id -un` because USER is not set under cron and under some CI runners, and
+  # `id -u` because a user need not have a passwd entry.  `|| :` because a
+  # command substitution whose command fails would, under a client's `set -e`,
+  # exit the client's shell before the diagnostic below could be printed.
+  _sgr_user="${USER:-$(id -un 2> /dev/null || :)}"
+  _sgr_user="${_sgr_user:-$(id -u 2> /dev/null || :)}"
+  if [ -z "${_sgr_user}" ]; then
+    # Do not fall back to a directory under /tmp that lacks a per-user
+    # component; the client must say where the scripts are.
+    echo "set-git-range: cannot determine your user name, so cannot guess where these scripts are." >&2
+    echo "Set variable PLUME_SCRIPTS to the directory that contains these scripts." >&2
+    unset _sgr_plume_scripts _sgr_user
+    return 2
+  fi
+  _sgr_plume_scripts="/tmp/${_sgr_user}/plume-scripts"
+  unset _sgr_user
+fi
 if [ ! -r "${_sgr_plume_scripts}/set-ci-org-and-branch" ]; then
   echo "set-git-range: cannot read ${_sgr_plume_scripts}/set-ci-org-and-branch." >&2
   echo "Set variable PLUME_SCRIPTS to the directory that contains these scripts." >&2

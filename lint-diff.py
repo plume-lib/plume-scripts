@@ -30,14 +30,17 @@
 # CircleCI, GitHub Actions, and Travis CI are currently supported) to require
 # that pull requests satisfy the command `command-that-issues-warnings`:
 #
-#  if [ -d /tmp/$USER/plume-scripts ] ; then
-#   git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
+#  # Per-user, so that no other user can choose the code that you run.
+#  # `id -un` because USER is not set under cron or under some CI runners.
+#  PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
+#  if [ -d "$PLUME_SCRIPTS" ] ; then
+#   git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 #  else
-#   mkdir -p /tmp/$USER \
-#    && git -C /tmp/$USER clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   mkdir -p "$PLUME_SCRIPTS" \
+#    && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #  fi
-# (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
-# /tmp/$USER/plume-scripts/ci-lint-diff /tmp/warnings.txt
+#  (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
+#  "$PLUME_SCRIPTS"/ci-lint-diff /tmp/warnings.txt
 
 # Implementation notes:
 # 1. It may be possible to achieve a similar result using diff (but not `git diff`):

@@ -14,13 +14,17 @@ This project contains utilities for:
 ## Installation
 
 To install, run the following (or put it at the top of a script).
-Then, the scripts are available at `/tmp/$USER/plume-scripts`.
+Then, the scripts are available in the directory named by `$PLUME_SCRIPTS`.
 
 ```sh
-if [ -d /tmp/$USER/plume-scripts ] ; then
-  git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
+# Per-user, so that no other user can choose the code that you run.
+# `id -un` because USER is not set under cron or under some CI runners.
+PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
+if [ -d "$PLUME_SCRIPTS" ] ; then
+  git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 else
-  mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+  mkdir -p "$PLUME_SCRIPTS" \
+    && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 fi
 ```
 
