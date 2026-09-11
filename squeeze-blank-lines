@@ -5,8 +5,15 @@
 # blank at beginning and end of file, but not within file.  (TODO: make the
 # behavior consistent.)
 #
-# If given a filename, modifies the file in place.
+# If given a filename, rewrites the file.
 # Otherwise, reads from stdin and outputs to stdout.
+#
+# Rewriting a file writes the new contents to a temporary file in the file's
+# directory, then renames that over the file.  Therefore, rewriting requires
+# write permission on the directory, and other hard links to the file still
+# refer to the old contents.  A symbolic link is not replaced by a regular
+# file, and the file's permissions (and, if the user is root, its ownership)
+# are preserved.
 
 # 1. Determine the input source.
 # If $1 exists, read from that file; otherwise, read from stdin.
@@ -62,21 +69,40 @@ if [ -n "$1" ]; then
   # leaves the original file intact rather than truncated or half-written.
 
   # If the input is a symbolic link, rewrite the file it refers to, rather
-  # than replacing the link by a regular file.
+  # than replacing the link by a regular file.  `readlink -f` would resolve
+  # the whole chain of links in one step, but it is a GNU extension that BSD
+  # and older macOS lack.  Resolving only the last component is enough:  the
+  # goal is to name a regular file, not to canonicalize the directories
+  # leading to it.
   outfile="$1"
-  if [ -L "$outfile" ]; then
-    outfile=$(readlink -f -- "$outfile")
-    if [ -z "$outfile" ]; then
+  links=0
+  while [ -L "$outfile" ]; do
+    # Give up rather than loop forever on a cycle of symbolic links.  The
+    # `-e` test above usually rejects such a cycle first, because the kernel
+    # refuses to resolve it; this is in case some kernel does not.
+    if [ "$links" -ge 40 ]; then
+      echo "squeeze-blank-lines: too many levels of symbolic links: $1" >&2
+      exit 2
+    fi
+    links=$((links + 1))
+    target=$(readlink -- "$outfile")
+    if [ -z "$target" ]; then
       echo "squeeze-blank-lines: cannot resolve symbolic link: $1" >&2
       exit 2
     fi
-  fi
+    case "$target" in
+      /*) outfile="$target" ;;
+      # A relative target is relative to the directory of the link.
+      *) outfile="$(dirname -- "$outfile")/$target" ;;
+    esac
+  done
   outdir=$(dirname -- "$outfile")
 
   tmpfile=$(mktemp -- "$outdir/squeeze-blank-lines.XXXXXX")
   status=$?
   if [ "$status" -ne 0 ]; then
-    echo "squeeze-blank-lines: failed to create a temporary file in $outdir" >&2
+    echo "squeeze-blank-lines: failed to create a temporary file in $outdir;" \
+      "rewriting $1 requires write permission on its directory" >&2
     exit "$status"
   fi
   # Remove the temporary file if this script is interrupted.  The handlers
@@ -86,13 +112,6 @@ if [ -n "$1" ]; then
   trap 'rm -f -- "$tmpfile"' EXIT
   trap 'rm -f -- "$tmpfile"; exit 2' HUP INT TERM XFSZ
 
-  # Give the temporary file the input file's permissions (and, if permitted,
-  # its ownership); `cp -p` also copies the contents, which the redirection
-  # below discards.  This is best effort:  `cp -p` fails when the user does
-  # not own the file, but it copies the permissions before trying to copy the
-  # ownership, and a failure to copy the ownership is not worth aborting for.
-  cp -p -- "$outfile" "$tmpfile" 2> /dev/null
-
   if [ -n "$processed_data" ]; then
     printf '%s\n' "$processed_data" > "$tmpfile"
   else
@@ -100,8 +119,32 @@ if [ -n "$1" ]; then
   fi
   status=$?
   if [ "$status" -ne 0 ]; then
-    echo "squeeze-blank-lines: failed to write $tmpfile" >&2
+    echo "squeeze-blank-lines: failed to write $1" >&2
     exit "$status"
+  fi
+
+  # Give the temporary file the input file's permissions and, if the user is
+  # permitted to, its ownership.  This is done after writing the contents,
+  # because the input file may be read-only:  a user who owns a read-only
+  # file, or who can write its directory, may rewrite it.
+  # `stat`'s options for this differ among implementations:  `-c` is GNU and
+  # BusyBox, `-f` is BSD and macOS.
+  file_mode=$(stat -c '%a' -- "$outfile" 2> /dev/null \
+    || stat -f '%Lp' -- "$outfile" 2> /dev/null)
+  if [ -z "$file_mode" ]; then
+    echo "squeeze-blank-lines: failed to read the permissions of $1" >&2
+    exit 2
+  fi
+  # Changing the ownership is best effort:  it fails unless the user is root.
+  # It precedes `chmod` because it clears the setuid and setgid bits.
+  file_owner=$(stat -c '%u:%g' -- "$outfile" 2> /dev/null \
+    || stat -f '%u:%g' -- "$outfile" 2> /dev/null)
+  if [ -n "$file_owner" ]; then
+    chown -- "$file_owner" "$tmpfile" 2> /dev/null
+  fi
+  if ! chmod -- "$file_mode" "$tmpfile"; then
+    echo "squeeze-blank-lines: failed to set the permissions of $1" >&2
+    exit 2
   fi
 
   if ! mv -f -- "$tmpfile" "$outfile"; then
