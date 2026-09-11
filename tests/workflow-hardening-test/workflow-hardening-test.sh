@@ -3,99 +3,86 @@
 # Tests that every GitHub Actions workflow in this repository is hardened.
 #
 # A workflow runs with a token and with read access to the repository's
-# secrets, so anything it executes runs with them.  The checks below are the
-# ones whose absence has bitten this repository:
+# secrets, so anything it executes runs with them.  The checks are in
+# `workflow-hardening.awk`, which explains each one; they are the ones whose
+# absence has bitten this repository.
 #
-#  * Code fetched from a mutable ref -- a branch rather than a tag or a commit
-#    -- is whatever that ref says at the moment of the fetch, not what was
-#    reviewed.  Piping such a fetch into a shell executes it, and doing so
-#    under `sudo` executes it as root.
-#  * Without a `permissions:` block, a workflow gets the repository's default
-#    token permissions, which may be read-write.
-#  * `actions/checkout` leaves the token in `.git/config` unless
-#    `persist-credentials: false`, so any later step -- including one from a
-#    third-party action -- can read it and push with it.
-#  * A full-history checkout is both slow and more than these workflows use;
-#    `fetch-depth: 1` says so explicitly rather than by default.
-#
-# These are textual checks on the workflow files.  That is coarse, but it is
+# They are textual checks on the workflow files.  That is coarse, but it is
 # what makes them apply to workflows added later:  a new workflow is covered
 # the moment it is added, with nothing to register here.
+#
+# The checks are run twice:  once on the example workflows in `examples/`,
+# where the expected output is recorded in a `-goal` file, and once on this
+# repository's workflows, which must violate nothing.  Without the examples,
+# the second run would say only that no check fired, which is also what it
+# would say if the checks were unable to fire at all.
 
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 PLUME_SCRIPTS="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
 WORKFLOW_DIR="${PLUME_SCRIPTS}/.github/workflows"
+EXAMPLE_DIR="${SCRIPT_DIR}/examples"
+CHECKS="${SCRIPT_DIR}/workflow-hardening.awk"
 
 status=0
 
-# fail FILE MESSAGE: reports that FILE violates MESSAGE.
-fail() {
-  echo "FAIL: $(basename -- "$1"): $2"
-  status=1
+# check_workflow FILE: writes one "FAIL:" line per hardening violation in
+# FILE, or one "PASS:" line if it has none.  Returns 0 if FILE is hardened.
+check_workflow() {
+  file="$1"
+  base="$(basename -- "$file")"
+  violations="$(awk -f "$CHECKS" -- "$file")"
+  if [ -z "$violations" ]; then
+    echo "PASS: ${base}: hardened"
+    return 0
+  fi
+  # A tab separates the line number from the message.
+  echo "$violations" | while IFS='	' read -r line message; do
+    echo "FAIL: ${base}:${line}: ${message}"
+  done
+  return 1
 }
 
-# pass FILE MESSAGE: reports that FILE satisfies MESSAGE.
-pass() {
-  echo "PASS: $(basename -- "$1"): $2"
-}
+### The checks themselves, on workflows whose violations are known
 
-# A workflow file, not the directory's README.
-for workflow in "$WORKFLOW_DIR"/*.yaml "$WORKFLOW_DIR"/*.yml; do
-  [ -f "$workflow" ] || continue
-
-  ### Remote code
-
-  # `curl ... | sh`, with or without `sudo`, and the `wget -O- ...` spelling of
-  # the same thing.  The fetched text is executed, so it must not be fetched at
-  # all in a workflow:  pinning it would not make the pipe reviewable, and this
-  # repository's workflows have no need for one.
-  if grep -Eq '(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)*(ba|da|z)?sh\b' \
-    "$workflow"; then
-    fail "$workflow" "pipes a downloaded file into a shell"
+# Each example is a workflow that contains one family of violations -- or, for
+# `hardened.workflow`, none -- and each `-goal` file is what the checks must
+# say about it.  An example is not a workflow of this repository, so it is not
+# under `.github/workflows/` and does not end in `.yaml`:  nothing should run
+# it, and the tools that lint this repository's workflows should not lint it.
+examples=0
+for example in "$EXAMPLE_DIR"/*.workflow; do
+  [ -f "$example" ] || continue
+  examples=$((examples + 1))
+  actual="$(check_workflow "$example" || true)"
+  if printf '%s\n' "$actual" | diff -u -- "${example}-goal" -; then
+    echo "PASS: $(basename -- "$example"): the checks report what they should"
   else
-    pass "$workflow" "does not pipe a downloaded file into a shell"
-  fi
-
-  # A download from a branch of a repository, which is a moving target.  A tag
-  # or a commit SHA in the URL is fine.
-  if grep -Eq 'https?://[^ "'"'"']*/(main|master)/' "$workflow"; then
-    fail "$workflow" "downloads from a mutable branch rather than a pinned ref"
-  else
-    pass "$workflow" "downloads only from pinned refs"
-  fi
-
-  # Third-party actions must be pinned too; `uses: owner/action@main` has the
-  # same problem as a URL naming a branch.
-  if grep -Eq '^[[:space:]-]+uses:[[:space:]]*[^ ]+@(main|master)[[:space:]]*$' \
-    "$workflow"; then
-    fail "$workflow" "uses an action pinned to a mutable branch"
-  else
-    pass "$workflow" "uses only actions pinned to a tag or SHA"
-  fi
-
-  ### Token exposure
-
-  # A `permissions:` block, at the top level or in every job.  Checking only
-  # for its presence, rather than for particular permissions, keeps this from
-  # objecting to a workflow that legitimately needs to write.
-  if grep -Eq '^[[:space:]]*permissions:' "$workflow"; then
-    pass "$workflow" "declares permissions"
-  else
-    fail "$workflow" "does not declare permissions"
-  fi
-
-  # Checkout hardening, for the workflows that check out at all.
-  if grep -Eq 'uses:[[:space:]]*actions/checkout@' "$workflow"; then
-    for setting in persist-credentials:.*false fetch-depth:; do
-      if grep -Eq "^[[:space:]]*${setting}" "$workflow"; then
-        pass "$workflow" "sets ${setting%%:*} on checkout"
-      else
-        fail "$workflow" "checks out without ${setting%%:*}"
-      fi
-    done
+    echo "FAIL: $(basename -- "$example"): the checks do not report what they should"
+    status=1
   fi
 done
+
+if [ "$examples" -eq 0 ]; then
+  echo "FAIL: no examples in ${EXAMPLE_DIR}, so the checks are untested"
+  status=1
+fi
+
+### This repository's workflows
+
+checked=0
+for workflow in "$WORKFLOW_DIR"/*.yaml "$WORKFLOW_DIR"/*.yml; do
+  [ -f "$workflow" ] || continue
+  checked=$((checked + 1))
+  check_workflow "$workflow" || status=1
+done
+
+# A test that examines nothing passes, which is the wrong answer:  renaming or
+# moving the workflow directory would silently disable every check above.
+if [ "$checked" -eq 0 ]; then
+  echo "FAIL: no workflows in ${WORKFLOW_DIR}, so nothing was checked"
+  status=1
+fi
 
 exit "$status"
