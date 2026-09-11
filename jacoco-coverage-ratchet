@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Exits with failure message if, for any single class, coverage goes down.
 
+Also exits with a failure message if a class appears in the old coverage report
+but not in the new one -- for example, because a test stopped running or a
+module failed to build.
+
 Arguments: two Jacoco coverage reports (.csv files).
 """
 
@@ -25,6 +29,13 @@ def main():
     new_coverage = read_jacoco_csv_to_map(sys.argv[2])
 
     failed = False
+
+    # A class that vanished from the new report is not measured at all, so no
+    # ratio comparison below would notice it.  Treat that as a ratchet failure.
+    for fq_classname in sorted(old_coverage.keys() - new_coverage.keys()):
+        print(f"Class {fq_classname} is in the old coverage report but not in the new one")
+        failed = True
+
     for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
         if fq_classname not in old_coverage:
             continue

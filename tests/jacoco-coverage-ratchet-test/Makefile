@@ -4,8 +4,8 @@ PROGRAM=../../jacoco-coverage-ratchet
 
 all: test
 
-.PHONY: clean test test12 test21 test13 test31
-test: test12 test21 test13 test31
+.PHONY: clean test test12 test21 test13 test31 test45 test54
+test: test12 test21 test13 test31 test45 test54
 
 test12:
 	${PROGRAM} jacocoTestReport1.csv jacocoTestReport2.csv > out12.txt
@@ -24,8 +24,18 @@ test31:
 	diff goal31.txt out31.txt
 
 
+# A class in the old report but not in the new one is a ratchet failure.
+test45:
+	if ${PROGRAM} jacocoTestReport4.csv jacocoTestReport5.csv > out45.txt; then echo "status 1 expected"; false; fi
+	diff goal45.txt out45.txt
+
+# A class in the new report but not in the old one is fine.
+test54:
+	${PROGRAM} jacocoTestReport5.csv jacocoTestReport4.csv > out54.txt
+	diff goal54.txt out54.txt
+
 
 # Miscellaneous targets
 
 clean:
-	rm -f out12.txt out21.txt out13.txt out31.txt
+	rm -f out12.txt out21.txt out13.txt out31.txt out45.txt out54.txt
