@@ -1,0 +1,7 @@
+Compilation started at Wed May 31 11:53:25
+
+Zebra.java:10: error: cannot find symbol: bar
+Apple.java:5: warning: unchecked cast
+Zebra.java:10: error: cannot find symbol: bar
+Apple.java:5: warning: unchecked cast
+Mango.c:100:3: error: expected ';'
