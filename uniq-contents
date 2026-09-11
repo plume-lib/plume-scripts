@@ -3,7 +3,8 @@
 # contents: for each group of files with identical contents, only the
 # first one (in argument order) is printed.
 #
-# Exits with status 1 if any file could not be read.  Such a file is
+# Exits with status 1 if any argument could not be read: it does not exist,
+# it is not a regular file, or reading it failed.  Such an argument is
 # reported on stderr and is omitted from the output; the readable files are
 # still processed.
 
@@ -17,20 +18,34 @@ else
   hash_cmd="cksum"
 fi
 
+prog=$(basename -- "$0")
+
 status=0
 seen=""
 for f in "$@"; do
-  # Skip anything that is not a regular file.
-  [ -f "$f" ] || continue
+  # Report, rather than silently skip, anything that is not a regular file:
+  # dropping a file from the output without a diagnostic is the same silent
+  # data loss as mishandling an unreadable one.  Use `printf`, not `echo`:
+  # `echo` interprets backslashes in a file name in some shells.
+  if [ ! -e "$f" ]; then
+    printf '%s: no such file: %s\n' "$prog" "$f" >&2
+    status=1
+    continue
+  fi
+  if [ ! -f "$f" ]; then
+    printf '%s: not a regular file: %s\n' "$prog" "$f" >&2
+    status=1
+    continue
+  fi
 
   # Do not pipe into `cut`:  `sh` has no `pipefail`, so the status of the
   # hashing command would be lost and an unreadable file would silently
   # produce an empty hash.  An empty hash is recorded as seen, after which
-  # every other unreadable file looks like a duplicate of the first one.
-  # The `2>/dev/null` precedes the input redirection so that it also
-  # suppresses the shell's own "cannot open" message for an unreadable file.
+  # every unreadable file -- including the first one -- looks like a
+  # duplicate.  The `2>/dev/null` precedes the input redirection so that it
+  # also suppresses the shell's own "cannot open" message.
   if ! sum=$($hash_cmd 2>/dev/null < "$f"); then
-    echo "$(basename -- "$0"): cannot read $f" >&2
+    printf '%s: cannot read %s\n' "$prog" "$f" >&2
     status=1
     continue
   fi

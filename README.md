@@ -164,7 +164,8 @@ useful for compilers such as javac that process files in nondeterministic order.
 Given a list of file names as arguments, print the ones with unique
 contents: for each group of files with identical contents, only the
 first one (in argument order) is printed.
-Exits with status 1 if any file could not be read; such a file is
+Exits with status 1 if any argument could not be read (it does not exist,
+it is not a regular file, or reading it failed); such an argument is
 reported on stderr and is omitted from the output.
 
 ## Java

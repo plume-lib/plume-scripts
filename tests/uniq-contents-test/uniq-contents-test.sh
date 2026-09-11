@@ -5,10 +5,12 @@
 # The unreadable-file tests are the interesting ones.  `uniq-contents` used
 # to pipe the hashing command into `cut`, which discards the hashing
 # command's exit status because `sh` has no `pipefail`.  An unreadable file
-# therefore hashed to the empty string:  the first such file was printed as
-# if it were unique and recorded the empty hash as seen, and every later
-# unreadable file matched it and was silently dropped.  For a tool whose
-# output is meant to be fed to another command, that is silent data loss.
+# therefore hashed to the empty string, which matches the "already seen"
+# `case` pattern even on the first iteration (with `seen` empty, both the
+# case word and the pattern are just spaces).  So every unreadable file --
+# the first one included -- was silently dropped, and the exit status was 0.
+# For a tool whose output is meant to be fed to another command, that is
+# silent data loss.
 
 set -eu
 
@@ -76,7 +78,7 @@ else
   # the shell's "cannot open" message for the failed input redirection also
   # names the file, so a laxer test would pass even without the fix.
   for f in "$work/c.txt" "$work/d.txt"; do
-    if grep -q -- "uniq-contents: cannot read $f" "$work/err"; then
+    if grep -qF -- "uniq-contents: cannot read $f" "$work/err"; then
       pass "reported $(basename -- "$f") on stderr"
     else
       fail "did not report $(basename -- "$f") on stderr"
@@ -91,9 +93,54 @@ else
     "$work/b.txt" "$out"
 fi
 
-### A nonexistent file or a directory is skipped, as documented.
+### A nonexistent file or a directory is reported, not silently skipped.
 
-out="$("$UNIQ" "$work/nosuch.txt" "$work/a.txt")"
-check_output "skips a nonexistent file" "$work/a.txt" "$out"
+if out="$("$UNIQ" "$work/nosuch.txt" "$work/a.txt" 2> "$work/err")"; then
+  fail "zero exit status for a nonexistent file"
+else
+  pass "nonzero exit status for a nonexistent file"
+fi
+check_output "omits a nonexistent file from the output" "$work/a.txt" "$out"
+if grep -qF -- "uniq-contents: no such file: $work/nosuch.txt" "$work/err"; then
+  pass "reported a nonexistent file on stderr"
+else
+  fail "did not report a nonexistent file on stderr"
+  cat "$work/err"
+fi
+
+mkdir "$work/adir"
+if out="$("$UNIQ" "$work/adir" "$work/a.txt" 2> "$work/err")"; then
+  fail "zero exit status for a directory"
+else
+  pass "nonzero exit status for a directory"
+fi
+check_output "omits a directory from the output" "$work/a.txt" "$out"
+if grep -qF -- "uniq-contents: not a regular file: $work/adir" "$work/err"; then
+  pass "reported a directory on stderr"
+else
+  fail "did not report a directory on stderr"
+  cat "$work/err"
+fi
+
+### A file name containing a backslash is printed and reported literally.
+### The escape sequence matters:  some shells' `echo` (dash's, for one) turns
+### the two characters `\t` into a tab, so a diagnostic that used `echo` would
+### name a file that does not exist.
+
+esc='tab\there.txt'
+printf 'eee\n' > "$work/$esc"
+out="$("$UNIQ" "$work/$esc")"
+check_output "prints a file name containing a backslash escape literally" \
+  "$work/$esc" "$out"
+if [ "$(id -u)" != 0 ]; then
+  chmod 000 "$work/$esc"
+  "$UNIQ" "$work/$esc" 2> "$work/err" || true
+  if grep -qF -- "uniq-contents: cannot read $work/$esc" "$work/err"; then
+    pass "reported a file name containing a backslash escape literally"
+  else
+    fail "did not report a file name containing a backslash escape literally"
+    cat "$work/err"
+  fi
+fi
 
 exit "$status"
