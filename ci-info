@@ -352,6 +352,8 @@ redact_url() {
   # The userinfo, if any, precedes the first "/" of the path.  Testing only
   # that prefix avoids mangling a URL whose path contains an "@".
   case ${ru_rest%%/*} in
+    # "git@github.com:org/repo" is a convention, not a credential.
+    git@*) ;;
     *@*) ru_rest="REDACTED@${ru_rest#*@}" ;;
   esac
   printf '%s\n' "${ru_scheme}${ru_rest}"

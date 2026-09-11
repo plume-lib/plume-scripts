@@ -202,6 +202,8 @@ _scoab_redact_url() {
   # The userinfo, if any, precedes the first "/" of the path.  Testing only
   # that prefix avoids mangling a URL whose path contains an "@".
   case ${rest%%/*} in
+    # "git@github.com:org/repo" is a convention, not a credential.
+    git@*) ;;
     *@*) rest="<redacted>@${rest#*@}" ;;
   esac
   printf '%s\n' "${scheme}${rest}"
@@ -651,7 +653,7 @@ fi
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
 unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_redact_tokens \
-  _scoab_org_from_url
+  _scoab_redact_url _scoab_org_from_url
 if [ -n "$_scoab_had_errexit" ]; then
   set -e
 fi

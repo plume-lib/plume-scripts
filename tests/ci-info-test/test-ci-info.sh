@@ -88,7 +88,7 @@ check_output "ci-info --debug"
 # URL, so it must take the URL apart rather than strip a fixed prefix.
 URL_SECRET="fake-url-credential-that-must-not-be-printed"
 git config remote.origin.url \
-  "https://a-user:${URL_SECRET}@github.com/an-organization/a-repository.git"
+  "https://a-user:${URL_SECRET}@github.com/a-url-organization/a-repository.git"
 # `git remote show origin` and `git ls-remote` contact the remote.  A proxy
 # that refuses connections makes them fail at once, without using the network.
 git config http.proxy 'http://127.0.0.1:1'
@@ -100,7 +100,9 @@ check_organization() {
     grep -n -- "$URL_SECRET" "$tmpdir/out.txt" "$tmpdir/err.txt" >&2
     status=1
   fi
-  if ! grep -q '^CI_ORGANIZATION=.an-organization.;' "$tmpdir/out.txt"; then
+  # This differs from the default organization that `run_ci_info` passes, so
+  # the check fails if `ci-info` ignores the URL and falls back to the default.
+  if ! grep -q '^CI_ORGANIZATION=.a-url-organization.;' "$tmpdir/out.txt"; then
     echo "test-ci-info.sh: FAILED: ${description} did not set CI_ORGANIZATION to the URL's organization:" >&2
     grep -n '^CI_ORGANIZATION=' "$tmpdir/out.txt" >&2
     status=1
