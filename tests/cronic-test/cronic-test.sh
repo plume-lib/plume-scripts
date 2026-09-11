@@ -55,7 +55,9 @@ chmod +x "$work/make-noise"
 cat > "$work/make-noise-and-stderr" <<'EOF'
 #!/bin/sh
 echo "make: Entering directory '/tmp/x'" 1>&2
+echo "make[1]: Entering directory '/tmp/x/sub'" 1>&2
 echo "a real error" 1>&2
+echo "make[1]: Leaving directory '/tmp/x/sub'" 1>&2
 echo "make: Leaving directory '/tmp/x'" 1>&2
 exit "$1"
 EOF
@@ -68,7 +70,8 @@ temp_files() {
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
-# it left no temporary files behind.  EXPECTED-OUTPUT is "report" or "silent".
+# it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report", or
+# "report:TEXT", which also requires TEXT to appear in the report.
 check() {
   description="$1"
   expected_status="$2"
@@ -101,6 +104,17 @@ check() {
       status=1
       return
     fi
+    case "$expected_output" in
+      report:*)
+        if ! grep -q "${expected_output#report:}" "$work/output"; then
+          echo "FAIL: $description: expected the report to contain" \
+            "\"${expected_output#report:}\", but got:"
+          cat "$work/output"
+          status=1
+          return
+        fi
+        ;;
+    esac
   fi
 
   if [ "$before" != "$after" ]; then
@@ -136,7 +150,7 @@ check "trace lines and real stderr, --permit-stderr" 0 silent \
 check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 
 # ... but a real error among them is still reported.
-check "make directory-change notices and real stderr, exit 0" 0 report \
-  "$work/make-noise-and-stderr" 0
+check "make directory-change notices and real stderr, exit 0" 0 \
+  "report:^a real error$" "$work/make-noise-and-stderr" 0
 
 exit "$status"
