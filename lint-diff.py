@@ -60,7 +60,10 @@ DEBUG = False
 PLUSPLUSPLUS_RE = re.compile(r"\+\+\+ (\S*).*")
 
 # This cannot be multiline because files are read one line at a time.
-FILENAME_LINENO_RE = re.compile(r"([^:]*):([0-9]+):.*")
+# The leading "[ \t]*" is necessary because after Gradle outputs all warnings,
+# it prints "> Compilation failed; see the compiler output below." and then
+# prints one warning, indented by two spaces.
+FILENAME_LINENO_RE = re.compile(r"[ \t]*([^:]*):([0-9]+):.*")
 
 INITIAL_WHITESPACE_RE = re.compile(r"[ \t]")
 
@@ -272,10 +275,7 @@ def warning_filenames(warning_filename: str) -> set[str]:
         for warning_line in warnings:
             match = FILENAME_LINENO_RE.match(warning_line)
             if match:
-                # lstrip is necessary because after Gradle outputs all warnings,
-                # it prints "> Compilation failed; see the compiler output
-                # below." and then prints one warning, indented by two spaces.
-                result.add(match.group(1).lstrip())
+                result.add(match.group(1))
     return result
 
 

@@ -1,0 +1,4 @@
+Foo.java:2: warning: [rawtypes] found raw type: List
+  List x;
+  ^
+  Bar.java:2: error: cannot find symbol
