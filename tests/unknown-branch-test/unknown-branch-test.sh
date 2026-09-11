@@ -36,8 +36,9 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 
 ### A repository with a tag on a branch other than the default branch
 
-git init -q -b main "$work/repo"
-cd "$work/repo"
+repo="$work/repo"
+git init -q -b main "$repo"
+cd "$repo"
 git config user.email test@example.com
 git config user.name "Test User"
 echo one > file.txt
@@ -90,7 +91,7 @@ run() {
       set_git_range_status=0
       . "$2/set-git-range" || set_git_range_status=$?
       printf "%s %s" "$set_git_range_status" "$CI_COMMIT_RANGE"
-    ' sh "$work/repo" "$PLUME_SCRIPTS"
+    ' sh "$repo" "$PLUME_SCRIPTS"
 }
 
 # check DESCRIPTION EXPECTED-RANGE: checks that `set-git-range` succeeds with
@@ -137,6 +138,43 @@ git branch -q -r -d origin/main
 # Only the last commit, because nothing names the default branch; but the
 # script must say that it guessed.  Before the fix, it said nothing.
 check "a tag build when neither branch is known" \
+  "${PREVIOUS_COMMIT}...${HEAD_SHA}"
+
+### A repository with a tag on the default branch, which has since moved on
+
+# The commit being built is then contained in origin/main, so the range for a
+# branch other than the default one, "origin/main...HEAD", is empty:  git reads
+# it as "merge-base(origin/main, HEAD)..HEAD", which is "HEAD..HEAD".  A client
+# would report no changes at all.  The range must be the default branch's:  the
+# commit being built.
+
+repo="$work/repo-on-default-branch"
+git init -q -b main "$repo"
+cd "$repo"
+git config user.email test@example.com
+git config user.name "Test User"
+echo one > file.txt
+git add file.txt
+git commit -q -m "First commit"
+echo two >> file.txt
+git commit -q -am "Second commit"
+git tag v2.0
+# The default branch moves on after the tag is created, which is what puts the
+# tagged commit strictly inside origin/main's history.
+echo three >> file.txt
+git commit -q -am "Third commit"
+git clone -q --bare . "$work/origin-on-default-branch.git"
+git remote add origin "$work/origin-on-default-branch.git"
+git fetch -q origin
+git remote set-head origin main
+git checkout -q --detach v2.0
+
+HEAD_SHA="$(git rev-parse HEAD)"
+PREVIOUS_COMMIT="$(git rev-parse HEAD^1)"
+
+# Only the tagged commit.  Before the fix, the range was "origin/main...HEAD",
+# whose diff is empty, so the script silently reported no changes.
+check "a tag build of a commit that the default branch contains" \
   "${PREVIOUS_COMMIT}...${HEAD_SHA}"
 
 exit "$status"
