@@ -10,12 +10,12 @@
 
 # Typical use:
 #
-#   if [ -d /tmp/plume-scripts ] ; then
-#     git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+#   if [ -d /tmp/$USER/plume-scripts ] ; then
+#     git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 #   else
-#     mkdir -p /tmp && git -C /tmp clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#     mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
 #   fi
-#   eval "$(/tmp/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
+#   eval "$(/tmp/$USER/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
 #
 # Alternatively, to use a specific version of this script rather than the latest:
 #

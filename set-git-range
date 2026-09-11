@@ -12,12 +12,12 @@
 
 # Typical use:
 #
-#   if [ -d /tmp/plume-scripts ] ; then
-#     git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+#   if [ -d /tmp/$USER/plume-scripts ] ; then
+#     git -C /tmp/$USER/plume-scripts pull -q > /dev/null 2>&1
 #   else
-#     mkdir -p /tmp && git -C /tmp clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#     mkdir -p /tmp/$USER && git -C /tmp/$USER clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
 #   fi
-#   PLUME_SCRIPTS=/tmp/plume-scripts
+#   PLUME_SCRIPTS=/tmp/$USER/plume-scripts
 #   CI_DEFAULT_ORGANIZATION=MY-DEFAULT-ORGANIZATION
 #   . "$PLUME_SCRIPTS"/set-git-range
 #
@@ -51,7 +51,7 @@
 # The client configures this script by setting variables rather than by passing
 # command-line arguments.
 # PLUME_SCRIPTS: the directory that contains these scripts; the default is
-#   /tmp/plume-scripts.  A sourced file cannot portably determine its own
+#   /tmp/$USER/plume-scripts.  A sourced file cannot portably determine its own
 #   location -- under dash, "$0" is the client's name -- so the client must say
 #   where to find `set-ci-org-and-branch`, which this script sources.
 # CI_DEFAULT_ORGANIZATION: if the script cannot determine the organization, use this one.  Optional
@@ -101,7 +101,10 @@ CI_PULL_JSON=""
 
 # Use a private variable rather than defaulting PLUME_SCRIPTS itself, so that
 # this script leaves no variable set in a client that did not set one.
-_sgr_plume_scripts="${PLUME_SCRIPTS:-/tmp/plume-scripts}"
+# The default is per-user:  a clone in a directory that every user can create
+# would let whoever creates it first choose the code that everyone else sources.
+# `id -un` because USER is not set under cron and under some CI runners.
+_sgr_plume_scripts="${PLUME_SCRIPTS:-/tmp/${USER:-$(id -un)}/plume-scripts}"
 if [ ! -r "${_sgr_plume_scripts}/set-ci-org-and-branch" ]; then
   echo "set-git-range: cannot read ${_sgr_plume_scripts}/set-ci-org-and-branch." >&2
   echo "Set variable PLUME_SCRIPTS to the directory that contains these scripts." >&2
