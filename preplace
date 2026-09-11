@@ -26,6 +26,9 @@ performed (because the old regular expression did not match in the file), then
 the timestamp is unmodified.  Thus, you can call it on as many files as you like
 without losing the historical information about when a file was last modified.
 
+Binary files are never modified, and version control directories such as
+".git" are never descended into.
+
 END_OF_USAGE
 }
 
@@ -172,8 +175,17 @@ foreach my $file (@filelist) {
   if ($debug) {
     print STDERR "file: <<$file>>\n";
   }
-  # TODO: Document this and make it customizable.
-  if ($file =~ /\.(class|pyc)$/) {
+  # Skip binary files, which are not line-oriented text and would be corrupted
+  # by a textual substitution.  Perl's -B heuristic examines the first block of
+  # the file; it is more robust than a list of file extensions, which cannot
+  # anticipate every binary format (.jar, .png, .o, ...).  -B is also true of an
+  # empty file, which contains nothing to replace anyway.  If the file cannot
+  # be read, -B is undef and therefore false, and the open below reports the
+  # problem.
+  if (-B $file) {
+    if ($debug) {
+      print STDERR "skipping binary file $file\n";
+    }
     next;
   }
   if (! open(SEARCH, $file)) {
