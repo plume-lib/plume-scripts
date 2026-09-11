@@ -9,7 +9,9 @@
 # no `checkbashisms` behind.
 #
 # `wget` is replaced by a stub that logs its invocations and writes canned
-# content, so this test makes no network connection.
+# content, so this test makes no network connection.  The checksum program is
+# replaced by a stub that logs the checksum line the `Makefile` pipes into it
+# and then defers to the real program.
 
 set -eu
 
@@ -17,14 +19,21 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 MAKEFILE="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/Makefile"
 MAKE="${MAKE:-make}"
 
+# Mirror the `Makefile`'s choice of checksum program, so that the stub below
+# shadows the program that the `Makefile` will invoke.
 if command -v sha256sum > /dev/null 2>&1; then
-  sha256() { sha256sum | cut -d' ' -f1; }
+  SHA256_NAME=sha256sum
+  REAL_SHA256="$(command -v sha256sum)"
+  sha256() { "$REAL_SHA256" | cut -d' ' -f1; }
 elif command -v shasum > /dev/null 2>&1; then
-  sha256() { shasum -a 256 | cut -d' ' -f1; }
+  SHA256_NAME=shasum
+  REAL_SHA256="$(command -v shasum)"
+  sha256() { "$REAL_SHA256" -a 256 | cut -d' ' -f1; }
 else
   echo "SKIP: neither sha256sum nor shasum is installed"
   exit 0
 fi
+export REAL_SHA256
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT HUP INT TERM
@@ -79,18 +88,34 @@ cat "$WGET_PAYLOAD" > "$out"
 END
 chmod +x "$work/bin/wget"
 
+# A checksum program that logs the checksum line piped into it, then defers to
+# the real program, so that this test can see what the `Makefile` verified
+# against.
+cat > "$work/bin/$SHA256_NAME" << 'END'
+#!/bin/sh
+input="$(cat)"
+printf '%s\n' "$input" >> "$SHA256_LOG"
+printf '%s\n' "$input" | "$REAL_SHA256" "$@"
+END
+chmod +x "$work/bin/$SHA256_NAME"
+
 WGET_LOG="$work/wget.log"
 WGET_FAILS="$work/wget-fails"
 WGET_PAYLOAD="$work/payload"
-export WGET_LOG WGET_FAILS WGET_PAYLOAD
+SHA256_LOG="$work/sha256.log"
+export WGET_LOG WGET_FAILS WGET_PAYLOAD SHA256_LOG
 PATH="$work/bin:$PATH"
 export PATH
 
 printf '#!/usr/bin/perl\nprint "fake checkbashisms\\n";\n' > "$WGET_PAYLOAD"
 payload_sha="$(sha256 < "$WGET_PAYLOAD")"
 
+# Runs `make` with the checksum of the canned payload, so that the download
+# succeeds.  The `Makefile`'s own pinned checksum is exercised separately,
+# below.
 run_make() {
   : > "$WGET_LOG"
+  : > "$SHA256_LOG"
   (cd "$work" && "$MAKE" "$@" CHECKBASHISMS_SHA256="$payload_sha") \
     > "$work/make.log" 2>&1
 }
@@ -169,6 +194,66 @@ if [ -e "$work/checkbashisms" ] || [ -e "$work/checkbashisms.tmp" ]; then
   rm -f "$work/checkbashisms" "$work/checkbashisms.tmp"
 else
   pass "a checksum mismatch left no file behind"
+fi
+
+### The `Makefile`'s own pinned checksum is what the rule verifies against.
+###
+### Every other `make` invocation in this test overrides CHECKBASHISMS_SHA256,
+### so without these checks the pinned constant could be deleted or corrupted
+### -- breaking every real user -- with the test suite staying green.
+
+pinned_sha="$(sed -n 's/^CHECKBASHISMS_SHA256[[:space:]]*=[[:space:]]*//p' "$MAKEFILE" | tr -d '[:space:]')"
+case "$pinned_sha" in
+  *[!0-9a-f]*) pinned_is_hex=no ;;
+  *) pinned_is_hex=yes ;;
+esac
+if [ "$pinned_is_hex" = yes ] && [ "${#pinned_sha}" -eq 64 ]; then
+  pass "CHECKBASHISMS_SHA256 is 64 hexadecimal digits"
+else
+  fail "CHECKBASHISMS_SHA256 is not 64 hexadecimal digits: \`$pinned_sha\`"
+fi
+
+: > "$WGET_LOG"
+: > "$SHA256_LOG"
+if (cd "$work" && "$MAKE" checkbashisms) > "$work/make.log" 2>&1; then
+  fail "zero exit status when the download does not match the pinned checksum"
+else
+  pass "nonzero exit status when the download does not match the pinned checksum"
+fi
+used_sha="$(cut -d' ' -f1 < "$SHA256_LOG")"
+if [ "$used_sha" = "$pinned_sha" ]; then
+  pass "the rule verified against the pinned CHECKBASHISMS_SHA256"
+else
+  fail "the rule verified against \`$used_sha\` rather than the pinned \`$pinned_sha\`"
+fi
+rm -f "$work/checkbashisms" "$work/checkbashisms.tmp"
+
+### With no checksum program, the rule diagnoses that rather than downloading
+### an unverifiable file or blaming the checksum.
+
+: > "$WGET_LOG"
+if (cd "$work" && "$MAKE" checkbashisms SHA256_CHECK= \
+  CHECKBASHISMS_SHA256="$payload_sha") > "$work/make.log" 2>&1; then
+  fail "zero exit status when no checksum program is available"
+else
+  pass "nonzero exit status when no checksum program is available"
+fi
+if grep -q "neither sha256sum nor shasum" "$work/make.log"; then
+  pass "a missing checksum program is diagnosed as such"
+else
+  fail "a missing checksum program is not diagnosed as such"
+  cat "$work/make.log"
+fi
+if [ "$(wget_calls)" = 0 ]; then
+  pass "no download is attempted without a checksum program"
+else
+  fail "a download was attempted without a checksum program"
+fi
+if [ -e "$work/checkbashisms" ] || [ -e "$work/checkbashisms.tmp" ]; then
+  fail "a missing checksum program left a file behind"
+  rm -f "$work/checkbashisms" "$work/checkbashisms.tmp"
+else
+  pass "a missing checksum program left no file behind"
 fi
 
 ### A successful `make` downloads the file once and makes it executable.
