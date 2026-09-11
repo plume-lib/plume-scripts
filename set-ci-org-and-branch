@@ -100,6 +100,10 @@ _scoab_get_url() {
 # example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
 # `set` prints a function's local variables too, which is why $auth_token is
 # assigned before the debug dump runs:  the pattern masks it there as well.
+# A credential can also hide in the userinfo of a URL, under a variable whose
+# name suggests nothing -- $origin_url holds `remote.origin.url`, which a job
+# that cloned with a token spells "https://USER:TOKEN@github.com/org/repo" --
+# so strip that too, wherever in a line it appears.
 _scoab_redact_tokens() {
   awk '
     /^[A-Za-z_][A-Za-z0-9_]*=/ {
@@ -110,7 +114,7 @@ _scoab_redact_tokens() {
         next
       }
     }
-    { print }
+    { gsub(/:\/\/[^\/]*@/, "://<redacted>@"); print }
   '
 }
 
@@ -179,6 +183,28 @@ _scoab_org_from_url() {
   case $path in
     */*) printf '%s\n' "${path%%/*}" ;;
   esac
+}
+
+# _scoab_redact_url URL: prints URL with any embedded credential replaced by a
+# placeholder.  git accepts "https://USER:TOKEN@github.com/org/repo", and the
+# debug output goes to the CI log, which is often readable by anyone who can
+# see the job.
+_scoab_redact_url() {
+  local scheme=""
+  local rest="$1"
+
+  case $rest in
+    *://*)
+      scheme="${rest%%://*}://"
+      rest="${rest#*://}"
+      ;;
+  esac
+  # The userinfo, if any, precedes the first "/" of the path.  Testing only
+  # that prefix avoids mangling a URL whose path contains an "@".
+  case ${rest%%/*} in
+    *@*) rest="<redacted>@${rest#*@}" ;;
+  esac
+  printf '%s\n' "${scheme}${rest}"
 }
 
 # Does all the work.  Its caller gives it the shell options it needs, and
@@ -438,12 +464,12 @@ _scoab_set_org_and_branch_body() {
     {
       echo "remote's CI_DEFAULT_BRANCH_NAME=$CI_DEFAULT_BRANCH_NAME"
       if [ -n "${origin_url}" ]; then
-        echo "HEAD of ${origin_url} = $(git ls-remote --symref "${origin_url}" HEAD)" 2>&1
+        echo "HEAD of $(_scoab_redact_url "${origin_url}") = $(git ls-remote --symref "${origin_url}" HEAD)" 2>&1
       else
         echo "origin_url is empty (is set only for non-CI runs)"
       fi
       echo "current branch: $(git branch --show-current)"
-      echo "current repo: $(git config --get remote.origin.url)"
+      echo "current repo: $(_scoab_redact_url "$(git config --get remote.origin.url)")"
     } >&2
   fi
 
