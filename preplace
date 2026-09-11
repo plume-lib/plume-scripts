@@ -56,6 +56,7 @@ my $preservedate = 0;
 my $fromregex;
 my $toregex;
 my @filelist;
+my $exit_status = 0;
 
 my $shortprogname = $0;
 $shortprogname =~ s|.*/||;
@@ -118,7 +119,15 @@ sub collect {
     if ($debug) {
       print STDERR "collected $fullname\n";
     }
-    push(@filelist, $fullname);
+    # abs_path() for the same reason as below:  without it, `perl -i` would
+    # replace a symbolic link by a copy of the linked-to file.
+    my $realname = abs_path($fullname);
+    if (! defined($realname)) {
+      print STDERR "Can't resolve $fullname: $!\n";
+      $exit_status = 1;
+      return;
+    }
+    push(@filelist, $realname);
   }
 }
 
@@ -131,7 +140,6 @@ if (scalar(@ARGV) == 0) {
 my $pwd = `pwd`; # pragma: allowlist secret
 chomp($pwd);
 
-my $exit_status = 0;
 @filelist = ();
 for my $arg (@ARGV) {
   if ($arg eq ".") { $arg = $pwd; }
@@ -149,6 +157,12 @@ for my $arg (@ARGV) {
     $exit_status = 1;
   }
 }
+
+# Deduplicate:  abs_path() maps a symbolic link and its target to the same
+# name, and an argument may be given twice or be nested in a directory
+# argument.  Editing a file twice would apply the replacement twice.
+my %seen;
+@filelist = grep { ! $seen{$_}++ } @filelist;
 
 if ($debug) {
   print STDERR "filelist: @filelist\n";
