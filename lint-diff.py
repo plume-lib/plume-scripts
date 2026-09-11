@@ -100,7 +100,13 @@ def main() -> None:
     print_multiline_warning = False
 
     for warning_line in warnings:
-        if print_multiline_warning and INITIAL_WHITESPACE_RE.match(warning_line):
+        # A line that itself looks like a warning is not a continuation line,
+        # even if it is indented (as Gradle indents the last warning it prints).
+        if (
+            print_multiline_warning
+            and INITIAL_WHITESPACE_RE.match(warning_line)
+            and not FILENAME_LINENO_RE.match(warning_line)
+        ):
             print(warning_line, end="")
             continue
         print_multiline_warning = False
