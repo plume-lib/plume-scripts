@@ -18,10 +18,17 @@ CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
+# Give `cronic` a temporary directory of its own, so that the checks below see
+# only the runs that this test starts, and not a concurrent `cronic` run
+# started by another test or by another user of the machine.
+TMPDIR="$work/tmp"
+export TMPDIR
+mkdir "$TMPDIR"
+
 status=0
 
 # A command whose stderr is nothing but trace lines.
-cat > "$work/trace-only" <<'EOF'
+cat > "$work/trace-only" << 'EOF'
 #!/bin/bash
 set -x
 echo "the standard output"
@@ -30,7 +37,7 @@ EOF
 chmod +x "$work/trace-only"
 
 # A command that writes real error output in addition to trace lines.
-cat > "$work/trace-and-stderr" <<'EOF'
+cat > "$work/trace-and-stderr" << 'EOF'
 #!/bin/bash
 set -x
 echo "a real error" 1>&2
@@ -40,7 +47,7 @@ chmod +x "$work/trace-and-stderr"
 
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
-  find /tmp -maxdepth 1 -name 'cronic.*' 2> /dev/null | sort
+  find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
 }
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`

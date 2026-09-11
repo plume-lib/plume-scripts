@@ -34,10 +34,23 @@ TRACE=$CRONIC_TMPDIR/trace
 # is interrupted before it reaches the end.  When DEBUG is true, the files are
 # retained; don't "echo" their location, because that would be appended to
 # stderr.
-trap '[ "$DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"' EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
+# shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
+cleanup() {
+  [ "$DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
+}
+trap cleanup EXIT
+
+# Clean up and then die of the signal, rather than exiting with status
+# 128+signum, so that a supervisor can distinguish "cronic was killed by
+# SIGTERM" from "the wrapped command exited with status 143".  Each handler
+# first removes itself and the EXIT trap, so that the cleanup runs exactly
+# once.  These handlers are not redundant with the EXIT trap:  with no handler
+# installed, bash dies as soon as the signal arrives, abandoning the wrapped
+# command and deleting the directory that the command is still writing into,
+# whereas a handler does not run until the wrapped command has finished.
+trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
+trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
+trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
 EXPECTED=0
 if [ "$1" == "--expected-status" ]; then

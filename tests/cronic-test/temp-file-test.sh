@@ -16,6 +16,15 @@ CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
+# Give `cronic` a temporary directory of its own, so that the checks below see
+# only the runs that this test starts.  Scanning the shared /tmp instead would
+# make this test fail whenever any other `cronic` run on the machine -- another
+# test running under `make -j`, or an unrelated user's cron job -- happened to
+# hold a temporary directory between a "before" and an "after" snapshot.
+TMPDIR="$work/tmp"
+export TMPDIR
+mkdir "$TMPDIR"
+
 status=0
 
 pass() {
@@ -29,7 +38,7 @@ fail() {
 
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
-  find "${TMPDIR:-/tmp}" /tmp -maxdepth 1 -name 'cronic.*' 2> /dev/null | sort -u
+  find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
 }
 
 ### The temporary file names are not derived from the process id.
@@ -88,7 +97,20 @@ done
 # once that command has finished; release the command after signaling.
 kill -TERM "$cronic_pid"
 touch "$work/release"
-wait "$cronic_pid" || true
+cronic_status=0
+# Redirect stderr to discard the shell's "Terminated" job message, which would
+# otherwise look like a failure in the test output.
+wait "$cronic_pid" 2> /dev/null || cronic_status=$?
+
+# Without this check, a `cronic` that ignored the signal and ran to completion
+# would also leave no temporary files behind, and so would pass the check below.
+# The shell reports death by signal N as status 128+N, so SIGTERM is 143.
+if [ "$cronic_status" -ne 143 ]; then
+  fail "the run was not interrupted: exit status $cronic_status, expected 143"
+  cat "$work/output"
+else
+  pass "an interrupted run exits with the status of the signal that killed it"
+fi
 
 after="$(temp_files)"
 if [ "$before" != "$after" ]; then
