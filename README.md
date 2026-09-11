@@ -159,6 +159,8 @@ Sorts the input errors/warnings by filename.  Works for any tool that produces
 output in the [standard
 format](https://www.gnu.org/prep/standards/html_node/Errors.html).  This is
 useful for compilers such as javac that process files in nondeterministic order.
+By default, duplicate messages are printed only once; pass `--keep-duplicates`
+to print every message.
 [Documentation](sort-compiler-output) at top of file.
 
 ## Unique file contents
