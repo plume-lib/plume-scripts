@@ -15,6 +15,10 @@ jobs:
           fetch-depth: 1
           show-progress: false
           persist-credentials: false
+      # `classfile_check_version` is a csh script, and its test skips itself
+      # when /bin/csh is absent, as it is on the runner image by default.
+      - name: Install csh
+        run: sudo apt-get install --no-install-recommends --yes tcsh
       # Some tests skip themselves when a prerequisite is absent, so check for
       # the prerequisites rather than let the runner image silently decide
       # which tests run.
@@ -22,4 +26,7 @@ jobs:
         run: |
           jq --version
           curl --version || wget --version
+          test -x /bin/csh
+          command -v xxd
+          command -v bc
       - run: make -C tests test

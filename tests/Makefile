@@ -5,16 +5,23 @@
 # recipe.
 TEST_DIRS = \
 	ci-info-test \
+	classfile-check-version-test \
 	cronic-test \
 	eval-quoting-test \
 	github-ref-name-test \
+	is-ci-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
+	latex-process-inputs-test \
 	lint-diff-test \
+	mail-e-test \
 	missing-file-test \
+	path-remove-test \
+	preplace-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
-	squeeze-blank-lines-test
+	squeeze-blank-lines-test \
+	uniq-contents-test
 
 all: test
 
