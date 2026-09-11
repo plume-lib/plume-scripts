@@ -29,17 +29,23 @@ while (scalar(@ARGV) > 0) {
   }
 }
 
+# The separator for the output.  All the input lines are merged into a single
+# output path, so the separator is decided once, by the first input line that
+# contains one; later lines do not change it.  (Each line is still split
+# according to its own contents.)  The default matters only if no input line
+# contains a separator.
 $splitchar = ":";
+$splitchar_known = 0;
 @result = ();
 while (<>) {
       my @pieces;
       chomp;
       if ($_ =~ /:/) {
 	@pieces = split(":");
-	$splitchar = ":";
+	if (! $splitchar_known) { $splitchar = ":"; $splitchar_known = 1; }
       } elsif ($_ =~ / /) {
 	@pieces = split(" ");
-	$splitchar = " ";
+	if (! $splitchar_known) { $splitchar = " "; $splitchar_known = 1; }
       } else {
 	# no separators; assume colon, but don't set splitchar.
 	@pieces = split(":");
