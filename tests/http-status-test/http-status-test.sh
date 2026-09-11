@@ -93,7 +93,9 @@ ready=""
 # this test is about.
 waited=0
 while [ -z "$ready" ] && [ "$waited" -lt 100 ]; do
-  port="$(cat "$work/port")"
+  # The server may not have written the file yet; that is what this loop is
+  # for, so a missing file must not abort the test under `set -e`.
+  port="$(cat "$work/port" 2> /dev/null || true)"
   if [ -n "$port" ] \
     && curl -s -o /dev/null --max-time 10 "http://127.0.0.1:${port}/200"; then
     ready="true"
@@ -184,15 +186,17 @@ SHA="$(git rev-parse HEAD)"
 
 status=0
 
-# run PATH REF-NAME HEAD-REF EVENT-NAME: sources the script the way its
-# documentation says to, in a simulated GitHub Actions job, leaving
+# run PATH REF-NAME HEAD-REF EVENT-NAME [EVENT-PATH]: sources the script the
+# way its documentation says to, in a simulated GitHub Actions job, leaving
 # CI_ORGANIZATION and CI_BRANCH in "$work/values" and the script's diagnostics
 # in "$work/stderr".  An empty HEAD-REF makes the job not a pull request.
+# EVENT-PATH is the job's event payload file; the default is no such file.
 run() {
   run_path="$1"
   ref_name="$2"
   head_ref="$3"
   event_name="$4"
+  event_path="${5-}"
   # A run that fails before writing the file must not be judged on the previous
   # run's values.
   rm -f "$work/values"
@@ -207,7 +211,7 @@ run() {
     GITHUB_ACTIONS=true GITHUB_EVENT_NAME="$event_name" \
     GITHUB_HEAD_REF="$head_ref" GITHUB_BASE_REF=main \
     GITHUB_REF_NAME="$ref_name" GITHUB_REPOSITORY=testorg/testrepo \
-    GITHUB_SHA="$SHA" \
+    GITHUB_SHA="$SHA" GITHUB_EVENT_PATH="$event_path" \
     sh -c '
       cd "$1" || exit 2
       CI_DEFAULT_ORGANIZATION=testorg
@@ -278,28 +282,52 @@ check_success() {
 # check_branch_path TOOL PATH: checks the request that determines CI_BRANCH for
 # a GitHub Actions job that is not a pull request but whose ref is like
 # "42/merge".  That request's failure used to be entirely silent:  no caller
-# warns about it, so the only possible report is the one from the fetch itself.
+# warned about it, and the script returned 0 with an empty CI_BRANCH, which a
+# client would use as if it were a branch name.
 check_branch_path() {
   tool="$1"
   check_path="$2"
-  run "$check_path" 403/merge "" push || true
+  exit_status=0
+  run "$check_path" 403/merge "" push || exit_status=$?
   ok=""
-  if grep -q "HTTP 403" "$work/stderr"; then
+  if grep -q "HTTP 403" "$work/stderr" && [ "$exit_status" -ne 0 ]; then
     ok="true"
   fi
-  report "$tool: a job with a merge ref reports HTTP 403" "$ok"
+  report "$tool: a job with a merge ref reports HTTP 403 and fails (exit status ${exit_status})" "$ok"
+}
+
+# check_branch_event TOOL PATH: checks that when that request fails, the branch
+# is taken from the job's event payload, which describes the same pull request.
+check_branch_event() {
+  tool="$1"
+  check_path="$2"
+  cat > "$work/event.json" << 'EOF'
+{"pull_request": {"head": {"ref": "feature-from-event"}}}
+EOF
+  ok=""
+  if run "$check_path" 403/merge "" push "$work/event.json"; then
+    branch="$(sed -n 2p "$work/values")"
+    if [ "$branch" = "feature-from-event" ]; then
+      ok="true"
+    fi
+  else
+    branch="<the script failed>"
+  fi
+  report "$tool: a job with a merge ref falls back to the event payload (got '${branch}')" "$ok"
 }
 
 check_success curl "$work/bin:$PATH"
 check_status curl "$work/bin:$PATH" 403
 check_status curl "$work/bin:$PATH" 404
 check_branch_path curl "$work/bin:$PATH"
+check_branch_event curl "$work/bin:$PATH"
 
 if [ -n "$wget_path_works" ]; then
   check_success wget "$work/bin-wget"
   check_status wget "$work/bin-wget" 403
   check_status wget "$work/bin-wget" 404
   check_branch_path wget "$work/bin-wget"
+  check_branch_event wget "$work/bin-wget"
 else
   echo "$(basename -- "$0"): skipping the wget cases, because this system has no PATH that contains wget, and the commands the script needs, but not curl."
 fi
