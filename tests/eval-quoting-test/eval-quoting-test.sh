@@ -40,8 +40,11 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 # Its `$(...)` and backquotes create ${CANARY} if the client's `eval` expands
 # them; a canary is used rather than a comparison of values, because the
 # scripts differ in when they use this argument and when they instead compute
-# the organization from the clone's origin.  The value has no space in it,
-# because it is passed through `env -i ... sh -c`.
+# the organization from the clone's origin.  For the same reason, the check
+# after the test loop requires that some case did use this argument:  a case
+# that did not could not have created the canary no matter how the script
+# quotes.  The value has no space in it, because it is passed through
+# `env -i ... sh -c`.
 CANARY="$work/canary"
 # The `$(...)` is single-quoted on purpose:  this shell must not expand it.
 # shellcheck disable=SC2016
@@ -80,14 +83,19 @@ done
 
 status=0
 
-# report SCRIPT DESCRIPTION EXPECTED ACTUAL: reports whether the branch name
-# survived the client's `eval` intact, and whether the `eval` executed part of
-# a value.
+# Set when some case's CI_ORGANIZATION was the hostile argument, which is what
+# makes the canary check below able to fail.  See the check after the loop.
+organization_was_hostile=""
+
+# report SCRIPT DESCRIPTION EXPECTED ACTUAL_BRANCH ACTUAL_ORGANIZATION: reports
+# whether the branch name survived the client's `eval` intact, and whether the
+# `eval` executed part of a value.
 report() {
   script="$1"
   description="$2"
   expected="$3"
   actual="$4"
+  actual_organization="$5"
   ok="true"
   if [ "$actual" != "$expected" ]; then
     echo "FAIL: $script did not quote CI_BRANCH with $description"
@@ -100,6 +108,9 @@ report() {
     echo "  the client's \`eval\` ran a command from the organization's name"
     ok=""
   fi
+  if [ "$actual_organization" = "$HOSTILE_ORGANIZATION" ]; then
+    organization_was_hostile="true"
+  fi
   if [ -n "$ok" ]; then
     echo "PASS: $script with $description"
   else
@@ -107,13 +118,20 @@ report() {
   fi
 }
 
+# The two runners below pass the values back in files rather than on standard
+# output, because `ci-info` reports a diagnostic by emitting an `echo` command
+# for the client to `eval`.  That diagnostic and the values would share standard
+# output, and no parsing of the two could be trusted:  a branch name is chosen
+# by whoever opened the pull request, so it can look like anything.  The
+# `eval`'s standard output is discarded for the same reason:  this test checks
+# values, not diagnostics.
+#
 # check SCRIPT BRANCH: checks out BRANCH, runs SCRIPT the way its
 # documentation says to, and checks that the branch name survived the client's
 # `eval` intact.
 check() {
   script="$1"
   branch="$2"
-  actual=""
   git checkout -q "$branch"
   # Remove any canary that a previous check created, so that one script's
   # failure is not reported again for the next script.
@@ -121,21 +139,23 @@ check() {
   # Run with an empty environment, so that this test behaves the same whether
   # or not it is itself running under CI.  The CI variables would send the
   # script down a different code path, one that makes a GitHub API request.
-  if ! actual="$(
+  if ! (
     # The inner script is single-quoted on purpose:  its arguments are passed
     # positionally, so that this shell does not expand them into it.
     # shellcheck disable=SC2016
     env -i PATH="$PATH" HOME="$HOME" sh -c '
       cd "$1" || exit 2
-      eval "$("$2/$3" "$4" 2> /dev/null)" || exit 2
-      printf "%s" "$CI_BRANCH"
-    ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" "$HOSTILE_ORGANIZATION"
-  )"; then
+      eval "$("$2/$3" "$4" 2> /dev/null)" > /dev/null || exit 2
+      printf "%s" "$CI_BRANCH" > "$5/branch"
+      printf "%s" "$CI_ORGANIZATION" > "$5/organization"
+    ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" "$HOSTILE_ORGANIZATION" "$work"
+  ); then
     echo "FAIL: $script: nonzero exit status with branch $branch"
     status=1
     return
   fi
-  report "$script" "branch $branch" "$branch" "$actual"
+  report "$script" "branch $branch" "$branch" \
+    "$(cat "$work/branch")" "$(cat "$work/organization")"
 }
 
 # check_pr SCRIPT BRANCH: runs SCRIPT the way its documentation says to, in a
@@ -147,14 +167,13 @@ check() {
 check_pr() {
   script="$1"
   branch="$2"
-  actual=""
   git checkout -q main
   rm -f "$CANARY"
   # Run with an empty environment except for the GitHub Actions variables, so
   # that this test behaves the same whether or not it is itself running under
   # CI.  Another CI service's variables would send the scripts down another
   # code path.
-  if ! actual="$(
+  if ! (
     # The inner script is single-quoted on purpose:  its arguments are passed
     # positionally, so that this shell does not expand them into it.
     # shellcheck disable=SC2016
@@ -165,15 +184,17 @@ check_pr() {
       GITHUB_SHA="$(git rev-parse HEAD)" \
       sh -c '
         cd "$1" || exit 2
-        eval "$("$2/$3" "$4" 2> /dev/null)" || exit 2
-        printf "%s" "$CI_BRANCH"
-      ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" "$HOSTILE_ORGANIZATION"
-  )"; then
+        eval "$("$2/$3" "$4" 2> /dev/null)" > /dev/null || exit 2
+        printf "%s" "$CI_BRANCH" > "$5/branch"
+        printf "%s" "$CI_ORGANIZATION" > "$5/organization"
+      ' sh "$work/repo" "$PLUME_SCRIPTS" "$script" "$HOSTILE_ORGANIZATION" "$work"
+  ); then
     echo "FAIL: $script: nonzero exit status with pull request branch $branch"
     status=1
     return
   fi
-  report "$script" "pull request branch $branch" "$branch" "$actual"
+  report "$script" "pull request branch $branch" "$branch" \
+    "$(cat "$work/branch")" "$(cat "$work/organization")"
 }
 
 for script in ci-info ci-org-and-branch git-changes; do
@@ -182,5 +203,19 @@ for script in ci-info ci-org-and-branch git-changes; do
   check_pr "$script" "$BRANCH_METACHARACTERS"
   check_pr "$script" "$BRANCH_APOSTROPHE"
 done
+
+# The canary check in `report` can only fail if the hostile argument reaches
+# CI_ORGANIZATION in the first place.  Whether it does depends on the scripts:
+# each one uses the argument only when it cannot determine the organization
+# from the clone or from the CI service.  If it never reaches CI_ORGANIZATION,
+# every canary check above is vacuous -- it passes no matter how the scripts
+# quote, which is a silently disabled assertion rather than a passing test.
+# So require that at least one case did use the argument.  This also catches a
+# script that ignores its DEFAULT-ORGANIZATION argument altogether.
+if [ -z "$organization_was_hostile" ]; then
+  echo "FAIL: no case set CI_ORGANIZATION to the DEFAULT-ORGANIZATION argument,"
+  echo "  so the CI_ORGANIZATION quoting checks above could not have failed."
+  status=1
+fi
 
 exit "$status"

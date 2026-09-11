@@ -45,80 +45,31 @@
 # so that only the variable settings appear on standard output.
 
 # Requires the `jq` program, either `curl` or `wget`, and the scripts
-# `set-git-range` and `set-ci-org-and-branch` in the same directory as this
-# script.
+# `eval-wrapper.sh`, `set-git-range`, and `set-ci-org-and-branch` in the same
+# directory as this script.
 #
 # If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-SCRIPT_NAME="$(basename -- "$0")"
-
-DEBUG=""
-# Initialize, so that an unrelated VERBOSE in the environment does not turn on
-# this script's diagnostics.
-VERBOSE=""
-DEFAULT_ORGANIZATION=""
-while [ "$#" -gt 0 ]; do
-  case $1 in
-    --verbose)
-      VERBOSE="--verbose"
-      ;;
-    --debug)
-      DEBUG="--debug"
-      VERBOSE="--verbose"
-      ;;
-    *)
-      if [ -n "${DEFAULT_ORGANIZATION}" ]; then
-        usage="Usage: ${SCRIPT_NAME} [--verbose] [--debug] [DEFAULT-ORGANIZATION]"
-        echo "echo \"$usage\";"
-        echo "$usage" >&2
-        echo "exit 2"
-        exit 2
-      else
-        DEFAULT_ORGANIZATION="$1"
-      fi
-      ;;
-  esac
-  shift
-done
-
-# Writes its argument, quoted so that the client's `eval` reads it back as one
-# word.  A value may contain a shell metacharacter:  a git branch name may
-# contain any of `$`, backquote, `;`, `&`, `|`, and `'`.
-shell_quote() {
-  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
-}
-
-### Compute the values
-
-# `set-git-range` does all the work.  It writes everything but the variable
-# values to standard error, so it does not disturb the variable settings that
-# this script writes to standard output.
-# The command-line argument wins, but an inherited CI_DEFAULT_ORGANIZATION is
-# honored if there is no argument, so that the two interfaces agree.
-PLUME_SCRIPTS="${SCRIPT_DIR}"
-CI_DEFAULT_ORGANIZATION="${DEFAULT_ORGANIZATION:-${CI_DEFAULT_ORGANIZATION}}"
-CI_VERBOSE="${VERBOSE}"
-CI_DEBUG="${DEBUG}"
-# shellcheck source=set-git-range
-. "${SCRIPT_DIR}"/set-git-range
-sgr_status=$?
-if [ "$sgr_status" -ne 0 ]; then
-  # The client's `eval` reports the status of the text it evaluated, not of
-  # this script, so exiting silently would leave the client with status 0 and
-  # with no value (or a stale value) for each variable.  Writing `exit` on
-  # standard output makes the client fail.  `set-git-range` already reported
-  # the reason on standard error.
-  echo "exit ${sgr_status}"
-  exit "${sgr_status}"
+_ew_script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+_ew_helper="set-git-range"
+_ew_variables="CI_ORGANIZATION CI_BRANCH CI_COMMIT_RANGE_START CI_COMMIT_RANGE_END CI_COMMIT_RANGE"
+# `eval-wrapper.sh` parses the arguments, runs `set-git-range`, and prints the
+# variables.  `ci-org-and-branch` shares it, so that the two scripts cannot
+# drift apart.
+#
+# `.` on a file that does not exist is an error in a special builtin, so the
+# shell aborts at once, without running anything below and without writing
+# anything on standard output.  The client's `eval` would then succeed, with no
+# value (or a stale value) for each variable -- the silent success that the
+# `exit` commands in `eval-wrapper.sh` exist to prevent.  A client that copies
+# individual scripts rather than cloning this repository can easily be missing
+# this one, because it is new.
+if [ ! -f "${_ew_script_dir}/eval-wrapper.sh" ] || [ ! -r "${_ew_script_dir}/eval-wrapper.sh" ]; then
+  echo "exit 2"
+  echo "$0: cannot read ${_ew_script_dir}/eval-wrapper.sh" >&2
+  exit 2
 fi
-
-### Print it out
-
-echo "CI_ORGANIZATION=$(shell_quote "$CI_ORGANIZATION"); export CI_ORGANIZATION;"
-echo "CI_BRANCH=$(shell_quote "$CI_BRANCH"); export CI_BRANCH;"
-echo "CI_COMMIT_RANGE_START=$(shell_quote "$CI_COMMIT_RANGE_START"); export CI_COMMIT_RANGE_START;"
-echo "CI_COMMIT_RANGE_END=$(shell_quote "$CI_COMMIT_RANGE_END"); export CI_COMMIT_RANGE_END;"
-echo "CI_COMMIT_RANGE=$(shell_quote "$CI_COMMIT_RANGE"); export CI_COMMIT_RANGE;"
+# shellcheck source=eval-wrapper.sh
+. "${_ew_script_dir}"/eval-wrapper.sh

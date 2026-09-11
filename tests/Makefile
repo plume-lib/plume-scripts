@@ -11,6 +11,7 @@ TEST_DIRS = \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
 	lint-diff-test \
+	missing-file-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test
