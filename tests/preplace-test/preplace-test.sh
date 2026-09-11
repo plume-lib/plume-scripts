@@ -7,9 +7,9 @@
 # when the replacement actually changes that file, so the timestamp checks
 # below are as important as the content checks.
 #
-# Not tested here, because they are currently broken:  a symbolic link found
-# by directory traversal is replaced by a regular file, and a binary file
-# whose extension is not .class or .pyc is rewritten.
+# Two behaviors have tests of their own in this directory:  binary-test.sh
+# checks that binary files are not rewritten, and symlink-test.sh checks that
+# a symbolic link is not replaced by a regular file.
 
 set -eu
 
@@ -73,10 +73,8 @@ mkdir -p "$recursive/sub"
 echo "hello world" > "$recursive/f1.txt"
 echo "nothing here" > "$recursive/f2.txt"
 echo "hello again" > "$recursive/sub/f3.txt"
-printf 'hello\n' > "$recursive/Foo.class"
-printf 'hello\n' > "$recursive/foo.pyc"
 touch -t "$OLD_TIMESTAMP" "$recursive/f1.txt" "$recursive/f2.txt" \
-  "$recursive/sub/f3.txt" "$recursive/Foo.class" "$recursive/foo.pyc"
+  "$recursive/sub/f3.txt"
 
 (cd "$recursive" && "$PREPLACE" hello HOWDY)
 
@@ -85,8 +83,6 @@ check_equal "replacement in a subdirectory" "HOWDY again" "$(cat "$recursive/sub
 check_equal "a non-matching file is unchanged" "nothing here" "$(cat "$recursive/f2.txt")"
 check_modified "a matching file's timestamp is updated" "$recursive/f1.txt"
 check_unmodified "a non-matching file's timestamp is preserved" "$recursive/f2.txt"
-check_equal "a .class file is skipped" "hello" "$(cat "$recursive/Foo.class")"
-check_equal "a .pyc file is skipped" "hello" "$(cat "$recursive/foo.pyc")"
 
 ## -preserve
 
