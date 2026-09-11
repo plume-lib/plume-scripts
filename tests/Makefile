@@ -8,6 +8,7 @@ TEST_DIRS = \
 	cronic-test \
 	eval-quoting-test \
 	github-ref-name-test \
+	http-status-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
 	lint-diff-test \

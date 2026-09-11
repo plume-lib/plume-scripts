@@ -70,26 +70,92 @@ esac
 ### Functions
 
 # _scoab_get_url URL: fetch URL to standard output, sending an Authorization header
-# if $auth_token is set.  The header is passed as a single argument rather than
-# being word-split out of a command string; that avoids mangling the header and
-# leaking the token into stray connection attempts.
+# if $auth_token is set.  Returns 0 if the server answered with a 2xx status,
+# and 1 otherwise -- after writing to standard error a diagnostic that names
+# the HTTP status.
+#
+# Checking the status is the caller's only way to tell what went wrong, because
+# neither `curl -s` nor `wget -q` says so by itself:  curl prints the server's
+# error body and exits 0, and wget exits nonzero but with the same status (8
+# for GNU wget, 1 for BusyBox wget) for every error response.  A caller that
+# inferred failure from an empty `jq` result could not distinguish "403, the
+# request was throttled" -- which succeeds if the job is re-run later -- from
+# "404, there is no such pull request", which never will.
+#
+# The body is written to standard output even for an error status, because the
+# callers include it in their own diagnostics.  (`wget` does not provide one:
+# it discards the body of an error response.)
+#
+# The header is passed as a single argument rather than being word-split out of
+# a command string; that avoids mangling the header and leaking the token into
+# stray connection attempts.
 # The timeouts bound how long a CI job waits when the network or the GitHub API
 # is unresponsive; without them, one request can hang until the job's own limit.
 # For `wget`, the short options are used because BusyBox wget accepts only those.
 _scoab_get_url() {
+  local url="$1"
+  local newline
+  local response
+  local http_status
+  local wget_stderr
+  newline='
+'
   if [ "$http_get_tool" = "curl" ]; then
+    # `--write-out` appends the status on a line of its own after the body.
+    # Command substitution strips trailing newlines, so the status is the last
+    # line of the result whether or not the body ends with a newline, and is
+    # "000" if no response arrived at all.
     if [ -n "$auth_token" ]; then
-      curl -s --connect-timeout 10 --max-time 30 --header "Authorization: token $auth_token" "$1"
+      response="$(curl -s --connect-timeout 10 --max-time 30 --write-out "${newline}%{http_code}" --header "Authorization: token $auth_token" "$url")"
     else
-      curl -s --connect-timeout 10 --max-time 30 "$1"
+      response="$(curl -s --connect-timeout 10 --max-time 30 --write-out "${newline}%{http_code}" "$url")"
     fi
+    http_status="${response##*"${newline}"}"
+    printf '%s\n' "${response%"${newline}"*}"
   else
+    # `-S` writes the response headers to standard error; both GNU wget and
+    # BusyBox wget accept it and write the status line as "  HTTP/1.1 403 ...".
+    # The command substitution captures standard error, so the headers can be
+    # parsed rather than printed; file descriptor 3 carries the body out to
+    # this function's own standard output.  The `3>&1` is on the enclosing
+    # group rather than on an `exec`, because this script is sourced:  an
+    # `exec 3>&1` here would redirect, and then close, a file descriptor that
+    # belongs to the client.
     if [ -n "$auth_token" ]; then
-      wget -q -O - -T 30 -t 2 --header="Authorization: token $auth_token" "$1"
+      { wget_stderr="$(wget -q -S -O - -T 30 -t 2 --header="Authorization: token $auth_token" "$url" 2>&1 1>&3 3>&-)"; } 3>&1
     else
-      wget -q -O - -T 30 -t 2 "$1"
+      { wget_stderr="$(wget -q -S -O - -T 30 -t 2 "$url" 2>&1 1>&3 3>&-)"; } 3>&1
     fi
+    # The last status line is the one that matters, the others being redirects.
+    http_status="$(printf '%s\n' "$wget_stderr" \
+      | awk '/^[[:blank:]]*HTTP\// { status = $2 } END { print status }')"
   fi
+
+  case "$http_status" in
+    2[0-9][0-9]) return 0 ;;
+  esac
+  {
+    case "$http_status" in
+      '' | 000)
+        echo "${SCRIPT_NAME} warning: no response for ${url}"
+        ;;
+      403 | 429)
+        # GitHub uses 403 both for a throttled request and for a token that
+        # does not permit the request; 429 is its newer answer for throttling.
+        echo "${SCRIPT_NAME} warning: HTTP ${http_status} (throttled or forbidden) for ${url}"
+        if [ -z "$auth_token" ]; then
+          echo "  The request was unauthenticated; setting GITHUB_PAT or GH_TOKEN raises the rate limit."
+        fi
+        ;;
+      404)
+        echo "${SCRIPT_NAME} warning: HTTP 404 (not found) for ${url}"
+        ;;
+      *)
+        echo "${SCRIPT_NAME} warning: HTTP ${http_status} for ${url}"
+        ;;
+    esac
+  } >&2
+  return 1
 }
 
 # Copies standard input to standard output, with the value of each variable
