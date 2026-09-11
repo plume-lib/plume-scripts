@@ -40,7 +40,10 @@ check() {
   expected_status="$2"
   shift 2
   actual_status=0
-  "$CCV" "$@" > "$work/output" 2>&1 || actual_status=$?
+  # Use `${1+"$@"}` rather than `"$@"`:  in bash 3.2, which is /bin/sh on
+  # macOS, `"$@"` is an unbound-variable error under `set -u` when there are
+  # no positional parameters.
+  "$CCV" ${1+"$@"} > "$work/output" 2>&1 || actual_status=$?
   if [ "$actual_status" = "$expected_status" ]; then
     echo "PASS: $description"
   else

@@ -15,13 +15,17 @@ jobs:
           fetch-depth: 1
           show-progress: false
           persist-credentials: false
-      # `classfile_check_version` is a csh script, and its test skips itself
-      # when /bin/csh is absent, as it is on the runner image by default.
-      - name: Install csh
-        run: sudo apt-get install --no-install-recommends --yes tcsh
-      # Some tests skip themselves when a prerequisite is absent, so check for
-      # the prerequisites rather than let the runner image silently decide
-      # which tests run.
+      # The tests skip themselves when a prerequisite is absent, so install
+      # every prerequisite that the runner image does not already provide:
+      # csh (for `classfile_check_version`, which is a csh script), and `xxd`
+      # and `bc` (which its test uses).  `apt-get update` is required because
+      # the runner image's package index goes stale as the archive moves on.
+      - name: Install test prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes tcsh xxd bc
+      # Check the prerequisites rather than let the runner image silently
+      # decide which tests run.
       - name: Check test prerequisites
         run: |
           jq --version

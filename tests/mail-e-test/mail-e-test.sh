@@ -35,6 +35,9 @@ mkdir "$work/bin"
 cat > "$work/bin/mail" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$@" > "${MAIL_E_TEST_DIR}/args"
+# Record what $TMPDIR holds while `mail-e` is running, so that a test can tell
+# whether the temporary file was created there.
+ls "${MAIL_E_TEST_DIR}/tmpdir" > "${MAIL_E_TEST_DIR}/tmpdir-during" 2> /dev/null
 cat > "${MAIL_E_TEST_DIR}/body"
 exit "$(cat "${MAIL_E_TEST_DIR}/mail-exit-status")"
 EOF
@@ -88,10 +91,23 @@ printf '' | "$MAIL_E" someone@example.com || actual_status=$?
 check_equal "an empty body ignores a failing mail" "0" "$actual_status"
 echo 0 > "$work/mail-exit-status"
 
-# The temporary file holding the body is removed, and is created under
-# $TMPDIR when that is set.
+# The temporary file holding the body is created under $TMPDIR when that is
+# set, and is removed afterward.  Checking only that $TMPDIR is empty at the
+# end would also pass if `mail-e` stopped honoring $TMPDIR and put its
+# temporary file in /tmp, so check that the file was there while `mail-e` ran.
 mkdir "$work/tmpdir"
+rm -f "$work/tmpdir-during"
 printf 'the body\n' | TMPDIR="$work/tmpdir" "$MAIL_E" someone@example.com
+case "$(cat "$work/tmpdir-during")" in
+  maile-input.*)
+    echo "PASS: the temporary file is created under \$TMPDIR"
+    ;;
+  *)
+    echo "FAIL: the temporary file is not created under \$TMPDIR;"
+    echo "  \$TMPDIR held: <<$(cat "$work/tmpdir-during")>>"
+    status=1
+    ;;
+esac
 leftover="$(find "$work/tmpdir" -mindepth 1)"
 check_equal "the temporary file is removed" "" "$leftover"
 

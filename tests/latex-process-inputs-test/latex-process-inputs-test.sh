@@ -81,7 +81,10 @@ sec2.tex
 sec3.tex" "$("$LPI" --list main.tex)"
 
 # The single-hyphen spelling is accepted too.
-check_equal "-list" "$("$LPI" --list main.tex)" "$("$LPI" -list main.tex)"
+check_equal "-list" "main.tex
+sec1.tex
+sec2.tex
+sec3.tex" "$("$LPI" -list main.tex)"
 
 check_equal "--antlist" '      <arg value="main.tex"/>
       <arg value="sec1.tex"/>
