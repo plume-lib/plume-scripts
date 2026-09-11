@@ -5,7 +5,8 @@ Usage:  ci-last-success ORG REPO [CANDIDATE]
 
 Outputs the SHA commit id corresponding to the most recent successful CI job
 that is CANDIDATE (a SHA hash) or earlier.
-Currently works only for Azure Pipelines.
+Works for any CI system that reports to GitHub, either as a commit status
+(as Travis CI does) or as a check run (as Azure Pipelines and GitHub Actions do).
 
 Requires the Python requests module to be installed, which you can do via:
   pip install requests
@@ -48,26 +49,59 @@ if DEBUG:
     print(f"commit_arg: {commit_arg}")
 
 
-### PROBLEM: api.github.com is returning   "state": "pending"   for commits with completed CI jobs.
-### Maybe I need to screen-scrape a different github.com page.  :-(
-def successful(sha: str) -> bool:
-    """Return true if `sha`'s CI job succeeded.
+# Check run conclusions that are not failures.  A check run that was skipped
+# or that is advisory ("neutral") does not make the commit unsuccessful.
+SUCCESS_CONCLUSIONS = frozenset(("success", "neutral", "skipped"))
+
+
+def github_api_get(url: str) -> dict:
+    """Return the JSON body of a GET request to the GitHub API.
 
     Returns:
-        true if `sha`'s CI job succeeded.
+        the JSON body of a GET request to the GitHub API.
     """
-    # message=commit['commit']['message']
-    url_status = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}/status"
     if DEBUG:
-        print(url_status)
-    resp_status = requests.get(url_status, timeout=30)
-    if resp_status.status_code != 200:
+        print(url)
+    resp = requests.get(url, headers={"Accept": "application/vnd.github+json"}, timeout=30)
+    if resp.status_code != 200:
         # This means something went wrong, possibly rate-limiting.
-        msg = f"GET {url_status} {resp_status.status_code} {resp_status.headers} {resp_status.text}"
+        msg = f"GET {url} {resp.status_code} {resp.headers} {resp.text}"
         raise Exception(msg)
-    state = resp_status.json()["state"]
-    result: bool = state == "success"
+    result: dict = resp.json()
     return result
+
+
+def successful(sha: str) -> bool:
+    """Return true if `sha` has at least one CI job and all of them succeeded.
+
+    A CI system reports to GitHub either as a commit status (as Travis CI does) or as a
+    check run (as Azure Pipelines and GitHub Actions do).  Both must be consulted.
+    Consulting only the commit statuses reports "state": "pending" -- the combined state
+    of zero commit statuses -- for a commit whose check runs all completed successfully.
+
+    Returns:
+        true if `sha` has at least one CI job and all of them succeeded.
+    """
+    api_prefix = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}"
+    saw_a_job = False
+
+    statuses = github_api_get(f"{api_prefix}/status")
+    if statuses["statuses"]:
+        if statuses["state"] != "success":
+            return False
+        saw_a_job = True
+
+    # `per_page=100` because the default page size is 30 and this code reads only
+    # the first page.
+    check_runs = github_api_get(f"{api_prefix}/check-runs?per_page=100")["check_runs"]
+    for check_run in check_runs:
+        if check_run["status"] != "completed":
+            return False
+        if check_run["conclusion"] not in SUCCESS_CONCLUSIONS:
+            return False
+        saw_a_job = True
+
+    return saw_a_job
 
 
 def parent(sha: str) -> str | None:
