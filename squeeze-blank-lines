@@ -41,9 +41,19 @@ if [ "$status" -ne 0 ]; then
   exit "$status"
 fi
 
-# 3. Remove leading blank lines, then remove trailing blank lines.
-processed_data=$(printf '%s\n' "$squeezed_data" \
-  | sed '/[^[:blank:]]/,$!d' \
+# 3. Remove leading blank lines, then remove trailing blank lines.  Each `sed`
+# is run as a separate command whose status is checked, rather than as one
+# pipeline, for the reason given in step 2:  `sh` has no `pipefail`, so a
+# failure of the first `sed` of a pipeline would go unnoticed and its truncated
+# output would be written over the input file.
+processed_data=$(printf '%s\n' "$squeezed_data" | sed '/[^[:blank:]]/,$!d')
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "squeeze-blank-lines: failed to process $input" >&2
+  exit "$status"
+fi
+
+processed_data=$(printf '%s\n' "$processed_data" \
   | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')
 status=$?
 if [ "$status" -ne 0 ]; then
