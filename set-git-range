@@ -538,8 +538,27 @@ _sgr_set_git_range_body() {
     if [ -n "$debug" ]; then
       echo "Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
     fi
-    CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
-    CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
+    # Split on the literal separator "..." or "..", not on a single ".":  a
+    # range endpoint may be a ref whose own name contains a dot, as tags
+    # usually do.  Splitting "v1.2.3...v1.3.0" on "." yields the start "v1" and
+    # the end "0", neither of which exists.  A range that Travis supplied whole
+    # (see $TRAVIS_COMMIT_RANGE above) reaches this code with its endpoints
+    # unset, so this is the only place that ever sees such a name.
+    case $CI_COMMIT_RANGE in
+      *...*)
+        CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%...*}
+        CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*...}
+        ;;
+      *..*)
+        CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%..*}
+        CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*..}
+        ;;
+      *)
+        # Not a range at all, but a single commit (or empty).
+        CI_COMMIT_RANGE_START=""
+        CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE}
+        ;;
+    esac
     if [ -z "$CI_COMMIT_RANGE_START" ]; then
       CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_END}
     fi

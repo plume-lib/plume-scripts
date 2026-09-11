@@ -12,6 +12,7 @@ TEST_DIRS = \
 	jq-null-test \
 	lint-diff-test \
 	missing-file-test \
+	set-git-range-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test
