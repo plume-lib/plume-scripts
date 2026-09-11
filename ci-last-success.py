@@ -9,7 +9,7 @@ Currently works only for Azure Pipelines.
 
 Options: --max-commits=N means to examine at most N commits; the default is
              100.  0 means no limit.
-         --debug means to print diagnostic output.
+         --debug means to print diagnostic output to standard error.
 
 Requires the Python requests module to be installed, which you can do via:
   pip install requests
@@ -22,8 +22,8 @@ Requires the Python requests module to be installed, which you can do via:
 #    API calls.  This can avoid "403 rate limit exceeded" failures.
 #  * At most --max-commits commits are examined, so that a repository whose
 #    last successful job is far in the past cannot consume the whole quota.
-#  * A request that fails transiently (including because of throttling) is
-#    retried a few times, with exponential backoff.
+#  * A request that fails transiently (including because of throttling or a
+#    network-level error) is retried a few times, with exponential backoff.
 # The script prints nothing to standard out, only to standard error, if it
 # cannot determine a successful commit.
 
@@ -37,6 +37,9 @@ from pathlib import Path
 import requests
 
 PROGRAM = Path(__file__).name
+
+# `__doc__` is None if Python was run with the `-OO` command-line option.
+DESCRIPTION = __doc__.splitlines()[0] if __doc__ else PROGRAM
 
 DEBUG = False
 
@@ -57,7 +60,8 @@ MAX_RETRY_SECONDS = 60.0
 
 # The HTTP status codes that are worth retrying:  throttling and transient
 # server-side failures.  403 is also retried, but only when its headers show
-# that it is the rate limit rather than, say, a nonexistent repository.
+# that it is a rate limit (either the hourly quota being exhausted or the
+# secondary rate limit) rather than, say, a nonexistent repository.
 RETRIABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
 
@@ -67,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     Returns:
         the parsed command-line arguments.
     """
-    parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog=PROGRAM, description=DESCRIPTION)
     parser.add_argument("--max-commits", type=int, default=DEFAULT_MAX_COMMITS)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("org")
@@ -106,6 +110,17 @@ def rate_limited(response: requests.Response) -> bool:
     return response.headers.get("x-ratelimit-remaining") == "0"
 
 
+def secondary_rate_limited(response: requests.Response) -> bool:
+    """Return true if `response` is a refusal because the secondary rate limit was exceeded.
+
+    Returns:
+        true if `response` is a refusal because the secondary rate limit was
+        exceeded.  Unlike the primary (hourly) rate limit, GitHub signals this
+        by a "retry-after" header rather than by an exhausted quota.
+    """
+    return response.status_code in (403, 429) and "retry-after" in response.headers
+
+
 def retry_delay(response: requests.Response, default_delay: float) -> float | None:
     """Return how long to wait before retrying the request that produced `response`.
 
@@ -113,7 +128,11 @@ def retry_delay(response: requests.Response, default_delay: float) -> float | No
         the number of seconds to wait before retrying the request, or None if
         the request should not be retried.
     """
-    if response.status_code not in RETRIABLE_STATUS_CODES and not rate_limited(response):
+    if (
+        response.status_code not in RETRIABLE_STATUS_CODES
+        and not rate_limited(response)
+        and not secondary_rate_limited(response)
+    ):
         return None
     # GitHub sends "retry-after" when it is throttling, and "x-ratelimit-reset"
     # (an epoch time) when the hourly quota is exhausted.
@@ -164,15 +183,28 @@ def get_url(url: str) -> requests.Response:
     delay = INITIAL_RETRY_SECONDS
     retries_left = MAX_RETRIES
     while True:
-        response = requests.get(url, headers=auth_headers(), timeout=30)
-        if response.status_code == 200:
-            return response
-        this_delay = retry_delay(response, delay)
-        if this_delay is None or retries_left == 0 or this_delay > MAX_RETRY_SECONDS:
-            # This means something went wrong, possibly rate-limiting.
-            raise RuntimeError(request_error_message(url, response))
+        try:
+            response = requests.get(url, headers=auth_headers(), timeout=30)
+        except requests.RequestException as exc:
+            # A connection reset, timeout, or DNS failure is transient, so
+            # retry it just as an unsuccessful HTTP status code is retried.
+            if retries_left == 0:
+                message = f"GET {url} {exc}"
+                raise RuntimeError(message) from exc
+            this_delay: float = delay
+        else:
+            if response.status_code == 200:
+                return response
+            delay_or_none = retry_delay(response, delay)
+            if delay_or_none is None or retries_left == 0 or delay_or_none > MAX_RETRY_SECONDS:
+                # This means something went wrong, possibly rate-limiting.
+                raise RuntimeError(request_error_message(url, response))
+            this_delay = delay_or_none
         if DEBUG:
-            print(f"Retrying {url} in {this_delay} seconds ({retries_left} retries left)")
+            print(
+                f"Retrying {url} in {this_delay} seconds ({retries_left} retries left)",
+                file=sys.stderr,
+            )
         time.sleep(this_delay)
         retries_left -= 1
         delay *= 2
@@ -189,7 +221,7 @@ def successful(org: str, repo: str, sha: str) -> bool:
     # message=commit['commit']['message']
     url_status = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}/status"
     if DEBUG:
-        print(url_status)
+        print(url_status, file=sys.stderr)
     resp_status = get_url(url_status)
     state = resp_status.json()["state"]
     result: bool = state == "success"
@@ -210,25 +242,35 @@ def parent(sha: str) -> str | None:
     return get_parent_result.stdout.rstrip().decode("utf-8")
 
 
+def head_commit() -> str:
+    """Return the SHA of the current HEAD.
+
+    Returns:
+        the SHA of the current HEAD.
+
+    Raises:
+        RuntimeError: if the SHA could not be determined.
+    """
+    git_rev_parse_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, check=False
+    )
+    if git_rev_parse_result.returncode != 0:
+        raise RuntimeError(git_rev_parse_result.stderr.decode("utf-8", errors="replace"))
+    return git_rev_parse_result.stdout.rstrip().decode("utf-8")
+
+
 def main() -> None:
     """Output the SHA commit id of a successful CI job."""
     global DEBUG
     args = parse_args()
     DEBUG = DEBUG or args.debug
 
-    commit_arg = args.commit
-    if commit_arg is None:
-        git_rev_parse_result = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, check=False
-        )
-        if git_rev_parse_result.returncode != 0:
-            raise RuntimeError(git_rev_parse_result.stderr.decode("utf-8", errors="replace"))
-        commit_arg = git_rev_parse_result.stdout.rstrip().decode("utf-8")
+    commit_arg: str = args.commit if args.commit is not None else head_commit()
 
     if DEBUG:
-        print(f"commit_arg: {commit_arg}")
+        print(f"commit_arg: {commit_arg}", file=sys.stderr)
 
-    commit = commit_arg
+    commit: str = commit_arg
     examined = 0
     while True:
         if args.max_commits != 0 and examined == args.max_commits:
@@ -239,7 +281,7 @@ def main() -> None:
             )
             sys.exit(1)
         if DEBUG:
-            print(f"Testing {commit}")
+            print(f"Testing {commit}", file=sys.stderr)
         examined += 1
         if successful(args.org, args.repo, commit):
             print(f"{commit}")
