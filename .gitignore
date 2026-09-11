@@ -5,6 +5,8 @@ tests/jacoco-coverage-ratchet-test/out12.txt
 tests/jacoco-coverage-ratchet-test/out13.txt
 tests/jacoco-coverage-ratchet-test/out21.txt
 tests/jacoco-coverage-ratchet-test/out31.txt
+tests/latex-process-inputs-test/inline.actual
+tests/latex-process-inputs-test/list.actual
 tests/lint-diff-test/gradleindent-lint-pruned.txt
 tests/lint-diff-test/guessstrip-lint-pruned.txt
 tests/lint-diff-test/incomparable-lint-pruned.txt
@@ -22,6 +24,8 @@ tests/lint-diff-test/words2-lint.txt
 tests/lint-diff-test/words2.txt
 tests/sort-compiler-output-test/errors1-sorted.actual
 tests/sort-compiler-output-test/errors2-sorted.actual
+tests/sort-compiler-output-test/errors3-sorted.actual
+tests/sort-compiler-output-test/errors3-duplicates.actual
 tests/sort-directory-order-test/lines1.output
 tests/squeeze-blank-lines-test/lines1.output
 tests/squeeze-blank-lines-test/lines1.output2
