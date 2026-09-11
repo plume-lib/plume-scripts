@@ -74,9 +74,9 @@ my @files = ($ARGV[0]);
 
 # I ought to abstract this out into a (recursively-called) procedure.
 my $text = "";
-open(TOPLEVEL, $files[0]) or die("Can't open $files[0]");
-my @toplevel_lines = <TOPLEVEL>;
-close TOPLEVEL;
+open(my $toplevel_fh, '<', $files[0]) or die("Can't open $files[0]: $!");
+my @toplevel_lines = <$toplevel_fh>;
+close $toplevel_fh;
 
 for my $line (@toplevel_lines) {
   # kill comments on the line
@@ -91,11 +91,12 @@ for my $line (@toplevel_lines) {
     my $opt_args = "$2";
     my $file = $minted_p ? "$4" : "$3";
     if ($debug) { print STDERR "INPUT: $file\n"; }
+    my $fh;
     if (-e "$file.tex") {
       $file .= ".tex";
-      open(F, "$file") or die("Can't open $file");
+      open($fh, '<', $file) or die("Can't open $file: $!");
     } elsif (-e "$file") {
-      open(F, "$file") or die("Can't open $file");
+      open($fh, '<', $file) or die("Can't open $file: $!");
     } else {
       # fwfd = "file_without_first_dir"
       $fwfd = $file;
@@ -104,18 +105,18 @@ for my $line (@toplevel_lines) {
       # For reasons I don't understand, just  (-e "$fwfd.tex")  here evaluates to false.
       if (-e "$dir/$fwfd.tex") {
 	$fwfd .= ".tex";
-	open(F, "$dir/$fwfd") or die("Can't open $fwfd");
+	open($fh, '<', "$dir/$fwfd") or die("Can't open $fwfd: $!");
 	$file = "$fwfd";
       } elsif (-e "$dir/$fwfd") {
-	open(F, "$dir/$fwfd") or die("Can't open $fwfd");
+	open($fh, '<', "$dir/$fwfd") or die("Can't open $fwfd: $!");
 	$file = "$fwfd";
       }	else {
 	die("File does not exist: $file.tex or $file");
       }
     }
     push @files, $file;
-    my @lines = <F>;
-    close F;
+    my @lines = <$fh>;
+    close $fh;
     my $replace = join('', @lines);
     if ($verbatim_p) {
       $replace = "\\begin{verbatim}\n" .
@@ -148,9 +149,9 @@ $text =~ s/([^\\]%).*?$/$1/gm;
 if ((! $list_mode) && ($text =~ /\\bibliography\{.*?\}/)) {
   my $bbl_file = $files[0];
   $bbl_file =~ s/\.tex$/.bbl/;
-  open(BBL, "$bbl_file") or die("Run bibtex (didn't find bbl file \"$bbl_file\")");
-  my @bib = <BBL>;
-  close BBL;
+  open(my $bbl_fh, '<', $bbl_file) or die("Run bibtex (didn't find bbl file \"$bbl_file\")");
+  my @bib = <$bbl_fh>;
+  close $bbl_fh;
   my $bib = join('', @bib);
   $text =~ s/\\bibliography\{.*?\}/$bib/i;
 }
