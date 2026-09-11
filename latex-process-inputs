@@ -36,8 +36,7 @@
 # replaced by the text of the inputted file and the process repeating until
 # there are no more \input commands.  The script does not know which file a
 # given \input command came from.  The solution is to rewrite the script to
-# work line-by-line.  That will also do a better job of not handling \input
-# and %-comments in verbatim-included files.
+# work line-by-line.
 # Writing a test suite would help with validating this change.
 
 use Cwd;
@@ -72,6 +71,28 @@ if (scalar(@ARGV) > 1) {
 # A list of all the files that have been processed so far.
 my @files = ($ARGV[0]);
 
+# Text that was included verbatim (by \verbatiminput, \lstinputlisting, or
+# \inputminted) must not be modified afterward; in particular, a "%" in it
+# does not start a comment.  Such text is therefore replaced by a placeholder
+# as soon as it is read, and the placeholders are expanded just before output,
+# after all comment-stripping has been done.  A NUL character does not appear
+# in a LaTeX document, so a placeholder cannot collide with document text.
+my @verbatim_texts = ();
+
+# Records its argument and returns a placeholder to stand for it.
+sub verbatim_placeholder {
+  my ($verbatim_text) = @_;
+  push @verbatim_texts, $verbatim_text;
+  return "\0VERBATIM" . $#verbatim_texts . "\0";
+}
+
+# Replaces each placeholder by the text it stands for.
+sub expand_verbatim_placeholders {
+  my ($result) = @_;
+  $result =~ s/\0VERBATIM([0-9]+)\0/$verbatim_texts[$1]/ge;
+  return $result;
+}
+
 # I ought to abstract this out into a (recursively-called) procedure.
 my $text = "";
 open(my $toplevel_fh, '<', $files[0]) or die("Can't open $files[0]: $!");
@@ -89,6 +110,7 @@ for my $line (@toplevel_lines) {
     my $lstinput_p = ($inputcommand eq "lstinputlisting");
     my $minted_p = ($inputcommand eq "inputminted");
     my $opt_args = "$2";
+    my $minted_language = "$3";
     my $file = $minted_p ? "$4" : "$3";
     if ($debug) { print STDERR "INPUT: $file\n"; }
     my $fh;
@@ -120,15 +142,15 @@ for my $line (@toplevel_lines) {
     my $replace = join('', @lines);
     if ($verbatim_p) {
       $replace = "\\begin{verbatim}\n" .
-	$replace .
+	verbatim_placeholder($replace) .
 	"\\end{verbatim}\n";
     } elsif ($lstinput_p) {
       $replace = "\\begin{lstlisting}\n" .
-	$replace .
+	verbatim_placeholder($replace) .
 	"\\end{lstlisting}\n";
     } elsif ($minted_p) {
-      $replace = "\\begin{minted}${opt_args}{$3}\n" .
-	$replace .
+      $replace = "\\begin{minted}${opt_args}{$minted_language}\n" .
+	verbatim_placeholder($replace) .
 	"\\end{minted}\n";
     } else {
       # kill comments
@@ -167,5 +189,5 @@ if ($ant_list_mode) {
     print "$file\n";
   }
 } else {
-  print $text;
+  print expand_verbatim_placeholders($text);
 }
