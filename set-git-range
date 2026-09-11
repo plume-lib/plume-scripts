@@ -552,6 +552,12 @@ _sgr_set_git_range_body() {
       *..*)
         CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%..*}
         CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*..}
+        # Restate the range in the three-dot form that every other code path
+        # produces.  `git diff A..B` is `git diff A B`, which reports changes
+        # that were made on the base branch, as if this branch had reverted
+        # them.  Without this assignment, a client that uses CI_COMMIT_RANGE
+        # would see a different diff than one that uses the two endpoints.
+        CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
         ;;
       *)
         # Not a range at all, but a single commit (or empty).

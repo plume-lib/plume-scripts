@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Tests that `set-git-range` splits a whole CI_COMMIT_RANGE on its literal
-# separator, "..." or "..".
+# separator, "..." or "..", and that the range and its endpoints agree.
 #
 # When a CI service supplies the range but not its endpoints -- Travis CI is
 # the one that does, via $TRAVIS_COMMIT_RANGE -- `set-git-range` splits the
@@ -50,7 +50,7 @@ THIRD="$(git rev-parse v1.3.0)"
 status=0
 
 # run RANGE: sources `set-git-range` in a simulated Travis CI job whose
-# $TRAVIS_COMMIT_RANGE is RANGE, and prints the resulting start and end.
+# $TRAVIS_COMMIT_RANGE is RANGE, and prints the resulting start, end, and range.
 run() {
   # Run with an empty environment except for the Travis CI variables, so that
   # this test behaves the same whether or not it is itself running under CI.
@@ -66,16 +66,17 @@ run() {
       PLUME_SCRIPTS="$2"
       export PLUME_SCRIPTS
       . "$2/set-git-range" || exit 2
-      printf "%s %s" "$CI_COMMIT_RANGE_START" "$CI_COMMIT_RANGE_END"
+      printf "%s %s %s" "$CI_COMMIT_RANGE_START" "$CI_COMMIT_RANGE_END" "$CI_COMMIT_RANGE"
     ' sh "$work/repo" "$PLUME_SCRIPTS" 2> /dev/null
 }
 
-# check DESCRIPTION RANGE EXPECTED_START EXPECTED_END: checks the endpoints
-# that `set-git-range` computes from the whole range RANGE.
+# check DESCRIPTION RANGE EXPECTED_START EXPECTED_END EXPECTED_RANGE: checks
+# the endpoints, and the possibly-rewritten range, that `set-git-range`
+# computes from the whole range RANGE.
 check() {
   description="$1"
   range="$2"
-  expected="$3 $4"
+  expected="$3 $4 $5"
   actual=""
   if ! actual="$(run "$range")"; then
     echo "FAIL: nonzero exit status for $description"
@@ -86,20 +87,22 @@ check() {
     echo "PASS: $description"
   else
     echo "FAIL: $description"
-    echo "  CI_COMMIT_RANGE:  $range"
-    echo "  expected start and end: $expected"
-    echo "  actual start and end:   $actual"
+    echo "  input range:                   $range"
+    echo "  expected start, end, and range: $expected"
+    echo "  actual start, end, and range:   $actual"
     status=1
   fi
 }
 
-check "a three-dot range of dotted tags" "v1.2.3...v1.3.0" v1.2.3 v1.3.0
-check "a two-dot range of dotted tags" "v1.2.3..v1.3.0" v1.2.3 v1.3.0
-check "a three-dot range of commit ids" "$FIRST...$THIRD" "$FIRST" "$THIRD"
-check "a two-dot range of commit ids" "$FIRST..$THIRD" "$FIRST" "$THIRD"
+check "a three-dot range of dotted tags" "v1.2.3...v1.3.0" v1.2.3 v1.3.0 "v1.2.3...v1.3.0"
+# A two-dot range is restated in three-dot form, so that a client that uses
+# CI_COMMIT_RANGE sees the same diff as one that uses the two endpoints.
+check "a two-dot range of dotted tags" "v1.2.3..v1.3.0" v1.2.3 v1.3.0 "v1.2.3...v1.3.0"
+check "a three-dot range of commit ids" "$FIRST...$THIRD" "$FIRST" "$THIRD" "$FIRST...$THIRD"
+check "a two-dot range of commit ids" "$FIRST..$THIRD" "$FIRST" "$THIRD" "$FIRST...$THIRD"
 # Not a range but a single commit, which is what a client gets if a CI service
 # ever supplies one.  The end is that commit and the start is its parent; that
 # is the same treatment the script gives a range whose endpoints are equal.
-check "a lone dotted tag" "v1.3.0" "$SECOND" v1.3.0
+check "a lone dotted tag" "v1.3.0" "$SECOND" v1.3.0 "$SECOND...v1.3.0"
 
 exit "$status"
