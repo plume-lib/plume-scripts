@@ -1,0 +1,99 @@
+#!/bin/sh
+
+# Tests for `uniq-contents`.
+#
+# The unreadable-file tests are the interesting ones.  `uniq-contents` used
+# to pipe the hashing command into `cut`, which discards the hashing
+# command's exit status because `sh` has no `pipefail`.  An unreadable file
+# therefore hashed to the empty string:  the first such file was printed as
+# if it were unique and recorded the empty hash as seen, and every later
+# unreadable file matched it and was silently dropped.  For a tool whose
+# output is meant to be fed to another command, that is silent data loss.
+
+set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+UNIQ="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/uniq-contents"
+
+work="$(mktemp -d)"
+trap 'chmod -R u+rwX "$work" 2> /dev/null; rm -rf "$work"' EXIT HUP INT TERM
+
+status=0
+
+pass() {
+  echo "PASS: $1"
+}
+
+fail() {
+  echo "FAIL: $1"
+  status=1
+}
+
+# check_output DESCRIPTION EXPECTED ACTUAL
+check_output() {
+  if [ "$2" = "$3" ]; then
+    pass "$1"
+  else
+    fail "$1"
+    echo "  expected: $2"
+    echo "  actual:   $3"
+  fi
+}
+
+### Duplicate contents are removed, keeping the first file in argument order.
+
+printf 'aaa\n' > "$work/a.txt"
+printf 'bbb\n' > "$work/b.txt"
+printf 'aaa\n' > "$work/a2.txt"
+out="$("$UNIQ" "$work/a.txt" "$work/b.txt" "$work/a2.txt")"
+check_output "keeps the first of a group of identical files" \
+  "$(printf '%s\n%s' "$work/a.txt" "$work/b.txt")" "$out"
+
+### Distinct files are all printed.
+
+out="$("$UNIQ" "$work/a.txt" "$work/b.txt")"
+check_output "prints all distinct files" \
+  "$(printf '%s\n%s' "$work/a.txt" "$work/b.txt")" "$out"
+
+### Unreadable files are reported, not silently dropped or deduplicated.
+
+# root can read a mode-000 file, so this part of the test would not test
+# anything.  Skipping is better than failing.
+if [ "$(id -u)" = 0 ]; then
+  echo "$(basename -- "$0"): skipping the unreadable-file tests, because it is running as root."
+else
+  printf 'ccc\n' > "$work/c.txt"
+  printf 'ddd\n' > "$work/d.txt"
+  chmod 000 "$work/c.txt" "$work/d.txt"
+
+  if out="$("$UNIQ" "$work/a.txt" "$work/c.txt" "$work/d.txt" 2> "$work/err")"; then
+    fail "zero exit status when a file cannot be read"
+  else
+    pass "nonzero exit status when a file cannot be read"
+  fi
+  check_output "omits unreadable files from the output" "$work/a.txt" "$out"
+  # Look for `uniq-contents`'s own message, not merely for the file name:
+  # the shell's "cannot open" message for the failed input redirection also
+  # names the file, so a laxer test would pass even without the fix.
+  for f in "$work/c.txt" "$work/d.txt"; do
+    if grep -q -- "uniq-contents: cannot read $f" "$work/err"; then
+      pass "reported $(basename -- "$f") on stderr"
+    else
+      fail "did not report $(basename -- "$f") on stderr"
+      cat "$work/err"
+    fi
+  done
+
+  # An unreadable file must not make a later readable file look like a
+  # duplicate of it.
+  out="$("$UNIQ" "$work/c.txt" "$work/b.txt" 2> /dev/null || true)"
+  check_output "an unreadable file does not mask a later readable one" \
+    "$work/b.txt" "$out"
+fi
+
+### A nonexistent file or a directory is skipped, as documented.
+
+out="$("$UNIQ" "$work/nosuch.txt" "$work/a.txt")"
+check_output "skips a nonexistent file" "$work/a.txt" "$out"
+
+exit "$status"
