@@ -489,7 +489,11 @@ _sgr_set_git_range_body() {
     else
       keep_end=""
     fi
-    if [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
+    # Treat the branch as the default branch only if it is known to be:  an
+    # empty $CI_BRANCH compares equal to an empty $CI_DEFAULT_BRANCH_NAME, and
+    # a job where neither could be determined would then take this arm and get
+    # a range covering only the last commit, with nothing said about the guess.
+    if [ -n "$CI_BRANCH" ] && [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
       if git show --summary HEAD | grep -q ^Merge:; then
         CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
       else
@@ -499,6 +503,14 @@ _sgr_set_git_range_body() {
         CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
       fi
     else
+      if [ -z "$CI_BRANCH" ]; then
+        # The branch is unknown, as in a CircleCI build of a tag, which sets no
+        # $CIRCLE_BRANCH.  Say so:  the range below is a guess, it is valid and
+        # non-empty, so no client will complain about it, and it is the range
+        # for a branch other than the default one -- which is the safer guess,
+        # because it is the wider of the two ranges.
+        echo "${SCRIPT_NAME}: WARNING: cannot determine the branch; computing the commit range as for a branch other than ${CI_DEFAULT_BRANCH_NAME:-the default branch}." >&2
+      fi
       # "origin/$CI_DEFAULT_BRANCH_NAME" is accurate when the pull request was
       # created, but it doesn't change when force-push occurs (as Renovate does),
       # making it out of date.
@@ -520,7 +532,14 @@ _sgr_set_git_range_body() {
           ;;
       esac
       if [ -z "$keep_end" ]; then
-        CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH")
+        if [ -n "$CI_BRANCH" ]; then
+          CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH")
+        else
+          # `git rev-parse ""` fails, which would leave the end empty and make
+          # this script report that it cannot determine the commit range.  HEAD
+          # is the commit that the job is testing, whatever branch it is on.
+          CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
+        fi
       fi
     fi
     CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}

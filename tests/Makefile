@@ -14,7 +14,8 @@ TEST_DIRS = \
 	missing-file-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
-	squeeze-blank-lines-test
+	squeeze-blank-lines-test \
+	unknown-branch-test
 
 all: test
 
