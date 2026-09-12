@@ -1,0 +1,1 @@
+FAIL: missing-permissions.workflow:20: job "test" does not declare permissions

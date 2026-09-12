@@ -90,8 +90,11 @@ hooks = [
 
 # This doesn't install the tool!  It fails with "Circleci CLI could not be
 # found." unless you have installed the CircleCI CLI.  Using `snap` to install
-# leads to permission problems due to snap confinement.  To install:
-# - run: curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/main/install.sh | sudo bash
+# leads to permission problems due to snap confinement.  To install, download a
+# release tarball and verify its checksum, as
+# `.github/workflows/prek.yaml` does.  Don't pipe the upstream `install.sh`
+# into a shell:  it is served from a mutable branch, so what runs is whatever
+# that branch says at the moment it is fetched.
 [[repos]]
 repo = "https://github.com/zahorniak/pre-commit-circleci"
 rev = "v1.3.0"
