@@ -1,0 +1,3 @@
+Foo.java:2: warning: [rawtypes] found raw type: List
+    log.error("Config.java:42: bad");
+    ^

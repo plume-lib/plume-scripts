@@ -12,8 +12,9 @@
 # directory, then renames that over the file.  Therefore, rewriting requires
 # write permission on the directory, and other hard links to the file still
 # refer to the old contents.  A symbolic link is not replaced by a regular
-# file, and the file's permissions (and, if the user is root, its ownership)
-# are preserved.
+# file, and the file's permissions and ownership are preserved; a file whose
+# owner cannot be preserved is not rewritten at all.  Access control lists and
+# extended attributes are not preserved.
 
 # 1. Determine the input source.
 # If $1 exists, read from that file; otherwise, read from stdin.
@@ -133,10 +134,10 @@ if [ -n "$1" ]; then
     exit "$status"
   fi
 
-  # Give the temporary file the input file's permissions and, if the user is
-  # permitted to, its ownership.  This is done after writing the contents,
-  # because the input file may be read-only:  a user who owns a read-only
-  # file, or who can write its directory, may rewrite it.
+  # Give the temporary file the input file's ownership and permissions.  This
+  # is done after writing the contents, because the input file may be
+  # read-only:  a user who owns a read-only file, or who can write its
+  # directory, may rewrite it.
   # `stat`'s options for this differ among implementations:  `-c` is GNU and
   # BusyBox, `-f` is BSD and macOS.
   file_mode=$(stat -c '%a' -- "$outfile" 2> /dev/null \
@@ -145,12 +146,35 @@ if [ -n "$1" ]; then
     echo "squeeze-blank-lines: failed to read the permissions of $1" >&2
     exit 2
   fi
-  # Changing the ownership is best effort:  it fails unless the user is root.
-  # It precedes `chmod` because it clears the setuid and setgid bits.
   file_owner=$(stat -c '%u:%g' -- "$outfile" 2> /dev/null \
     || stat -f '%u:%g' -- "$outfile" 2> /dev/null)
-  if [ -n "$file_owner" ]; then
+  if [ -z "$file_owner" ]; then
+    echo "squeeze-blank-lines: failed to read the ownership of $1" >&2
+    exit 2
+  fi
+  tmp_owner=$(stat -c '%u:%g' -- "$tmpfile" 2> /dev/null \
+    || stat -f '%u:%g' -- "$tmpfile" 2> /dev/null)
+  if [ "$tmp_owner" != "$file_owner" ]; then
+    # Changing the ownership fails unless the user has the privilege to do so.
+    # It precedes `chmod` because it clears the setuid and setgid bits.
     chown -- "$file_owner" "$tmpfile" 2> /dev/null
+    tmp_owner=$(stat -c '%u:%g' -- "$tmpfile" 2> /dev/null \
+      || stat -f '%u:%g' -- "$tmpfile" 2> /dev/null)
+  fi
+  # The rename replaces the input file by the temporary file, so an owner that
+  # could not be set would silently transfer the file to whoever ran this
+  # script.  Rather than do that, refuse to rewrite the file.  (Writing to the
+  # file itself, which is what this script used to do, would have failed with
+  # a permission error.)  A group that could not be set is only a warning:
+  # losing a group is not a change of ownership.
+  if [ "${tmp_owner%:*}" != "${file_owner%:*}" ]; then
+    echo "squeeze-blank-lines: not rewriting $1, because its owner" \
+      "(${file_owner%:*}) cannot be preserved" >&2
+    exit 2
+  fi
+  if [ "$tmp_owner" != "$file_owner" ]; then
+    echo "squeeze-blank-lines: warning: the group of $1 changes from" \
+      "${file_owner#*:} to ${tmp_owner#*:}" >&2
   fi
   if ! chmod -- "$file_mode" "$tmpfile"; then
     echo "squeeze-blank-lines: failed to set the permissions of $1" >&2

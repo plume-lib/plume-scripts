@@ -114,7 +114,8 @@ else
     "$work/b.txt" "$out"
 fi
 
-### A nonexistent file or a directory is reported, not silently skipped.
+### A nonexistent file is an error, and a directory is a warning; neither is
+### silently skipped.
 
 if out="$("$UNIQ" "$work/nosuch.txt" "$work/a.txt" 2> "$work/err")"; then
   fail "zero exit status for a nonexistent file"
@@ -129,18 +130,29 @@ else
   cat "$work/err"
 fi
 
+# A directory is only a warning:  `uniq-contents *` in a directory that
+# contains a subdirectory must not abort a caller that uses `set -e`.
 mkdir "$work/adir"
 if out="$("$UNIQ" "$work/adir" "$work/a.txt" 2> "$work/err")"; then
-  fail "zero exit status for a directory"
+  pass "zero exit status for a directory"
 else
-  pass "nonzero exit status for a directory"
+  fail "nonzero exit status for a directory"
 fi
 check_output "omits a directory from the output" "$work/a.txt" "$out"
-if grep -qF -- "uniq-contents: not a regular file: $work/adir" "$work/err"; then
+if grep -qF -- "uniq-contents: warning: not a regular file: $work/adir" "$work/err"; then
   pass "reported a directory on stderr"
 else
   fail "did not report a directory on stderr"
   cat "$work/err"
+fi
+
+# A directory does not mask a read error elsewhere in the argument list.
+if [ "$(id -u)" != 0 ]; then
+  if "$UNIQ" "$work/adir" "$work/c.txt" 2> /dev/null; then
+    fail "zero exit status for an unreadable file alongside a directory"
+  else
+    pass "nonzero exit status for an unreadable file alongside a directory"
+  fi
 fi
 
 ### A file name containing a backslash is printed and reported literally.
