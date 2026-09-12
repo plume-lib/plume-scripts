@@ -5,6 +5,9 @@ tests/jacoco-coverage-ratchet-test/out12.txt
 tests/jacoco-coverage-ratchet-test/out13.txt
 tests/jacoco-coverage-ratchet-test/out21.txt
 tests/jacoco-coverage-ratchet-test/out31.txt
+tests/jacoco-coverage-ratchet-test/out45.txt
+tests/jacoco-coverage-ratchet-test/out45ignore.txt
+tests/jacoco-coverage-ratchet-test/out54.txt
 tests/latex-process-inputs-test/inline.actual
 tests/latex-process-inputs-test/list.actual
 tests/lint-diff-test/gradleindent-lint-pruned.txt
