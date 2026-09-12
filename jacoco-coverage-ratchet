@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Exits with failure message if, for any single class, coverage goes down.
 
+Also exits with a failure message if a class appears in the old coverage report
+but not in the new one -- for example, because the class was deleted or renamed,
+or because a module was not analyzed (it failed to build, or it was omitted from
+the Jacoco report).  Pass --ignore-removed-classes to permit such classes, which
+is appropriate when the code change intentionally deletes or renames a class.
+
+Usage: jacoco-coverage-ratchet [--ignore-removed-classes] OLD.csv NEW.csv
+
 Arguments: two Jacoco coverage reports (.csv files).
 """
 
@@ -15,16 +23,32 @@ DEBUG = False
 
 
 def main():
-    """Exit with failure message if, for any single class, coverage goes down."""
-    num_args = len(sys.argv) - 1
+    """Exit with failure message if, for any single class, coverage goes down.
+
+    Also exit with a failure message if a class is in the old coverage report but
+    not in the new one, unless --ignore-removed-classes was passed.
+    """
+    args = sys.argv[1:]
+    ignore_removed_classes = "--ignore-removed-classes" in args
+    if ignore_removed_classes:
+        args = [arg for arg in args if arg != "--ignore-removed-classes"]
+    num_args = len(args)
     if num_args != 2:
-        print(f"{PROGRAM} received {num_args} arguments, expected 2: {sys.argv[1:]}")
+        print(f"{PROGRAM} received {num_args} arguments, expected 2: {args}")
         sys.exit(2)
 
-    old_coverage = read_jacoco_csv_to_map(sys.argv[1])
-    new_coverage = read_jacoco_csv_to_map(sys.argv[2])
+    old_coverage = read_jacoco_csv_to_map(args[0])
+    new_coverage = read_jacoco_csv_to_map(args[1])
 
     failed = False
+
+    # A class that vanished from the new report is not measured at all, so no
+    # ratio comparison below would notice it.  Treat that as a ratchet failure.
+    if not ignore_removed_classes:
+        for fq_classname in sorted(old_coverage.keys() - new_coverage.keys()):
+            print(f"Class {fq_classname} is in the old coverage report but not in the new one")
+            failed = True
+
     for fq_classname, new_instruction_cov in sorted(new_coverage.items()):
         if fq_classname not in old_coverage:
             continue

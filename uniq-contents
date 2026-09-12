@@ -2,6 +2,11 @@
 # Given a list of file names as arguments, print the ones with unique
 # contents: for each group of files with identical contents, only the
 # first one (in argument order) is printed.
+#
+# Exits with status 1 if any argument could not be read: it does not exist,
+# it is not a regular file, or reading it failed.  Such an argument is
+# reported on stderr and is omitted from the output; the readable files are
+# still processed.
 
 # Pick a hashing command; sha256 makes accidental collisions
 # (calling distinct files identical) astronomically unlikely.
@@ -13,15 +18,44 @@ else
   hash_cmd="cksum"
 fi
 
+prog=$(basename -- "$0")
+
+status=0
 seen=""
 for f in "$@"; do
-  # Skip anything that is not a readable regular file.
-  [ -f "$f" ] || continue
+  # Report, rather than silently skip, anything that is not a regular file:
+  # dropping a file from the output without a diagnostic is the same silent
+  # data loss as mishandling an unreadable one.  Use `printf`, not `echo`:
+  # `echo` interprets backslashes in a file name in some shells.
+  if [ ! -e "$f" ]; then
+    printf '%s: no such file: %s\n' "$prog" "$f" >&2
+    status=1
+    continue
+  fi
+  if [ ! -f "$f" ]; then
+    printf '%s: not a regular file: %s\n' "$prog" "$f" >&2
+    status=1
+    continue
+  fi
 
-  sum=$($hash_cmd < "$f" | cut -d' ' -f1)
+  # Do not pipe into `cut`:  `sh` has no `pipefail`, so the status of the
+  # hashing command would be lost and an unreadable file would silently
+  # produce an empty hash.  An empty hash is recorded as seen, after which
+  # every unreadable file -- including the first one -- looks like a
+  # duplicate.  The `2>/dev/null` precedes the input redirection so that it
+  # also suppresses the shell's own "cannot open" message.
+  if ! sum=$($hash_cmd 2>/dev/null < "$f"); then
+    printf '%s: cannot read %s\n' "$prog" "$f" >&2
+    status=1
+    continue
+  fi
+  # Discard everything after the hash itself (a file name or a byte count).
+  sum=${sum%% *}
 
   case " $seen " in
     *" $sum "*) ;;             # content already seen; skip it
     *) seen="$seen $sum"; printf '%s\n' "$f" ;;
   esac
 done
+
+exit "$status"
