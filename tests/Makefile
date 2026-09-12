@@ -7,6 +7,7 @@ TEST_DIRS = \
 	ci-info-test \
 	cronic-test \
 	eval-quoting-test \
+	github-pr-number-test \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
