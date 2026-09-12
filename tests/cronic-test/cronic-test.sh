@@ -38,6 +38,31 @@ exit "$1"
 EOF
 chmod +x "$work/trace-and-stderr"
 
+# A command whose stderr is nothing but `make` directory-change notices.  Both
+# the top-level form (`make:`) and the recursive form (`make[1]:`) appear; both
+# must be filtered out of the reduced error output.
+cat > "$work/make-noise" <<'EOF'
+#!/bin/sh
+echo "make: Entering directory '/tmp/x'" 1>&2
+echo "make[1]: Entering directory '/tmp/x/sub'" 1>&2
+echo "make[1]: Leaving directory '/tmp/x/sub'" 1>&2
+echo "make: Leaving directory '/tmp/x'" 1>&2
+exit "$1"
+EOF
+chmod +x "$work/make-noise"
+
+# A command that writes a real error among the `make` directory-change notices.
+cat > "$work/make-noise-and-stderr" <<'EOF'
+#!/bin/sh
+echo "make: Entering directory '/tmp/x'" 1>&2
+echo "make[1]: Entering directory '/tmp/x/sub'" 1>&2
+echo "a real error" 1>&2
+echo "make[1]: Leaving directory '/tmp/x/sub'" 1>&2
+echo "make: Leaving directory '/tmp/x'" 1>&2
+exit "$1"
+EOF
+chmod +x "$work/make-noise-and-stderr"
+
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find /tmp -maxdepth 1 -name 'cronic.*' 2> /dev/null | sort
@@ -45,7 +70,8 @@ temp_files() {
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
-# it left no temporary files behind.  EXPECTED-OUTPUT is "report" or "silent".
+# it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report", or
+# "report:TEXT", which also requires TEXT to appear in the report.
 check() {
   description="$1"
   expected_status="$2"
@@ -78,6 +104,17 @@ check() {
       status=1
       return
     fi
+    case "$expected_output" in
+      report:*)
+        if ! grep -q "${expected_output#report:}" "$work/output"; then
+          echo "FAIL: $description: expected the report to contain" \
+            "\"${expected_output#report:}\", but got:"
+          cat "$work/output"
+          status=1
+          return
+        fi
+        ;;
+    esac
   fi
 
   if [ "$before" != "$after" ]; then
@@ -107,5 +144,13 @@ check "trace lines and real stderr, exit 0" 0 report "$work/trace-and-stderr" 0
 # ... unless --permit-stderr says not to.
 check "trace lines and real stderr, --permit-stderr" 0 silent \
   --permit-stderr "$work/trace-and-stderr" 0
+
+# `make` directory-change notices are not error output, whether they come from
+# a top-level `make` or from a recursive one.
+check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
+
+# ... but a real error among them is still reported.
+check "make directory-change notices and real stderr, exit 0" 0 \
+  "report:^a real error$" "$work/make-noise-and-stderr" 0
 
 exit "$status"
