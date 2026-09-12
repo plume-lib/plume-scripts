@@ -5,6 +5,7 @@
 # recipe.
 TEST_DIRS = \
 	ci-info-test \
+	ci-last-success-test \
 	cronic-test \
 	eval-quoting-test \
 	github-pr-number-test \
