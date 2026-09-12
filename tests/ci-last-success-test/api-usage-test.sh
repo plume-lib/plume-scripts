@@ -15,7 +15,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 PROGRAM="${SCRIPT_DIR}/../../ci-last-success.py"
 
 if [ -z "$(command -v python3 2> /dev/null)" ]; then
-  echo "test-ci-last-success.sh: skipping, because python3 is not installed." >&2
+  echo "api-usage-test.sh: skipping, because python3 is not installed." >&2
   exit 0
 fi
 
@@ -64,7 +64,7 @@ run_program() {
 }
 
 fail() {
-  echo "test-ci-last-success.sh: FAILED: $1" >&2
+  echo "api-usage-test.sh: FAILED: $1" >&2
   echo "---------------- standard output" >&2
   cat "$tmpdir/out.txt" >&2
   echo "---------------- standard error" >&2
@@ -115,7 +115,8 @@ for variable in GITHUB_PAT GH_TOKEN; do
   if [ "$(cat "$tmpdir/out.txt")" != "$head_sha" ]; then
     fail "search with a successful job did not output $head_sha"
   fi
-  check_requests 1 "$variable"
+  # Two requests:  the first page of check runs, then the commit statuses.
+  check_requests 2 "$variable"
   if ! grep -q "auth=.*a-fake-token" "$tmpdir/log.txt"; then
     fail "$variable did not authenticate the request"
   fi
@@ -130,7 +131,21 @@ run_program "503 success" UNUSED=
 if [ "$program_status" -ne 0 ]; then
   fail "a transient failure was not retried"
 fi
-check_requests 2 "a transient failure"
+# Three requests:  the first page of check runs, which fails and is then
+# retried successfully, and the commit statuses.
+check_requests 3 "a transient failure"
+
+# Test: a credential that may read the repository but not its check runs is
+# tolerated; the commit statuses decide the commit, as they did before this
+# script consulted check runs at all.
+run_program "forbidden success" GITHUB_PAT=a-fake-token
+if [ "$program_status" -ne 0 ]; then
+  fail "a refusal to supply check runs was not tolerated"
+fi
+if [ "$(cat "$tmpdir/out.txt")" != "$head_sha" ]; then
+  fail "a refusal to supply check runs did not fall back to the commit statuses"
+fi
+check_requests 2 "a refusal to supply check runs"
 
 # Test: a rate limit that will not reset for an hour is reported rather than
 # waited for, and with no token set, the report suggests setting one.
@@ -181,6 +196,6 @@ if grep -q "Traceback" "$tmpdir/err.txt"; then
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "test-ci-last-success.sh: passed."
+  echo "api-usage-test.sh: passed."
 fi
 exit "$status"
