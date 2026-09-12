@@ -19,7 +19,8 @@ TEST_DIRS = \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test \
-	uniq-contents-test
+	uniq-contents-test \
+	workflow-hardening-test \
 
 all: test
 
