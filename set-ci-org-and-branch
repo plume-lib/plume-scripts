@@ -206,6 +206,10 @@ _scoab_get_url() {
 # example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
 # `set` prints a function's local variables too, which is why $auth_token is
 # assigned before the debug dump runs:  the pattern masks it there as well.
+# A credential can also hide in the userinfo of a URL, under a variable whose
+# name suggests nothing -- $origin_url holds `remote.origin.url`, which a job
+# that cloned with a token spells "https://USER:TOKEN@github.com/org/repo" --
+# so strip that too, wherever in a line it appears.
 _scoab_redact_tokens() {
   awk '
     /^[A-Za-z_][A-Za-z0-9_]*=/ {
@@ -216,7 +220,11 @@ _scoab_redact_tokens() {
         next
       }
     }
-    { print }
+    # Excluding whitespace and quotes from the userinfo keeps a match from
+    # spanning a URL and a later "@" in unrelated text, which would delete
+    # everything between them.  The userinfo also ends at the first "/", "?",
+    # or "#", so an "@" in a path, query, or fragment is not a credential.
+    { gsub(/:\/\/[^\/?#[:space:]"'\'']*@/, "://<redacted>@"); print }
   '
 }
 
@@ -274,6 +282,8 @@ _scoab_org_from_url() {
   # Discard any userinfo ("git@", "USER:TOKEN@") and any port.
   host=${host##*@}
   host=${host%%:*}
+  # Hostnames are case-insensitive, and git accepts them in any case.
+  host=$(printf '%s' "${host}" | tr '[:upper:]' '[:lower:]')
   case $host in
     github.com | www.github.com) : ;;
     *) return 0 ;;
@@ -285,6 +295,34 @@ _scoab_org_from_url() {
   case $path in
     */*) printf '%s\n' "${path%%/*}" ;;
   esac
+}
+
+# _scoab_redact_url URL: prints URL with any embedded credential replaced by a
+# placeholder.  git accepts "https://USER:TOKEN@github.com/org/repo", and the
+# debug output goes to the CI log, which is often readable by anyone who can
+# see the job.
+_scoab_redact_url() {
+  local scheme=""
+  local rest="$1"
+
+  case $rest in
+    *://*)
+      scheme="${rest%%://*}://"
+      rest="${rest#*://}"
+      ;;
+  esac
+  # The userinfo, if any, precedes the first "/", "?", or "#":  the start of
+  # the path, query, or fragment.  Testing only that prefix avoids mangling a
+  # URL whose path, query, or fragment contains an "@".
+  local authority="${rest%%/*}"
+  authority="${authority%%\?*}"
+  authority="${authority%%#*}"
+  case $authority in
+    # "git@github.com:org/repo" is a convention, not a credential.
+    git@*) ;;
+    *@*) rest="<redacted>@${rest#*@}" ;;
+  esac
+  printf '%s\n' "${scheme}${rest}"
 }
 
 # _scoab_pr_number_from_ref_name: prints the pull request number that
@@ -572,12 +610,15 @@ _scoab_set_org_and_branch_body() {
     {
       echo "remote's CI_DEFAULT_BRANCH_NAME=$CI_DEFAULT_BRANCH_NAME"
       if [ -n "${origin_url}" ]; then
-        echo "HEAD of ${origin_url} = $(git ls-remote --symref "${origin_url}" HEAD)" 2>&1
+        # The redirection is inside the substitution, so that git's
+        # diagnostics are captured rather than written to stderr unredacted.
+        # An old git names the URL, credential and all, in them.
+        echo "HEAD of $(_scoab_redact_url "${origin_url}") = $(git ls-remote --symref "${origin_url}" HEAD 2>&1)" | _scoab_redact_tokens
       else
         echo "origin_url is empty (is set only for non-CI runs)"
       fi
       echo "current branch: $(git branch --show-current)"
-      echo "current repo: $(git config --get remote.origin.url)"
+      echo "current repo: $(_scoab_redact_url "$(git config --get remote.origin.url)")"
     } >&2
   fi
 
@@ -798,8 +839,8 @@ fi
 
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
-unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_redact_tokens \
-  _scoab_org_from_url _scoab_pr_number_from_ref_name
+unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_org_from_url \
+  _scoab_pr_number_from_ref_name _scoab_redact_tokens _scoab_redact_url
 if [ -n "$_scoab_had_errexit" ]; then
   set -e
 fi

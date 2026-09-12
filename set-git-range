@@ -154,6 +154,10 @@ unset _sgr_status
 # the job.  Matching by name pattern rather than by an allowlist of names also
 # covers secrets that this script does not know about; GitHub Actions, for
 # example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
+# A credential can also hide in the userinfo of a URL, under a variable whose
+# name suggests nothing -- a job that cloned with a token has
+# "https://USER:TOKEN@github.com/org/repo" in `remote.origin.url` -- so strip
+# that too, wherever in a line it appears.
 # `set-ci-org-and-branch` has its own copy of this function, because it unsets
 # its functions before this script's body runs.
 _sgr_redact_tokens() {
@@ -166,7 +170,11 @@ _sgr_redact_tokens() {
         next
       }
     }
-    { print }
+    # Excluding whitespace and quotes from the userinfo keeps a match from
+    # spanning a URL and a later "@" in unrelated text, which would delete
+    # everything between them.  The userinfo also ends at the first "/", "?",
+    # or "#", so an "@" in a path, query, or fragment is not a credential.
+    { gsub(/:\/\/[^\/?#[:space:]"'\'']*@/, "://<redacted>@"); print }
   '
 }
 

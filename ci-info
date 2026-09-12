@@ -7,13 +7,10 @@
 # so extracting the shared code into a file that both it and the "set-" scripts
 # source would constrain those scripts for the sake of a script that no one
 # should be using.  Keep a bug fix in step across the copies, and prefer the
-# "set-" scripts' behavior where they differ, as they do in two places:
+# "set-" scripts' behavior where they differ, as they do in one place:
 #  * When the GitHub API request for an Azure Pipelines pull request fails,
 #    this script gives up; `set-ci-org-and-branch` falls back to
 #    $SYSTEM_PULLREQUEST_SOURCEREPOSITORYURI.
-#  * This script derives the organization from the leading components of the
-#    origin URL without checking that the URL names GitHub, so for a local or
-#    non-GitHub origin it yields a fragment of a path rather than nothing.
 
 # Determines the start and end commits for a CI job.
 # Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
@@ -127,6 +124,10 @@ done
 # the job.  Matching by name pattern rather than by an allowlist of names also
 # covers secrets that this script does not know about; GitHub Actions, for
 # example, defines $ACTIONS_RUNTIME_TOKEN in every job and does not mask it.
+# A credential can also hide in the userinfo of a URL, under a variable whose
+# name suggests nothing -- $URL holds `remote.origin.url`, which a job that
+# cloned with a token spells "https://USER:TOKEN@github.com/org/repo" -- so
+# strip that too, wherever in a line it appears.
 # The placeholder contains no shell metacharacters, because the client `eval`s
 # this script's output.
 # This function is defined here rather than with the other functions below,
@@ -141,7 +142,11 @@ redact_tokens() {
         next
       }
     }
-    { print }
+    # Excluding whitespace and quotes from the userinfo keeps a match from
+    # spanning a URL and a later "@" in unrelated text, which would delete
+    # everything between them.  The userinfo also ends at the first "/", "?",
+    # or "#", so an "@" in a path, query, or fragment is not a credential.
+    { gsub(/:\/\/[^\/?#[:space:]"'\'']*@/, "://REDACTED@"); print }
   '
 }
 
@@ -273,6 +278,100 @@ commit_range_is_usable() {
   git merge-base "$CI_COMMIT_RANGE_START" "$CI_COMMIT_RANGE_END" > /dev/null 2>&1
 }
 
+# org_from_url URL: prints the GitHub organization of a repository URL, or
+# nothing if the argument is not a GitHub repository URL.  The caller treats no
+# output as "unknown" and falls back to $DEFAULT_ORGANIZATION, so it is better
+# to print nothing than to print a guess.
+# These are the forms that git accepts and that can name GitHub:
+#   https://github.com/mernst/annotation-tools[.git]
+#   https://USER[:TOKEN]@github.com/mernst/annotation-tools[.git]
+#   http://github.com/mernst/annotation-tools[.git]
+#   git://github.com/mernst/annotation-tools[.git]
+#   ssh://git@github.com[:PORT]/mernst/annotation-tools[.git]
+#   git@github.com:mernst/annotation-tools[.git]   (git's scp-like syntax)
+# A local path such as "../plume-scripts" is not one of them; neither is a URL
+# for some other forge.  Printing the leading component of those would yield an
+# organization that does not exist -- and, for a URL that embeds a credential,
+# would copy the credential into $CI_ORGANIZATION and thence into the log.
+org_from_url() {
+  ofu_rest="$1"
+
+  case $ofu_rest in
+    ssh://* | git://* | http://* | https://*)
+      ofu_rest=${ofu_rest#*://}
+      # The host is everything before the first "/", which must be present:
+      # these forms have no path-less spelling.
+      case $ofu_rest in
+        */*)
+          ofu_host=${ofu_rest%%/*}
+          ofu_path=${ofu_rest#*/}
+          ;;
+        *) return 0 ;;
+      esac
+      ;;
+    *://*)
+      # Some other scheme, such as git's file://.
+      return 0
+      ;;
+    *:*)
+      # The scp-like syntax, [USER@]HOST:PATH.  It has no "//", so the case
+      # above has already ruled out every URL with a scheme.  A Windows path
+      # such as "C:/repo" also matches, but git treats that as scp-like syntax
+      # too, so this function is no more wrong about it than git is.
+      ofu_host=${ofu_rest%%:*}
+      ofu_path=${ofu_rest#*:}
+      ;;
+    *)
+      # A local path, or a bare name.
+      return 0
+      ;;
+  esac
+
+  # Discard any userinfo ("git@", "USER:TOKEN@") and any port.
+  ofu_host=${ofu_host##*@}
+  ofu_host=${ofu_host%%:*}
+  # Hostnames are case-insensitive, and git accepts them in any case.
+  ofu_host=$(printf '%s' "${ofu_host}" | tr '[:upper:]' '[:lower:]')
+  case $ofu_host in
+    github.com | www.github.com) : ;;
+    *) return 0 ;;
+  esac
+
+  # The organization is the first component of the path.  Requiring a second
+  # component rejects a URL that names no repository.
+  ofu_path=${ofu_path#/}
+  case $ofu_path in
+    */*) printf '%s\n' "${ofu_path%%/*}" ;;
+  esac
+}
+
+# redact_url URL: prints URL with any embedded credential replaced by a
+# placeholder.  git accepts "https://USER:TOKEN@github.com/org/repo", and the
+# --debug output goes to the CI log, which is often readable by anyone who can
+# see the job.
+redact_url() {
+  ru_scheme=""
+  ru_rest="$1"
+  case $ru_rest in
+    *://*)
+      ru_scheme="${ru_rest%%://*}://"
+      ru_rest="${ru_rest#*://}"
+      ;;
+  esac
+  # The userinfo, if any, precedes the first "/", "?", or "#":  the start of
+  # the path, query, or fragment.  Testing only that prefix avoids mangling a
+  # URL whose path, query, or fragment contains an "@".
+  ru_authority="${ru_rest%%/*}"
+  ru_authority="${ru_authority%%\?*}"
+  ru_authority="${ru_authority%%#*}"
+  case $ru_authority in
+    # "git@github.com:org/repo" is a convention, not a credential.
+    git@*) ;;
+    *@*) ru_rest="REDACTED@${ru_rest#*@}" ;;
+  esac
+  printf '%s\n' "${ru_scheme}${ru_rest}"
+}
+
 ### Organization
 
 ## Continuous integration services
@@ -351,12 +450,7 @@ fi
 ## Git clone
 if [ -z "$CI_ORGANIZATION" ]; then
   URL=$(git config --get remote.origin.url)
-  # This removes the leading part of two possible forms for a URL:
-  #   https://github.com/mernst/annotation-tools
-  #   git@github.com:mernst/annotation-tools.git
-  SLUG=${URL#https://github.com/}
-  SLUG=${SLUG#git@github.com:}
-  CI_ORGANIZATION=${SLUG%/*}
+  CI_ORGANIZATION=$(org_from_url "$URL")
   # TODO: Maybe add a sanity check here.
 fi
 
@@ -377,12 +471,15 @@ DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f
 if [ "$DEBUG" = "--debug" ]; then
   emit_echo "remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME"
   if [ -n "${URL}" ]; then
-    echo "HEAD of ${URL} = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | emit_echo_lines
+    # The redirection is inside the substitution, so that git's diagnostics
+    # are captured rather than written to this script's stderr.  An old git
+    # names the URL, credential and all, in them, hence `redact_tokens`.
+    echo "HEAD of $(redact_url "${URL}") = $(git ls-remote --symref "${URL}" HEAD 2>&1)" | redact_tokens | emit_echo_lines
   else
     emit_echo "URL is empty (is set only for non-CI runs)"
   fi
   emit_echo "current branch: $(git branch --show-current)"
-  emit_echo "current repo: $(git config --get remote.origin.url)"
+  emit_echo "current repo: $(redact_url "$(git config --get remote.origin.url)")"
 fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
