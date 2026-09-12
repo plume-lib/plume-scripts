@@ -44,8 +44,13 @@
 #   it.
 #
 # The script sets no other variables and leaves no functions defined.  It
-# returns 0 on success, or 2 if it cannot determine the information; in the
-# latter case all four variables are set to the empty string.
+# returns 0 on success, 3 if it cannot determine the information because a
+# GitHub API request failed in a way that re-running the job might not repeat
+# (the request was throttled, or no response arrived), or 2 if it cannot
+# determine the information for any other reason.  In both failure cases all
+# four variables are set to the empty string.  A client that treats any nonzero
+# status as failure remains correct; distinguishing 3 lets a client retry
+# instead of reporting a permanent failure.
 
 # The client configures this script by setting optional variables rather than
 # by passing command-line arguments.
@@ -73,26 +78,124 @@ esac
 ### Functions
 
 # _scoab_get_url URL: fetch URL to standard output, sending an Authorization header
-# if $auth_token is set.  The header is passed as a single argument rather than
-# being word-split out of a command string; that avoids mangling the header and
-# leaking the token into stray connection attempts.
+# if $auth_token is set.  Writes to standard error a diagnostic that names the
+# HTTP status, and returns:
+#   0  the server answered with a 2xx status
+#   2  the request failed for a reason that re-running the job might not repeat:
+#      no response at all, 403, 429, or a 5xx server error
+#   1  the request failed permanently, as for 404
+#
+# Checking the status is the caller's only way to tell what went wrong, because
+# neither `curl -s` nor `wget -q` says so by itself:  curl prints the server's
+# error body and exits 0, and wget exits nonzero but with the same status (8
+# for GNU wget, 1 for BusyBox wget) for every error response.  A caller that
+# inferred failure from an empty `jq` result could not distinguish "403, the
+# request was throttled" -- which succeeds if the job is re-run later -- from
+# "404, there is no such pull request", which never will.
+#
+# A caller that acts on the status must not put this function in a pipeline,
+# which would discard it; see the CI_BRANCH request below.
+#
+# The body is written to standard output even for an error status, because the
+# callers include it in their own diagnostics.  (`wget` does not provide one:
+# it discards the body of an error response.)
+#
+# The header is passed as a single argument rather than being word-split out of
+# a command string; that avoids mangling the header and leaking the token into
+# stray connection attempts.
 # The timeouts bound how long a CI job waits when the network or the GitHub API
 # is unresponsive; without them, one request can hang until the job's own limit.
 # For `wget`, the short options are used because BusyBox wget accepts only those.
 _scoab_get_url() {
+  local url="$1"
+  local newline
+  local response
+  local http_status
+  local transient
+  local wget_stderr
+  local wget_message
+  # Only the wget branch sets this; keep it defined for the curl branch too.
+  wget_message=""
+  newline='
+'
   if [ "$http_get_tool" = "curl" ]; then
+    # `--write-out` appends the status on a line of its own after the body.
+    # Command substitution strips trailing newlines, so the status is the last
+    # line of the result whether or not the body ends with a newline, and is
+    # "000" if no response arrived at all.
     if [ -n "$auth_token" ]; then
-      curl -s --connect-timeout 10 --max-time 30 --header "Authorization: token $auth_token" "$1"
+      response="$(curl -s --connect-timeout 10 --max-time 30 --write-out "${newline}%{http_code}" --header "Authorization: token $auth_token" "$url")"
     else
-      curl -s --connect-timeout 10 --max-time 30 "$1"
+      response="$(curl -s --connect-timeout 10 --max-time 30 --write-out "${newline}%{http_code}" "$url")"
     fi
+    http_status="${response##*"${newline}"}"
+    printf '%s\n' "${response%"${newline}"*}"
   else
+    # `-S` writes the response headers to standard error; both GNU wget and
+    # BusyBox wget accept it and write the status line as "  HTTP/1.x 403 ...".
+    # GNU wget writes "HTTP/1.1" and BusyBox wget writes "HTTP/1.0", so the
+    # version must not be matched exactly.
+    # The command substitution captures standard error, so the headers can be
+    # parsed rather than printed; file descriptor 3 carries the body out to
+    # this function's own standard output.  The `3>&1` is on the enclosing
+    # group rather than on an `exec`, because this script is sourced:  an
+    # `exec 3>&1` here would redirect, and then close, a file descriptor that
+    # belongs to the client.
     if [ -n "$auth_token" ]; then
-      wget -q -O - -T 30 -t 2 --header="Authorization: token $auth_token" "$1"
+      { wget_stderr="$(wget -q -S -O - -T 30 -t 2 --header="Authorization: token $auth_token" "$url" 2>&1 1>&3 3>&-)"; } 3>&1
     else
-      wget -q -O - -T 30 -t 2 "$1"
+      { wget_stderr="$(wget -q -S -O - -T 30 -t 2 "$url" 2>&1 1>&3 3>&-)"; } 3>&1
     fi
+    # The last status line is the one that matters, the others being redirects.
+    http_status="$(printf '%s\n' "$wget_stderr" \
+      | awk '/^[[:blank:]]*HTTP\// { status = $2 } END { print status }')"
+    # wget indents every response header, so an unindented line is wget's own
+    # message.  Keep those to print below:  when no response arrived at all,
+    # wget's message is the only statement of why -- a refused connection, an
+    # unresolvable host and a rejected certificate are otherwise
+    # indistinguishable to the caller.
+    wget_message="$(printf '%s\n' "$wget_stderr" \
+      | awk '/^[^[:blank:]]/ && NF')"
   fi
+
+  case "$http_status" in
+    2[0-9][0-9]) return 0 ;;
+  esac
+  transient=""
+  {
+    case "$http_status" in
+      '' | 000)
+        echo "${SCRIPT_NAME} warning: no response for ${url}"
+        if [ -n "$wget_message" ]; then
+          printf '%s\n' "$wget_message"
+        fi
+        transient="true"
+        ;;
+      403 | 429)
+        # GitHub uses 403 both for a throttled request and for a token that
+        # does not permit the request; 429 is its newer answer for throttling.
+        echo "${SCRIPT_NAME} warning: HTTP ${http_status} (throttled or forbidden) for ${url}"
+        if [ -z "$auth_token" ]; then
+          echo "  The request was unauthenticated; setting GITHUB_PAT or GH_TOKEN raises the rate limit."
+        fi
+        transient="true"
+        ;;
+      404)
+        echo "${SCRIPT_NAME} warning: HTTP 404 (not found) for ${url}"
+        ;;
+      5[0-9][0-9])
+        echo "${SCRIPT_NAME} warning: HTTP ${http_status} (server error) for ${url}"
+        transient="true"
+        ;;
+      *)
+        echo "${SCRIPT_NAME} warning: HTTP ${http_status} for ${url}"
+        ;;
+    esac
+  } >&2
+  if [ -n "$transient" ]; then
+    return 2
+  fi
+  return 1
 }
 
 # Copies standard input to standard output, with the value of each variable
@@ -214,6 +317,7 @@ _scoab_set_org_and_branch_body() {
   local auth_token
   local http_get_tool
   local api_url
+  local get_url_status
   local SLUG
   local origin_url
   local GITHUB_PR_NUMBER
@@ -381,9 +485,7 @@ _scoab_set_org_and_branch_body() {
     if [ -n "$GITHUB_PR_NUMBER" ]; then
       api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
       CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
-      # "// empty" maps JSON null to the empty string, so that a response that
-      # does not describe a pull request (as when the request was throttled)
-      # falls through to the fallbacks below instead of yielding "null".
+      # "// empty" maps JSON null to the empty string, to avoid yielding "null".
       CI_ORGANIZATION=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
       if [ -z "$CI_ORGANIZATION" ]; then
         # Warn and fall back, rather than failing:  a throttled request should
@@ -585,8 +687,51 @@ _scoab_set_org_and_branch_body() {
     else
       # TODO: Can I implement this without a GitHub API request?
       api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}"
-      CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
+      # No pipeline here, unlike the requests above:  a pipeline's status is
+      # that of its last command, and this is the one caller that acts on
+      # _scoab_get_url's status rather than merely falling back.
+      CI_PULL_JSON="$(_scoab_get_url "${api_url}")"
+      get_url_status=$?
+      CI_PULL_JSON="$(printf '%s' "${CI_PULL_JSON}" | tr -d '[:cntrl:]')"
+      # "// empty" maps JSON null to the empty string, to avoid yielding "null".
       CI_BRANCH=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.ref // empty' 2> /dev/null)
+      if [ -z "$CI_BRANCH" ]; then
+        {
+          echo "${SCRIPT_NAME} warning: bad output for ${api_url}"
+          if [ -n "$auth_token" ]; then
+            echo "auth_token is set."
+          fi
+          echo "---- start of ${http_get_tool} output ----"
+          printf '%s\n' "${CI_PULL_JSON}"
+          echo "---- end of ${http_get_tool} output ----"
+        } >&2
+        # GitHub Actions writes the event payload to the file named by
+        # $GITHUB_EVENT_PATH, and if this job was triggered by a pull request
+        # event that payload names the same head branch that the API request
+        # asked about.
+        if [ -r "${GITHUB_EVENT_PATH}" ]; then
+          CI_BRANCH=$(jq -r '.pull_request.head.ref // empty' "${GITHUB_EVENT_PATH}" 2> /dev/null)
+        fi
+        if [ -n "$CI_BRANCH" ]; then
+          echo "${SCRIPT_NAME}: using branch ${CI_BRANCH} from ${GITHUB_EVENT_PATH}." >&2
+        else
+          # Unlike the organization, the branch has no fallback here:
+          # GITHUB_REF_NAME is like "42/merge", which names no branch, and this
+          # clone's HEAD is the merge commit, which is on no branch either.
+          # Report failure rather than returning an empty CI_BRANCH, which a
+          # client would use as if it were a branch name.  This is why a
+          # throttled request fails the job here but not above, where falling
+          # back to a correct answer is possible.
+          echo "${SCRIPT_NAME}: cannot determine the branch of ${api_url}" >&2
+          if [ "$get_url_status" -eq 2 ]; then
+            # Status 3 rather than 2, so that a client can re-run the job (or
+            # wait and retry) instead of reporting a permanent failure.
+            echo "${SCRIPT_NAME}: the request may succeed if it is made again later." >&2
+            return 3
+          fi
+          return 2
+        fi
+      fi
     fi
 
   else
