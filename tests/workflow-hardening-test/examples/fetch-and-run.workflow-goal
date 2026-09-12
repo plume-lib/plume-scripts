@@ -1,0 +1,8 @@
+FAIL: fetch-and-run.workflow:23: pipes a downloaded file into a shell
+FAIL: fetch-and-run.workflow:23: downloads from a mutable branch rather than a pinned ref
+FAIL: fetch-and-run.workflow:26: pipes a downloaded file into a shell
+FAIL: fetch-and-run.workflow:28: pipes a downloaded file into a shell
+FAIL: fetch-and-run.workflow:32: runs a shell in a job that downloads a file (line 30)
+FAIL: fetch-and-run.workflow:33: uses an action pinned to a mutable branch:  example/action@main
+FAIL: fetch-and-run.workflow:34: uses an action pinned to a mutable branch:  example/other@develop
+FAIL: fetch-and-run.workflow:35: uses an action that names no version:  example/unversioned

@@ -7,6 +7,7 @@ TEST_DIRS = \
 	ci-info-test \
 	cronic-test \
 	eval-quoting-test \
+	github-pr-number-test \
 	github-ref-name-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
@@ -15,11 +16,13 @@ TEST_DIRS = \
 	missing-file-test \
 	path-remove-test \
 	preplace-test \
+	set-git-range-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test \
 	uniq-contents-test \
 	unknown-branch-test \
+	workflow-hardening-test \
 
 all: test
 
