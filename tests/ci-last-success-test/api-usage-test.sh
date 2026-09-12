@@ -15,7 +15,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 PROGRAM="${SCRIPT_DIR}/../../ci-last-success.py"
 
 if [ -z "$(command -v python3 2> /dev/null)" ]; then
-  echo "test-ci-last-success.sh: skipping, because python3 is not installed." >&2
+  echo "api-usage-test.sh: skipping, because python3 is not installed." >&2
   exit 0
 fi
 
@@ -64,7 +64,7 @@ run_program() {
 }
 
 fail() {
-  echo "test-ci-last-success.sh: FAILED: $1" >&2
+  echo "api-usage-test.sh: FAILED: $1" >&2
   echo "---------------- standard output" >&2
   cat "$tmpdir/out.txt" >&2
   echo "---------------- standard error" >&2
@@ -184,6 +184,6 @@ if grep -q "Traceback" "$tmpdir/err.txt"; then
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "test-ci-last-success.sh: passed."
+  echo "api-usage-test.sh: passed."
 fi
 exit "$status"
