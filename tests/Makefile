@@ -24,6 +24,7 @@ TEST_DIRS = \
 	squeeze-blank-lines-test \
 	tmp-directory-test \
 	uniq-contents-test \
+	unknown-branch-test \
 	workflow-hardening-test \
 
 all: test

@@ -224,6 +224,7 @@ _sgr_set_git_range_body() {
   local base_branch_fetched=""
   local base_tip=""
   local default_commit_range_start
+  local head_in_default_branch
   local keep_end
   local pr_head_sha
 
@@ -510,7 +511,11 @@ _sgr_set_git_range_body() {
     else
       keep_end=""
     fi
-    if [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
+    # Treat the branch as the default branch only if it is known to be:  an
+    # empty $CI_BRANCH compares equal to an empty $CI_DEFAULT_BRANCH_NAME, and
+    # a job where neither could be determined would then take this arm and get
+    # a range covering only the last commit, with nothing said about the guess.
+    if [ -n "$CI_BRANCH" ] && [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
       if git show --summary HEAD | grep -q ^Merge:; then
         CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
       else
@@ -520,13 +525,40 @@ _sgr_set_git_range_body() {
         CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
       fi
     else
+      if [ -z "$CI_BRANCH" ]; then
+        # The branch is unknown, as in a CircleCI build of a tag, which sets no
+        # $CIRCLE_BRANCH.  Say so:  the range below is a guess.  It is the range
+        # for a branch other than the default one -- which is the safer guess,
+        # because it is the wider of the two ranges -- except when the commit
+        # being built is already contained in the default branch, in which case
+        # that range would be empty and the code below uses the default
+        # branch's range instead.
+        echo "${SCRIPT_NAME}: WARNING: cannot determine the branch; computing the commit range as for a branch other than ${CI_DEFAULT_BRANCH_NAME:-the default branch}." >&2
+      fi
+      # When the branch is unknown and HEAD is an ancestor of the default
+      # branch -- as in a build of a tag that was cut from the default branch,
+      # after the default branch moved on -- "origin/$CI_DEFAULT_BRANCH_NAME"
+      # contains HEAD, so "origin/$CI_DEFAULT_BRANCH_NAME...HEAD" is the empty
+      # range and a client would report no changes at all.  Compute the range
+      # as for the default branch instead.  (This command also fails, harmlessly,
+      # if "origin/$CI_DEFAULT_BRANCH_NAME" does not exist in this clone.)
+      if [ -z "$CI_BRANCH" ] \
+        && git merge-base --is-ancestor HEAD "origin/$CI_DEFAULT_BRANCH_NAME" 2> /dev/null; then
+        head_in_default_branch="true"
+        if [ -n "$debug" ]; then
+          echo "HEAD is contained in origin/$CI_DEFAULT_BRANCH_NAME" >&2
+        fi
+      else
+        head_in_default_branch=""
+      fi
       # "origin/$CI_DEFAULT_BRANCH_NAME" is accurate when the pull request was
       # created, but it doesn't change when force-push occurs (as Renovate does),
       # making it out of date.
       case $CI_BRANCH in
         renovate/*) CI_COMMIT_RANGE_START=$(_sgr_head1) ;;
         *)
-          if git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
+          if [ -z "$head_in_default_branch" ] \
+            && git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
             CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
             if [ -n "$debug" ]; then
               echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$CI_DEFAULT_BRANCH_NAME" >&2
@@ -541,7 +573,14 @@ _sgr_set_git_range_body() {
           ;;
       esac
       if [ -z "$keep_end" ]; then
-        CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH")
+        if [ -n "$CI_BRANCH" ]; then
+          CI_COMMIT_RANGE_END=$(git rev-parse "$CI_BRANCH")
+        else
+          # `git rev-parse ""` fails, which would leave the end empty and make
+          # this script report that it cannot determine the commit range.  HEAD
+          # is the commit that the job is testing, whatever branch it is on.
+          CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
+        fi
       fi
     fi
     CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
