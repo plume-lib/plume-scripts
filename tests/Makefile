@@ -13,6 +13,7 @@ TEST_DIRS = \
 	latex-process-inputs-test \
 	lint-diff-test \
 	missing-file-test \
+	path-remove-test \
 	preplace-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
