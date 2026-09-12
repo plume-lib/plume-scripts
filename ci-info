@@ -142,7 +142,10 @@ redact_tokens() {
         next
       }
     }
-    { gsub(/:\/\/[^\/]*@/, "://REDACTED@"); print }
+    # Excluding whitespace and quotes from the userinfo keeps a match from
+    # spanning a URL and a later "@" in unrelated text, which would delete
+    # everything between them.
+    { gsub(/:\/\/[^\/[:space:]"'\'']*@/, "://REDACTED@"); print }
   '
 }
 
@@ -326,6 +329,8 @@ org_from_url() {
   # Discard any userinfo ("git@", "USER:TOKEN@") and any port.
   ofu_host=${ofu_host##*@}
   ofu_host=${ofu_host%%:*}
+  # Hostnames are case-insensitive, and git accepts them in any case.
+  ofu_host=$(printf '%s' "${ofu_host}" | tr '[:upper:]' '[:lower:]')
   case $ofu_host in
     github.com | www.github.com) : ;;
     *) return 0 ;;
@@ -463,7 +468,10 @@ DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f
 if [ "$DEBUG" = "--debug" ]; then
   emit_echo "remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME"
   if [ -n "${URL}" ]; then
-    echo "HEAD of $(redact_url "${URL}") = $(git ls-remote --symref "${URL}" HEAD)" 2>&1 | emit_echo_lines
+    # The redirection is inside the substitution, so that git's diagnostics
+    # are captured rather than written to this script's stderr.  An old git
+    # names the URL, credential and all, in them, hence `redact_tokens`.
+    echo "HEAD of $(redact_url "${URL}") = $(git ls-remote --symref "${URL}" HEAD 2>&1)" | redact_tokens | emit_echo_lines
   else
     emit_echo "URL is empty (is set only for non-CI runs)"
   fi
