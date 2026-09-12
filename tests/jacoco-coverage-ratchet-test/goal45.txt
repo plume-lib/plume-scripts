@@ -1,0 +1,1 @@
+Class plume-util:org.plumelib.util.Vanishes is in the old coverage report but not in the new one
