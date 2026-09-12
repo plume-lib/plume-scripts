@@ -16,6 +16,7 @@ TEST_DIRS = \
 	missing-file-test \
 	path-remove-test \
 	preplace-test \
+	set-git-range-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test \
