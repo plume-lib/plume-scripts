@@ -17,8 +17,6 @@ To install, run the following (or put it at the top of a script).
 Then, the scripts are available in the directory named by `$PLUME_SCRIPTS`.
 
 ```sh
-# Per-user, so that no other user can choose the code that you run.
-# `id -un` because USER is not set under cron or under some CI runners.
 PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
 if [ -d "$PLUME_SCRIPTS" ] ; then
   git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1

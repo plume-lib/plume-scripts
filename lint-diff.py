@@ -30,8 +30,6 @@
 # CircleCI, GitHub Actions, and Travis CI are currently supported) to require
 # that pull requests satisfy the command `command-that-issues-warnings`:
 #
-#  # Per-user, so that no other user can choose the code that you run.
-#  # `id -un` because USER is not set under cron or under some CI runners.
 #  PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
 #  if [ -d "$PLUME_SCRIPTS" ] ; then
 #   git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1

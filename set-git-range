@@ -12,8 +12,6 @@
 
 # Typical use:
 #
-#   # Per-user, so that no other user can choose the code that you run.
-#   # `id -un` because USER is not set under cron or under some CI runners.
 #   PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
 #   if [ -d "$PLUME_SCRIPTS" ] ; then
 #     git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
@@ -53,12 +51,8 @@
 
 # The client configures this script by setting variables rather than by passing
 # command-line arguments.
-# PLUME_SCRIPTS: the directory that contains these scripts; the default is
-#   /tmp/USERNAME/plume-scripts, where USERNAME is $USER or, if that is unset,
-#   the output of `id -un`.  A sourced file cannot portably determine its own
-#   location -- under dash, "$0" is the client's name -- so the client must say
-#   where to find `set-ci-org-and-branch`, which this script sources.
-# CI_DEFAULT_ORGANIZATION: if the script cannot determine the organization, use this one.  Optional
+# PLUME_SCRIPTS: the directory that contains these scripts.  Optional.
+# CI_DEFAULT_ORGANIZATION: if the script cannot determine the organization, use this one.  Optional.
 # CI_VERBOSE: if non-empty, report progress.  Optional.
 # CI_DEBUG: if non-empty, report voluminous debugging information.  Optional.
 # If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
