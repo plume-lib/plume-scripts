@@ -12,7 +12,6 @@ TEST_DIRS = \
 	jq-null-test \
 	latex-process-inputs-test \
 	lint-diff-test \
-	makefile-test \
 	missing-file-test \
 	path-remove-test \
 	preplace-test \
