@@ -6,21 +6,12 @@
 # Only the first 8 bytes of a .class file matter to the script -- the magic
 # number 0xcafebabe, the minor version, and the major version -- so the test
 # inputs are 8-byte files rather than real compiled classes.
-#
-# `classfile_check_version` is a csh script, so this test does nothing if csh
-# is not installed.
 
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 CCV="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/classfile_check_version"
 
-# The script's shebang is "#! /bin/csh -f", so csh must be at that exact path
-# and not merely somewhere on PATH.
-if [ ! -x /bin/csh ]; then
-  echo "SKIP: classfile_check_version tests: /bin/csh does not exist"
-  exit 0
-fi
 for prerequisite in xxd bc; do
   if ! command -v "$prerequisite" > /dev/null 2>&1; then
     echo "SKIP: classfile_check_version tests: $prerequisite is not installed"
@@ -67,8 +58,7 @@ check_output() {
   esac
 }
 
-# `exit -1` in csh yields exit status 255.
-FAILURE_STATUS=255
+FAILURE_STATUS=1
 
 # An 8-byte .class file header:  the magic number 0xcafebabe, then the minor
 # version 0, then the major version.  Major version 52 (octal 064) is Java 8
@@ -90,6 +80,15 @@ check_output "the too-new version is reported" "has version 52"
 printf 'not a class file at all\n' > "$work/notaclass.txt"
 check "not a class file" "$FAILURE_STATUS" 52 "$work/notaclass.txt"
 check_output "a non-class file is reported" "is not a Java class file"
+
+# A file shorter than a .class file header is rejected rather than misparsed.
+printf '\312\376\272\276' > "$work/truncated.class"
+check "a file shorter than 8 bytes" "$FAILURE_STATUS" 52 "$work/truncated.class"
+check_output "a short file is reported" "is not a Java class file"
+
+# A file name containing a space is one name, not two.
+cp "$work/Java8.class" "$work/spaced name.class"
+check "a file name containing a space" 0 52 "$work/spaced name.class"
 
 # A nonexistent file is rejected.
 check "nonexistent file" "$FAILURE_STATUS" 52 "$work/nosuchfile.class"

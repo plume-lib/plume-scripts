@@ -17,20 +17,19 @@ jobs:
           persist-credentials: false
       # The tests skip themselves when a prerequisite is absent, so install
       # every prerequisite that the runner image does not already provide:
-      # csh (for `classfile_check_version`, which is a csh script), and `xxd`
-      # and `bc` (which its test uses).  `apt-get update` is required because
-      # the runner image's package index goes stale as the archive moves on.
+      # `xxd` and `bc`, which `classfile_check_version` uses.  `apt-get update`
+      # is required because the runner image's package index goes stale as the
+      # archive moves on.
       - name: Install test prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes tcsh xxd bc
+          sudo apt-get install --no-install-recommends --yes xxd bc
       # Check the prerequisites rather than let the runner image silently
       # decide which tests run.
       - name: Check test prerequisites
         run: |
           jq --version
           curl --version || wget --version
-          test -x /bin/csh
           command -v xxd
           command -v bc
       - run: make -C tests test

@@ -5,11 +5,6 @@
 #    out comments, and
 #  * list mode (--list, --antlist, --makefilelist), which reports the
 #    transitively \input files.
-#
-# Not tested here, because it is currently broken:  comment-stripping is
-# applied to verbatim-included content, so a \verbatiminput'ed file
-# containing a "%" is truncated at the "%".  The verbatim tests below use
-# content with no "%" in it.
 
 set -eu
 
@@ -33,18 +28,30 @@ check_equal() {
   fi
 }
 
-# check_fails DESCRIPTION COMMAND...: checks that COMMAND exits nonzero.
+# check_fails DESCRIPTION PATTERN COMMAND...: checks that COMMAND exits
+# nonzero and that its output contains PATTERN.  Checking the message, not
+# merely the status, ensures that the command failed for the intended reason.
 check_fails() {
   description="$1"
-  shift
+  pattern="$2"
+  shift 2
   actual_status=0
-  "$@" > /dev/null 2>&1 || actual_status=$?
+  output="$("$@" 2>&1)" || actual_status=$?
   if [ "$actual_status" = 0 ]; then
     echo "FAIL: $description: expected a nonzero exit status"
     status=1
-  else
-    echo "PASS: $description"
+    return
   fi
+  case "$output" in
+    *"$pattern"*)
+      echo "PASS: $description"
+      ;;
+    *)
+      echo "FAIL: $description: output does not contain '$pattern':"
+      echo "$output"
+      status=1
+      ;;
+  esac
 }
 
 cd "$work"
@@ -143,18 +150,30 @@ cat > verbatim.tex <<'EOF'
 \lstinputlisting{code.txt}
 \end{document}
 EOF
-printf 'int x = 1;\nreturn x;\n' > code.txt
+# Verbatim-included text is passed through unchanged:  neither its "%"
+# characters nor its \input commands are processed.  `notinputted.tex` exists,
+# so if the \input below were processed its contents would be spliced in.
+cat > code.txt <<'EOF'
+int x = 1;  % not a comment
+\input{notinputted}
+return x;
+EOF
+cat > notinputted.tex <<'EOF'
+This text must not appear in the output.
+EOF
 
 cat > verbatim.goal <<'EOF'
 \documentclass{article}
 \begin{document}
 \begin{verbatim}
-int x = 1;
+int x = 1;  % not a comment
+\input{notinputted}
 return x;
 \end{verbatim}
 
 \begin{lstlisting}
-int x = 1;
+int x = 1;  % not a comment
+\input{notinputted}
 return x;
 \end{lstlisting}
 
@@ -211,11 +230,21 @@ check_equal "--list does not require a .bbl file" "nobbl.tex" "$("$LPI" --list n
 
 ## Error cases.
 
-check_fails "a missing .bbl file is an error" "$LPI" nobbl.tex
+check_fails "a missing .bbl file is an error" \
+  'Run bibtex (didn'\''t find bbl file "nobbl.bbl")' "$LPI" nobbl.tex
 printf '\\input{nosuchfile}\n' > missinginput.tex
-check_fails "a missing input file is an error" "$LPI" missinginput.tex
-check_fails "a missing top-level file is an error" "$LPI" nosuchfile.tex
-check_fails "more than one file is an error" "$LPI" main.tex sec1.tex
+check_fails "a missing input file is an error" \
+  "File does not exist: nosuchfile.tex or nosuchfile" "$LPI" missinginput.tex
+check_fails "a missing top-level file is an error" \
+  "Can't open nosuchfile.tex: No such file or directory" "$LPI" nosuchfile.tex
+check_fails "more than one file is an error" \
+  "Supply exactly one file on the command line (got 2: main.tex sec1.tex)" \
+  "$LPI" main.tex sec1.tex
+
+# With no arguments the script dies while opening the empty filename.  The
+# message is unhelpful, but pinning it here means a change to it is noticed.
+check_fails "no arguments is an error" \
+  "Can't open : No such file or directory" "$LPI"
 
 ## --help
 
