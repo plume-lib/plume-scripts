@@ -177,7 +177,10 @@ Documentation [at top of file](classfile_check_version).
 
 ### jacoco-coverage-ratchet
 
-Check that the Jacoco coverage has not decreased for any class.
+Check that the Jacoco coverage has not decreased for any class, and that no
+class has disappeared from the report (say, because a class was deleted or
+renamed, or because a module was not analyzed).  Pass
+`--ignore-removed-classes` to permit classes to disappear.
 Documentation [at top of file](jacoco-coverage-ratchet).
 
 ## LaTeX
