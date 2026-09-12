@@ -309,9 +309,7 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
   GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
   url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
   pull_json="$(get_url "${url}" 2>&1 | tr -d '[:cntrl:]')"
-  # "// empty" maps JSON null to the empty string, so that a response that does
-  # not describe a pull request (as when the request was throttled) falls
-  # through to the fallbacks below instead of yielding "null".
+  # "// empty" maps JSON null to the empty string, to avoid yielding "null".
   CI_ORGANIZATION=$(printf '%s' "${pull_json}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
   if [ -z "$CI_ORGANIZATION" ]; then
     # Warn and fall back, rather than failing:  a throttled request should not
