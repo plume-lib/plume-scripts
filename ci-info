@@ -144,8 +144,9 @@ redact_tokens() {
     }
     # Excluding whitespace and quotes from the userinfo keeps a match from
     # spanning a URL and a later "@" in unrelated text, which would delete
-    # everything between them.
-    { gsub(/:\/\/[^\/[:space:]"'\'']*@/, "://REDACTED@"); print }
+    # everything between them.  The userinfo also ends at the first "/", "?",
+    # or "#", so an "@" in a path, query, or fragment is not a credential.
+    { gsub(/:\/\/[^\/?#[:space:]"'\'']*@/, "://REDACTED@"); print }
   '
 }
 
@@ -357,9 +358,13 @@ redact_url() {
       ru_rest="${ru_rest#*://}"
       ;;
   esac
-  # The userinfo, if any, precedes the first "/" of the path.  Testing only
-  # that prefix avoids mangling a URL whose path contains an "@".
-  case ${ru_rest%%/*} in
+  # The userinfo, if any, precedes the first "/", "?", or "#":  the start of
+  # the path, query, or fragment.  Testing only that prefix avoids mangling a
+  # URL whose path, query, or fragment contains an "@".
+  ru_authority="${ru_rest%%/*}"
+  ru_authority="${ru_authority%%\?*}"
+  ru_authority="${ru_authority%%#*}"
+  case $ru_authority in
     # "git@github.com:org/repo" is a convention, not a credential.
     git@*) ;;
     *@*) ru_rest="REDACTED@${ru_rest#*@}" ;;

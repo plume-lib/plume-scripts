@@ -41,6 +41,8 @@ SQUOTED='https://a-user:a-url-credential@github.com/org/repo'
 SCP=git@github.com:org/repo.git
 PLAIN=https://github.com/org/repo
 MSG=see http://example.com and mail me@example.org
+QUERY=https://example.com?contact=me@example.org
+FRAGMENT=https://example.com#mail-me@example.org
 NOT_A_VARIABLE some text with an @ sign
 EOF
 
@@ -49,7 +51,9 @@ EOF
 # information that the dump exists to provide.  In particular, "MSG" keeps its
 # text -- a userinfo cannot contain whitespace, so the match must not run from
 # the URL to the "@" of the mail address and delete everything between them --
-# and "SCP" keeps its "git@", which is a convention rather than a credential.
+# "QUERY" and "FRAGMENT" keep theirs, because a userinfo ends at the first "/",
+# "?", or "#", even in a URL that has no path -- and "SCP" keeps its "git@",
+# which is a convention rather than a credential.
 cat > "$work/expected.txt" << 'EOF'
 GITHUB_PAT=<P>
 ACTIONS_RUNTIME_TOKEN=<P>
@@ -59,6 +63,8 @@ SQUOTED='https://<P>@github.com/org/repo'
 SCP=git@github.com:org/repo.git
 PLAIN=https://github.com/org/repo
 MSG=see http://example.com and mail me@example.org
+QUERY=https://example.com?contact=me@example.org
+FRAGMENT=https://example.com#mail-me@example.org
 NOT_A_VARIABLE some text with an @ sign
 EOF
 

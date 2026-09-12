@@ -102,7 +102,7 @@ check_organization() {
   fi
   # This differs from the default organization that `run_ci_info` passes, so
   # the check fails if `ci-info` ignores the URL and falls back to the default.
-  if ! grep -q '^CI_ORGANIZATION=.a-url-organization.;' "$tmpdir/out.txt"; then
+  if ! grep -q "^CI_ORGANIZATION='a-url-organization';" "$tmpdir/out.txt"; then
     echo "test-ci-info.sh: FAILED: ${description} did not set CI_ORGANIZATION to the URL's organization:" >&2
     grep -n '^CI_ORGANIZATION=' "$tmpdir/out.txt" >&2
     status=1

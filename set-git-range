@@ -169,8 +169,9 @@ _sgr_redact_tokens() {
     }
     # Excluding whitespace and quotes from the userinfo keeps a match from
     # spanning a URL and a later "@" in unrelated text, which would delete
-    # everything between them.
-    { gsub(/:\/\/[^\/[:space:]"'\'']*@/, "://<redacted>@"); print }
+    # everything between them.  The userinfo also ends at the first "/", "?",
+    # or "#", so an "@" in a path, query, or fragment is not a credential.
+    { gsub(/:\/\/[^\/?#[:space:]"'\'']*@/, "://<redacted>@"); print }
   '
 }
 
