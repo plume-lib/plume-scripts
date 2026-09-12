@@ -1,14 +1,14 @@
 #!/bin/sh
 
 # Tests for `ci-last-success.py`.
-# These tests use a stub `requests` module (see `stub/requests.py`) that answers
-# from a JSON file, so they need neither network access nor a GitHub API quota.
+# These tests use a fake `requests` module (see `fake-modules/requests.py`) that
+# answers from a JSON file, so they need neither network access nor a GitHub API quota.
 
 set -e
 
 SCRIPTDIR="$(cd "$(dirname "$0")" > /dev/null 2>&1 && pwd -P)"
 PROGRAM="${SCRIPTDIR}/../../ci-last-success.py"
-PYTHONPATH="${SCRIPTDIR}/stub${PYTHONPATH:+:${PYTHONPATH}}"
+PYTHONPATH="${SCRIPTDIR}/fake-modules${PYTHONPATH:+:${PYTHONPATH}}"
 export PYTHONPATH
 
 ORG=plume-lib
@@ -34,8 +34,8 @@ STDERR="${tmpdir}/stderr"
 
 # Arguments: responses file, SHA.  The SHA must be reported as successful.
 expect_success() {
-  STUB_RESPONSES="$1"
-  export STUB_RESPONSES
+  FAKE_REQUESTS_RESPONSES="$1"
+  export FAKE_REQUESTS_RESPONSES
   if ! out="$("${PROGRAM}" "${ORG}" "${REPO}" "$2")"; then
     echo "FAILED $(basename "$1"): exited with a nonzero status, expected \"$2\"" >&2
     status=1
@@ -51,8 +51,8 @@ expect_success() {
 # Checks the exit status and the diagnostic, so that the test does not pass
 # vacuously when the script crashes (which also yields a nonzero exit status).
 expect_failure() {
-  STUB_RESPONSES="$1"
-  export STUB_RESPONSES
+  FAKE_REQUESTS_RESPONSES="$1"
+  export FAKE_REQUESTS_RESPONSES
   out="$("${PROGRAM}" "${ORG}" "${REPO}" "$2" 2> "${STDERR}")" && exit_status=0 || exit_status=$?
   if [ "${exit_status}" -ne 1 ]; then
     echo "FAILED $(basename "$1"): exited with status ${exit_status}, expected 1" >&2
