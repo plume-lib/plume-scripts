@@ -3,7 +3,7 @@
 all: test
 
 test: test-words test-reldir test-guessstrip test-javaexception test-incomparable \
-  test-mixedpaths
+  test-mixedpaths test-gradleindent
 
 
 # "words" test
@@ -91,8 +91,19 @@ mixedpaths-lint-pruned.txt: mixedpaths.diff mixedpaths-lint.txt ../../lint-diff.
 	../../lint-diff.py --guess-strip --context=0 mixedpaths.diff mixedpaths-lint.txt > $@ 2>/dev/null || true
 
 
+# "gradleindent" test
+
+# After Gradle outputs all warnings, it prints "> Compilation failed; see the
+# compiler output below." and then prints one warning, indented by two spaces.
+test-gradleindent: gradleindent-lint-pruned.txt-goal gradleindent-lint-pruned.txt
+	diff $^
+
+gradleindent-lint-pruned.txt: gradleindent.diff gradleindent-lint.txt ../../lint-diff.py
+	../../lint-diff.py --context=0 gradleindent.diff gradleindent-lint.txt > $@ || true
+
+
 # Miscellaneous targets
 
 # The `clean` target would be simpler if all generated files were put in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt mixedpaths-lint-pruned.txt
+	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt mixedpaths-lint-pruned.txt gradleindent-lint-pruned.txt

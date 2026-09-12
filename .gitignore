@@ -10,6 +10,7 @@ tests/jacoco-coverage-ratchet-test/out45ignore.txt
 tests/jacoco-coverage-ratchet-test/out54.txt
 tests/latex-process-inputs-test/inline.actual
 tests/latex-process-inputs-test/list.actual
+tests/lint-diff-test/gradleindent-lint-pruned.txt
 tests/lint-diff-test/guessstrip-lint-pruned.txt
 tests/lint-diff-test/incomparable-lint-pruned.txt
 tests/lint-diff-test/javaexception-lint-pruned.txt

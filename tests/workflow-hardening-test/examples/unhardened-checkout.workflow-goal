@@ -1,0 +1,2 @@
+FAIL: unhardened-checkout.workflow:22: checks out without persist-credentials: false
+FAIL: unhardened-checkout.workflow:22: checks out without fetch-depth
