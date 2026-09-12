@@ -16,12 +16,15 @@ Requires the Python requests module to be installed, which you can do via:
   pip install requests
 """
 
-# This script makes at least two GitHub API requests per commit that it
-# examines:  one for the commit statuses and one or more for the check runs.
+# This script makes at least one GitHub API request per commit that it
+# examines:  one or more for the check runs and, unless those show that CI
+# failed, one for the commit statuses.
 # GitHub permits only 60 unauthenticated requests per hour, so:
 #  * If environment variable GITHUB_PAT or GH_TOKEN is set when this script is
 #    called, it is used as a GitHub Personal Access Token when making GitHub
-#    API calls.  This can avoid "403 rate limit exceeded" failures.
+#    API calls.  This can avoid "403 rate limit exceeded" failures.  The token
+#    needs no permission beyond reading the repository:  if it may not read the
+#    repository's check runs, this script uses only the commit statuses.
 #  * At most --max-commits commits are examined, so that a repository whose
 #    last successful job is far in the past cannot consume the whole quota.
 #  * A request that fails transiently (including because of throttling or a
@@ -232,11 +235,14 @@ def request_error_message(url: str, response: requests.Response) -> str:
     return result
 
 
-def get_url(url: str) -> requests.Response:
+def get_url(url: str, permitted_failures: tuple[int, ...] = ()) -> requests.Response:
     """Issue a GET request for `url`, retrying transient failures.
 
+    `permitted_failures` are HTTP status codes that the caller can proceed
+    without, so a response with one of them is returned rather than raised on.
+
     Returns:
-        the response, whose status code is 200.
+        the response, whose status code is 200 or is in `permitted_failures`.
 
     Raises:
         RuntimeError: if the request did not succeed.
@@ -256,6 +262,14 @@ def get_url(url: str) -> requests.Response:
         else:
             if response.status_code == 200:
                 return response
+            if (
+                response.status_code in permitted_failures
+                and not rate_limited(response)
+                and not secondary_rate_limited(response)
+            ):
+                # A rate limit is never a permitted failure:  proceeding without
+                # the response would silently mis-report every commit examined.
+                return response
             delay_or_none = retry_delay(response, delay)
             if delay_or_none is None or retries_left == 0 or delay_or_none > MAX_RETRY_SECONDS:
                 # This means something went wrong, possibly rate-limiting.
@@ -271,13 +285,40 @@ def get_url(url: str) -> requests.Response:
         delay *= 2
 
 
-# Check run conclusions that are not failures.  A check run that was skipped
-# or that is advisory ("neutral") does not make the commit unsuccessful.
+# Check run conclusions that are not failures.  A check run that was skipped,
+# that is advisory ("neutral"), or that GitHub superseded ("stale") does not
+# make the commit unsuccessful.
 # However, only a "success" conclusion is evidence that a CI job actually ran.
-SUCCESS_CONCLUSIONS = frozenset(("success", "neutral", "skipped"))
+SUCCESS_CONCLUSIONS = frozenset(("success", "neutral", "skipped", "stale"))
+
+# The HTTP status codes with which GitHub may decline to say what a commit's
+# check runs are:  the credential may read the repository but not its check runs
+# (403), or the endpoint is unavailable for the repository (404).  Neither is
+# evidence that CI failed, and this script worked without the check runs before
+# it consulted them, so the commit statuses decide such a commit.  A 403 that is
+# a rate limit is not tolerated; see `get_url`.
+CHECK_RUNS_UNAVAILABLE_STATUS_CODES = (403, 404)
 
 # The largest page size that the GitHub API permits.
 CHECK_RUNS_PER_PAGE = 100
+
+
+def github_api_get_or_none(url: str, permitted_failures: tuple[int, ...]) -> dict | None:
+    """Return the JSON body of a GET request to the GitHub API, or None if it was refused.
+
+    Returns:
+        the JSON body of a GET request to the GitHub API, or None if GitHub
+        refused the request with one of `permitted_failures`.
+    """
+    if DEBUG:
+        print(url, file=sys.stderr)
+    response = get_url(url, permitted_failures)
+    if response.status_code != 200:
+        if DEBUG:
+            print(f"  refused with status {response.status_code}", file=sys.stderr)
+        return None
+    result: dict = response.json()
+    return result
 
 
 def github_api_get(url: str) -> dict:
@@ -292,6 +333,50 @@ def github_api_get(url: str) -> dict:
     return result
 
 
+def check_runs_successful(api_prefix: str) -> bool | None:
+    """Return what the check runs of the commit at `api_prefix` say about its CI.
+
+    Unlike the commit statuses, the check runs are combined by this code rather than by
+    GitHub, so every page of them must be read.  Reading only the first page would report
+    a commit as successful when a check run beyond that page failed, which happens for a
+    build matrix with more jobs than fit on a page.
+
+    Returns:
+        False if a check run failed or has not completed, True if a check run
+        succeeded, or None if the check runs are evidence neither way:  the
+        commit has none, none of them ran (each was skipped, advisory, or
+        superseded), or GitHub would not say what they are.
+    """
+    result: bool | None = None
+    page = 1
+    check_runs_seen = 0
+    while True:
+        response = github_api_get_or_none(
+            f"{api_prefix}/check-runs?per_page={CHECK_RUNS_PER_PAGE}&page={page}",
+            CHECK_RUNS_UNAVAILABLE_STATUS_CODES,
+        )
+        if response is None:
+            # GitHub would not say what the check runs are, so let the commit
+            # statuses decide the commit, as this script did before it consulted
+            # check runs at all.
+            return None
+        check_runs = response["check_runs"]
+        for check_run in check_runs:
+            if check_run["status"] != "completed":
+                return False
+            conclusion = check_run["conclusion"]
+            if conclusion not in SUCCESS_CONCLUSIONS:
+                return False
+            if conclusion == "success":
+                result = True
+        check_runs_seen += len(check_runs)
+        # The second disjunct guards against a nonterminating loop if `total_count`
+        # exceeds the number of check runs that the API actually yields.
+        if check_runs_seen >= response["total_count"] or not check_runs:
+            return result
+        page += 1
+
+
 def successful(org: str, repo: str, sha: str) -> bool:
     """Return true if at least one CI job ran for `sha` and no CI job failed.
 
@@ -304,7 +389,17 @@ def successful(org: str, repo: str, sha: str) -> bool:
         true if at least one CI job ran for `sha` and no CI job failed.
     """
     api_prefix = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}"
-    saw_a_job = False
+
+    # Consult the check runs before the commit statuses, because the check runs alone
+    # can answer "no" and every commit that this script steps over is a "no".  The
+    # repositories that motivate consulting check runs (those whose CI is GitHub Actions
+    # or Azure Pipelines) have no commit statuses at all, so requesting the commit
+    # statuses first would double the number of requests -- and the number of requests
+    # is what limits how far back this script can search.
+    check_runs = check_runs_successful(api_prefix)
+    if check_runs is False:
+        return False
+    saw_a_job = check_runs is True
 
     # GitHub computes the combined `state` over every commit status, so a single
     # request suffices no matter how many commit statuses there are.
@@ -314,31 +409,7 @@ def successful(org: str, repo: str, sha: str) -> bool:
             return False
         saw_a_job = True
 
-    # Unlike the commit statuses, the check runs are combined by this code rather than
-    # by GitHub, so every page of them must be read.  Reading only the first page would
-    # report a commit as successful when a check run beyond that page failed, which
-    # happens for a build matrix with more jobs than fit on a page.
-    page = 1
-    check_runs_seen = 0
-    while True:
-        response = github_api_get(
-            f"{api_prefix}/check-runs?per_page={CHECK_RUNS_PER_PAGE}&page={page}"
-        )
-        check_runs = response["check_runs"]
-        for check_run in check_runs:
-            if check_run["status"] != "completed":
-                return False
-            conclusion = check_run["conclusion"]
-            if conclusion not in SUCCESS_CONCLUSIONS:
-                return False
-            if conclusion == "success":
-                saw_a_job = True
-        check_runs_seen += len(check_runs)
-        # The second disjunct guards against a nonterminating loop if `total_count`
-        # exceeds the number of check runs that the API actually yields.
-        if check_runs_seen >= response["total_count"] or not check_runs:
-            return saw_a_job
-        page += 1
+    return saw_a_job
 
 
 def parent(sha: str) -> str | None:

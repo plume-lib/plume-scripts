@@ -11,6 +11,11 @@ PROGRAM="${SCRIPTDIR}/../../ci-last-success.py"
 PYTHONPATH="${SCRIPTDIR}/fake-modules${PYTHONPATH:+:${PYTHONPATH}}"
 export PYTHONPATH
 
+if [ -z "$(command -v python3 2> /dev/null)" ]; then
+  echo "ci-last-success-test.sh: skipping, because python3 is not installed." >&2
+  exit 0
+fi
+
 ORG=plume-lib
 REPO=plume-scripts
 
@@ -22,6 +27,7 @@ CHECKRUNS_INCOMPLETE_SHA=3333333333333333333333333333333333333333
 STATUS_SUCCESS_SHA=4444444444444444444444444444444444444444
 NO_CI_SHA=5555555555555555555555555555555555555555
 CHECKRUNS_SKIPPED_SHA=6666666666666666666666666666666666666666
+CHECKRUNS_STALE_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 STATUS_FAILURE_SHA=7777777777777777777777777777777777777777
 STATUS_FAILURE_CHECKRUNS_SUCCESS_SHA=8888888888888888888888888888888888888888
 CHECKRUNS_PAGINATED_FAILURE_SHA=9999999999999999999999999999999999999999
@@ -29,7 +35,7 @@ CHECKRUNS_PAGINATED_FAILURE_SHA=9999999999999999999999999999999999999999
 status=0
 
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "${tmpdir}"' 0
+trap 'rm -rf "${tmpdir}"' EXIT HUP INT TERM
 STDERR="${tmpdir}/stderr"
 
 # Arguments: responses file, SHA.  The SHA must be reported as successful.
@@ -102,6 +108,10 @@ expect_success "${SCRIPTDIR}/checkruns-success.json" "${CHECKRUNS_SUCCESS_SHA}"
 
 # A CI system that reports a commit status rather than check runs, such as Travis CI.
 expect_success "${SCRIPTDIR}/status-success.json" "${STATUS_SUCCESS_SHA}"
+
+# GitHub gives the conclusion "stale" to a check run that it superseded, which
+# is not evidence that anything failed.
+expect_success "${SCRIPTDIR}/checkruns-stale.json" "${CHECKRUNS_STALE_SHA}"
 
 expect_failure "${SCRIPTDIR}/checkruns-failure.json" "${CHECKRUNS_FAILURE_SHA}"
 expect_failure "${SCRIPTDIR}/checkruns-incomplete.json" "${CHECKRUNS_INCOMPLETE_SHA}"

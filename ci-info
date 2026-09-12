@@ -422,10 +422,10 @@ elif [ -n "$BUILD_SOURCEBRANCH" ]; then
     # succeeding jobs and then ci-last-success.py will return just
     # part of the pull request's diffs.
 
-    ## # ci-last-success.py is disabled here because it makes at least two
-    ## # unauthenticated GitHub API requests per commit -- more when a commit's
-    ## # check runs span several pages -- so walking back far exhausts the
-    ## # 60-requests-per-hour limit.
+    ## # ci-last-success.py is disabled here because it makes at least one
+    ## # unauthenticated GitHub API request per commit -- two when the commit's
+    ## # check runs do not show that CI failed, and more when they span several
+    ## # pages -- so walking back far exhausts the 60-requests-per-hour limit.
     # # TODO: wrap all this in a ci-last-commit.sh shell script.
     # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
     #   # echo "echo \"Python requests package is already installed\";"

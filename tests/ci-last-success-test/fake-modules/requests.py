@@ -5,10 +5,11 @@ that file, one line per request, in the format
 
   GET URL auth=AUTHORIZATION-HEADER-OR-"NONE"
 
-Environment variable FAKE_REQUESTS_RESPONSES is a whitespace-separated list of
-responses, one per request; the last one is reused for any further requests.
-Each element is either the name of a built-in response or the name of a JSON
-file.
+Environment variable FAKE_REQUESTS_RESPONSES is either the name of a JSON file,
+which answers every request, or a whitespace-separated list of built-in
+response names, one per request, the last of which is reused for any further
+requests.  A file name is used whole rather than split, so it may contain
+whitespace.
 
 The built-in responses are:
 
@@ -20,12 +21,15 @@ The built-in responses are:
   ratelimit-authenticated
              like `ratelimit`, but the exhausted limit is the authenticated
              one (5000 per hour), showing that GitHub honored the token
+  forbidden  an HTTP 403 response that is a refusal of access rather than a
+             rate limit, as GitHub sends when a credential may read a
+             repository but not its check runs
 
 The body of a built-in response depends on whether the request is for a
-commit's statuses or for its check runs, since `ci-last-success.py` requests
-both.  A `pending` commit status is not the combined state of zero statuses, so
-`ci-last-success.py` rejects such a commit without going on to request its
-check runs; that makes `pending` cost exactly one request per commit examined.
+commit's check runs or for its statuses, since `ci-last-success.py` requests
+both.  A `pending` check run has not completed, so `ci-last-success.py` rejects
+such a commit without going on to request its commit statuses; that makes
+`pending` cost exactly one request per commit examined.
 
 A JSON file contains a map from URL to the JSON body that a GET of that URL
 returns, with status 200.  A URL that is not in the map gets a 404 response.
@@ -45,6 +49,7 @@ BUILT_IN_RESPONSES = (
     "503",
     "ratelimit",
     "ratelimit-authenticated",
+    "forbidden",
 )
 
 # The number of requests made so far, which selects from FAKE_REQUESTS_RESPONSES.
@@ -102,10 +107,25 @@ def built_in_response(name: str, url: str) -> Response:
         return Response(200, {}, {"state": "success", "statuses": [{"state": "success"}]})
     if name == "pending":
         if check_runs:
-            return Response(200, {}, {"total_count": 0, "check_runs": []})
+            return Response(
+                200,
+                {},
+                {
+                    "total_count": 1,
+                    "check_runs": [{"name": "build", "status": "in_progress", "conclusion": None}],
+                },
+            )
         return Response(200, {}, {"state": "pending", "statuses": [{"state": "pending"}]})
     if name == "503":
         return Response(503, {}, "Service Unavailable")
+    if name == "forbidden":
+        # GitHub reports an unexhausted quota, which is what distinguishes this
+        # refusal from a rate limit.
+        return Response(
+            403,
+            {"x-ratelimit-limit": "5000", "x-ratelimit-remaining": "4999"},
+            {"message": "Resource not accessible by personal access token"},
+        )
     reset = str(int(time.time()) + 3600)
     limit = "5000" if name == "ratelimit-authenticated" else "60"
     headers = {
@@ -151,7 +171,10 @@ def get(url: str, headers: dict[str, str] | None = None, timeout: float | None =
     if log is not None:
         with Path(log).open("a", encoding="utf-8") as log_file:
             log_file.write(f"GET {url} auth={headers.get('Authorization', 'NONE')}\n")
-    names = os.environ.get("FAKE_REQUESTS_RESPONSES", "pending").split()
+    responses = os.environ.get("FAKE_REQUESTS_RESPONSES", "pending")
+    # A file name is used whole, so that it may contain whitespace; a list of
+    # built-in response names is split.
+    names = [responses] if Path(responses).is_file() else responses.split()
     name = names[min(requests_made, len(names) - 1)]
     requests_made += 1
     if name in BUILT_IN_RESPONSES:
