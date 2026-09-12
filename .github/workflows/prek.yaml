@@ -1,10 +1,39 @@
 name: Prek checks
+
 "on": [push, pull_request]
+
+permissions:
+  contents: read
+
 jobs:
   prek:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Bump these together; the checksum is for the linux_amd64 tarball of
+      # CIRCLECI_CLI_VERSION, from the release's `..._checksums.txt` asset.
+      CIRCLECI_CLI_VERSION: 1.0.49592
+      CIRCLECI_CLI_SHA256: e7a6b06dab59a31941617f6a2431e774cbd6764f62cc0b39580a47ee298d77ff
     steps:
       - uses: actions/checkout@v7
-      - run: curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/main/install.sh | sudo bash
+        with:
+          fetch-depth: 1
+          show-progress: false
+          persist-credentials: false
+      # The `circleci_validate` hook in `prek.toml` needs the CircleCI CLI.
+      # Install a pinned release and verify its checksum, rather than piping
+      # the upstream installer into a shell:  that installer lives on a
+      # mutable branch, so every run would execute whatever it says today.
+      # Installing under $HOME also means this step needs no root.
+      - name: Install the CircleCI CLI
+        run: |
+          set -eu
+          tarball="circleci-cli_${CIRCLECI_CLI_VERSION}_linux_amd64.tar.gz"
+          curl -fLSs -o "$tarball" "https://github.com/CircleCI-Public/circleci-cli/releases/download/v${CIRCLECI_CLI_VERSION}/${tarball}"
+          echo "${CIRCLECI_CLI_SHA256}  ${tarball}" | sha256sum --check --strict -
+          tar --extract --gzip --file "$tarball" circleci
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 circleci "$HOME/.local/bin/circleci"
+          rm -f "$tarball" circleci
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - uses: j178/prek-action@v3.0.0

@@ -1,0 +1,1 @@
+FAIL: no-jobs.workflow:1: has no `jobs:` block, so the per-job checks examined nothing
