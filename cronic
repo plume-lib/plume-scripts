@@ -91,7 +91,7 @@ fi
 # TODO: Expand this.
 cat "$ERR" \
   | grep -v "^Everything up-to-date$" \
-  | grep -v '^make[\[0-9\]\+]: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
+  | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
     > "$REDUCED_ERR" || true
 
 if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ERR" ]; }; then
