@@ -12,8 +12,11 @@ requests.  The response names are:
   success    an HTTP 200 response whose CI state is "success"
   pending    an HTTP 200 response whose CI state is "pending"
   503        an HTTP 503 response, which is a transient failure
-  ratelimit  an HTTP 403 response that says the rate limit is exhausted
-             and will not reset for an hour
+  ratelimit  an HTTP 403 response that says the unauthenticated rate limit
+             (60 per hour) is exhausted and will not reset for an hour
+  ratelimit-authenticated
+             like `ratelimit`, but the exhausted limit is the authenticated
+             one (5000 per hour), showing that GitHub honored the token
 """
 
 import os
@@ -68,9 +71,14 @@ def get(url: str, headers: dict[str, str] | None = None, timeout: float | None =
         return Response(200, {}, {"state": "pending"})
     if name == "503":
         return Response(503, {}, "Service Unavailable")
-    if name == "ratelimit":
+    if name in ("ratelimit", "ratelimit-authenticated"):
         reset = str(int(time.time()) + 3600)
-        headers = {"x-ratelimit-remaining": "0", "x-ratelimit-reset": reset}
+        limit = "5000" if name == "ratelimit-authenticated" else "60"
+        headers = {
+            "x-ratelimit-limit": limit,
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": reset,
+        }
         return Response(403, headers, "API rate limit exceeded")
     msg = f"Unknown response name {name!r} in FAKE_REQUESTS_RESPONSES"
     raise AssertionError(msg)

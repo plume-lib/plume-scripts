@@ -24,6 +24,9 @@ Requires the Python requests module to be installed, which you can do via:
 #    last successful job is far in the past cannot consume the whole quota.
 #  * A request that fails transiently (including because of throttling or a
 #    network-level error) is retried a few times, with exponential backoff.
+#  * A request that is refused because of the rate limit is reported with
+#    advice:  to set GITHUB_PAT or GH_TOKEN if neither is set, or that the one
+#    that is set is not being respected if GitHub ignored it.
 # The script prints nothing to standard out, only to standard error, if it
 # cannot determine a successful commit.
 
@@ -64,6 +67,14 @@ MAX_RETRY_SECONDS = 60.0
 # secondary rate limit) rather than, say, a nonexistent repository.
 RETRIABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
+# The environment variables that may hold a GitHub Personal Access Token, in
+# the order in which they are consulted.
+TOKEN_VARIABLES = ("GITHUB_PAT", "GH_TOKEN")
+
+# GitHub's hourly rate limit for unauthenticated requests.  If GitHub reports
+# this as the applied limit even though a token was sent, it ignored the token.
+UNAUTHENTICATED_RATE_LIMIT = "60"
+
 
 def parse_args() -> argparse.Namespace:
     """Parse the command-line arguments.
@@ -83,6 +94,19 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def token_variable() -> str | None:
+    """Return the name of the environment variable that supplies the GitHub token.
+
+    Returns:
+        the name of the first of TOKEN_VARIABLES that is set to a non-empty
+        value, or None if none of them is.
+    """
+    for variable in TOKEN_VARIABLES:
+        if os.environ.get(variable):
+            return variable
+    return None
+
+
 def auth_headers() -> dict[str, str]:
     """Return the HTTP headers for a GitHub API request.
 
@@ -91,11 +115,11 @@ def auth_headers() -> dict[str, str]:
         the environment.
     """
     headers = {"Accept": "application/vnd.github+json"}
-    # "GITHUB_PAT" is a GitHub Personal Access Token.  GitHub accepts both
-    # "Bearer <token>" and "token <token>".
-    token = os.environ.get("GITHUB_PAT") or os.environ.get("GH_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    # A GitHub Personal Access Token.  GitHub accepts both "Bearer <token>"
+    # and "token <token>".
+    variable = token_variable()
+    if variable is not None:
+        headers["Authorization"] = f"Bearer {os.environ[variable]}"
     return headers
 
 
@@ -151,6 +175,41 @@ def retry_delay(response: requests.Response, default_delay: float) -> float | No
     return default_delay
 
 
+def rate_limit_advice(response: requests.Response) -> str:
+    """Return advice about the token environment variables, for a rate-limit refusal.
+
+    Returns:
+        advice about GITHUB_PAT and GH_TOKEN:  to set one if neither is set, or
+        that the one that is set is not being respected if GitHub applied the
+        unauthenticated rate limit to a request that was authenticated with it.
+    """
+    variable = token_variable()
+    # GitHub reports the rate limit that it applied to the request.
+    limit = response.headers.get("x-ratelimit-limit")
+    if variable is None:
+        return (
+            "\nThis request was not authenticated, and the GitHub rate limit for"
+            f" unauthenticated requests is {limit or UNAUTHENTICATED_RATE_LIMIT} per hour."
+            f"\nSet environment variable {' or '.join(TOKEN_VARIABLES)} to a GitHub"
+            " Personal Access Token to raise the limit."
+        )
+    if limit is None or limit == UNAUTHENTICATED_RATE_LIMIT:
+        # GitHub applied the unauthenticated limit even though the request was
+        # authenticated, so it did not accept the token.
+        return (
+            f"\nEnvironment variable {variable} is set, and its value was sent as a"
+            " Bearer token, but GitHub is not respecting it:  it applied its rate"
+            f" limit of {limit or UNAUTHENTICATED_RATE_LIMIT} requests per hour for"
+            " unauthenticated requests."
+            f"\nThe token in {variable} may be expired, revoked, or malformed."
+        )
+    return (
+        f"\nEnvironment variable {variable} authenticated this request, but its"
+        f" GitHub rate limit of {limit} requests per hour is exhausted."
+        "\nWait for the limit to reset, or pass --max-commits to examine fewer commits."
+    )
+
+
 def request_error_message(url: str, response: requests.Response) -> str:
     """Return a message describing a failed request.
 
@@ -158,15 +217,15 @@ def request_error_message(url: str, response: requests.Response) -> str:
         a message describing the failed request `url` that produced `response`.
     """
     result = f"GET {url} {response.status_code} {response.headers} {response.text}"
-    if (
-        rate_limited(response)
-        and not os.environ.get("GITHUB_PAT")
-        and not os.environ.get("GH_TOKEN")
-    ):
+    if rate_limited(response):
+        result += rate_limit_advice(response)
+    elif secondary_rate_limited(response) and token_variable() is None:
+        # GitHub's secondary rate limits are more generous for authenticated
+        # requests, so suggest a token for them too.
         result += (
-            "\nThe GitHub rate limit for unauthenticated requests is 60 per hour."
-            "\nSet environment variable GITHUB_PAT or GH_TOKEN to a GitHub"
-            " Personal Access Token to raise it."
+            "\nGitHub applied a secondary rate limit to this unauthenticated request."
+            f"\nSet environment variable {' or '.join(TOKEN_VARIABLES)} to a GitHub"
+            " Personal Access Token to raise the limits."
         )
     return result
 
@@ -294,4 +353,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:
+        # An expected failure, such as an exhausted rate limit, deserves a
+        # message on standard error rather than a stack trace.
+        print(f"{PROGRAM}: {exc}", file=sys.stderr)
+        sys.exit(1)
