@@ -232,7 +232,6 @@ hooks = [
     "tests/kvasir-tests/flex-pristine/mkskel.sh",
     "tests/kvasir-tests/tot_info/tests.sh",
     "cronic-orig",
-    "classfile_check_version",
   ] } },
 ]
 

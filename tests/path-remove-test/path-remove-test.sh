@@ -28,6 +28,7 @@ case "$work" in
 esac
 
 mkdir "$work/a" "$work/b" "$work/c"
+touch "$work/regular-file"
 a="$work/a"
 b="$work/b"
 c="$work/c"
@@ -49,6 +50,19 @@ check() {
     echo "  expected: $expected"
     echo "  actual:   $actual"
     status=1
+  fi
+}
+
+# check_fails DESCRIPTION [ARG...]:  runs `path-remove ARG...` on a
+# one-element input and checks that it exits with a nonzero status.
+check_fails() {
+  description="$1"
+  shift
+  if printf '%s' "$a" | "$PATH_REMOVE" "$@" > /dev/null 2>&1; then
+    echo "FAIL: $description"
+    status=1
+  else
+    echo "PASS: $description"
   fi
 }
 
@@ -96,5 +110,15 @@ check "separatorless input" "$a" "$a"
 check "removes duplicates" "$a:$b" "$a:$b:$a"
 check "removes nonexistent directories" "$a:$b" "$a:$work/nosuch:$b"
 check "-r removes matching elements" "$a:$c" "$a:$b:$c" -r "/b\$"
+check "removes a path element that is not a directory" "$a:$b" "$a:$work/regular-file:$b"
+
+### If nothing survives, the output is empty rather than a stray separator.
+
+check "nothing survives" "" "$work/nosuch1:$work/nosuch2"
+
+### A malformed command line is an error.
+
+check_fails "-r without an argument fails" -r
+check_fails "an unrecognized argument fails" -x
 
 exit "$status"

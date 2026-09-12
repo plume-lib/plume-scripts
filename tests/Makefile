@@ -5,16 +5,19 @@
 # recipe.
 TEST_DIRS = \
 	ci-info-test \
+	classfile-check-version-test \
 	ci-last-success-test \
 	cronic-test \
 	eval-quoting-test \
 	github-pr-number-test \
 	github-ref-name-test \
 	http-status-test \
+	is-ci-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
 	latex-process-inputs-test \
 	lint-diff-test \
+	mail-e-test \
 	missing-file-test \
 	path-remove-test \
 	preplace-test \
