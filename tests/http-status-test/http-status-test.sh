@@ -145,7 +145,7 @@ done
 
 mkdir "$work/bin-wget"
 ln -s "$work/bin/wget" "$work/bin-wget/wget"
-for command_name in git jq awk head tr sort grep cut sed cat sh; do
+for command_name in git jq awk head tr sort grep cut sed cat sh basename dirname; do
   command_path="$(command -v "$command_name" 2> /dev/null)" || command_path=""
   if [ -n "$command_path" ]; then
     ln -s "$command_path" "$work/bin-wget/$command_name"
@@ -156,7 +156,7 @@ wget_path_works="true"
 # so its `command -v` must run there rather than being expanded here.
 # shellcheck disable=SC2016
 if ! env -i PATH="$work/bin-wget" HOME="$HOME" sh -c '
-  for command_name in git jq awk head tr sort grep cut wget; do
+  for command_name in git jq awk head tr sort grep cut wget basename dirname; do
     command -v "$command_name" > /dev/null || exit 1
   done
   # The point of this PATH is that the script cannot find curl on it.
@@ -180,6 +180,11 @@ git clone -q --bare . "$work/origin.git"
 git remote add origin "$work/origin.git"
 git fetch -q origin
 git remote set-head origin main
+# The branch that this test's event payload names.  `ci-info` computes a commit
+# range from the branch it settled on, so the branch has to name a commit;
+# otherwise the ci-info cases would fail at the commit range rather than
+# reporting which branch was found.
+git branch -q feature-from-event main
 SHA="$(git rev-parse HEAD)"
 
 ### The test
@@ -189,8 +194,10 @@ status=0
 # run PATH REF-NAME HEAD-REF EVENT-NAME [EVENT-PATH]: sources the script the
 # way its documentation says to, in a simulated GitHub Actions job, leaving
 # CI_ORGANIZATION and CI_BRANCH in "$work/values" and the script's diagnostics
-# in "$work/stderr".  An empty HEAD-REF makes the job not a pull request.
-# EVENT-PATH is the job's event payload file; the default is no such file.
+# in "$work/stderr".  Exits with the script's own status, which distinguishes a
+# failure that re-running the job might not repeat from a permanent one.  An
+# empty HEAD-REF makes the job not a pull request.  EVENT-PATH is the job's
+# event payload file; the default is no such file.
 run() {
   run_path="$1"
   ref_name="$2"
@@ -215,7 +222,7 @@ run() {
     sh -c '
       cd "$1" || exit 2
       CI_DEFAULT_ORGANIZATION=testorg
-      . "$2/set-ci-org-and-branch" || exit 2
+      . "$2/set-ci-org-and-branch" || exit $?
       printf "%s\n%s\n" "$CI_ORGANIZATION" "$CI_BRANCH" > "$3/values"
     ' sh "$work/repo" "$PLUME_SCRIPTS" "$work" 2> "$work/stderr"
 }
@@ -316,11 +323,111 @@ EOF
   report "$tool: a job with a merge ref falls back to the event payload (got '${branch}')" "$ok"
 }
 
+# check_branch_status TOOL PATH HTTP-STATUS EXPECTED: checks that when the
+# CI_BRANCH request fails, the script's exit status says whether re-running the
+# job might succeed.  The script returns 3 for a throttled or unanswered
+# request and 2 for a permanent failure such as 404; without the distinction, a
+# client cannot tell a rate limit that clears in an hour from a pull request
+# that does not exist.
+check_branch_status() {
+  tool="$1"
+  check_path="$2"
+  http_status="$3"
+  expected="$4"
+  exit_status=0
+  run "$check_path" "${http_status}/merge" "" push || exit_status=$?
+  ok=""
+  if [ "$exit_status" -eq "$expected" ]; then
+    ok="true"
+  fi
+  report "$tool: a job with a merge ref exits ${expected} after HTTP ${http_status} (got ${exit_status})" "$ok"
+}
+
+# run_ci_info PATH REF-NAME [EVENT-PATH]: runs `ci-info` the way its clients
+# do, in a simulated GitHub Actions job that is not a pull request, leaving its
+# standard output -- the text that a client `eval`s -- in "$work/ci-info-out"
+# and its diagnostics in "$work/stderr".  Exits with `ci-info`'s own status.
+run_ci_info() {
+  run_path="$1"
+  ref_name="$2"
+  event_path="${3-}"
+  rm -f "$work/ci-info-out"
+  # shellcheck disable=SC2016  # The inner script uses its own arguments.
+  env -i PATH="$run_path" HOME="$HOME" \
+    GITHUB_ACTIONS=true GITHUB_EVENT_NAME=push \
+    GITHUB_HEAD_REF="" GITHUB_BASE_REF=main \
+    GITHUB_REF_NAME="$ref_name" GITHUB_REPOSITORY=testorg/testrepo \
+    GITHUB_SHA="$SHA" GITHUB_EVENT_PATH="$event_path" \
+    sh -c '
+      cd "$1" || exit 2
+      "$2/ci-info" > "$3/ci-info-out"
+    ' sh "$work/repo" "$PLUME_SCRIPTS" "$work" 2> "$work/stderr"
+}
+
+# ci_info_branch: prints the CI_BRANCH that the last `run_ci_info` emitted, by
+# `eval`ing its output the way a client does.  The output is shell commands,
+# not a table, so reading it any other way would test the wrong thing.  The
+# `exit` command that `ci-info` emits on failure is dropped first, because it
+# would end the subshell before it could report what it had read.
+ci_info_branch() {
+  grep -v '^exit ' "$work/ci-info-out" > "$work/ci-info-vars" || true
+  (
+    CI_BRANCH=""
+    # shellcheck disable=SC1091  # The file is this test's own output.
+    . "$work/ci-info-vars" > /dev/null 2>&1 || true
+    printf '%s\n' "$CI_BRANCH"
+  )
+}
+
+# check_ci_info_branch TOOL PATH: checks that `ci-info` notices that the
+# request which determines CI_BRANCH failed.  It used to assign CI_BRANCH from
+# the failed response with no check at all:  it exited 0 and emitted an empty
+# CI_BRANCH, which a client would use as if it were a branch name.
+check_ci_info_branch() {
+  tool="$1"
+  check_path="$2"
+  exit_status=0
+  run_ci_info "$check_path" 403/merge || exit_status=$?
+  branch="$(ci_info_branch)"
+  ok=""
+  if [ "$exit_status" -ne 0 ] && [ -z "$branch" ] \
+    && grep -q "cannot determine the branch" "$work/ci-info-out"; then
+    ok="true"
+  fi
+  report "ci-info, $tool: a job with a merge ref fails rather than emitting an empty CI_BRANCH (exit status ${exit_status})" "$ok"
+}
+
+# check_ci_info_event TOOL PATH: checks that when that request fails, `ci-info`
+# takes the branch from the job's event payload, as `set-ci-org-and-branch`
+# does.
+check_ci_info_event() {
+  tool="$1"
+  check_path="$2"
+  cat > "$work/event.json" << 'EOF'
+{"pull_request": {"head": {"ref": "feature-from-event"}}}
+EOF
+  ok=""
+  if run_ci_info "$check_path" 403/merge "$work/event.json"; then
+    branch="$(ci_info_branch)"
+    if [ "$branch" = "feature-from-event" ]; then
+      ok="true"
+    fi
+  else
+    branch="<ci-info failed>"
+  fi
+  report "ci-info, $tool: a job with a merge ref falls back to the event payload (got '${branch}')" "$ok"
+}
+
 check_success curl "$work/bin:$PATH"
 check_status curl "$work/bin:$PATH" 403
 check_status curl "$work/bin:$PATH" 404
 check_branch_path curl "$work/bin:$PATH"
 check_branch_event curl "$work/bin:$PATH"
+check_branch_status curl "$work/bin:$PATH" 403 3
+check_branch_status curl "$work/bin:$PATH" 500 3
+check_branch_status curl "$work/bin:$PATH" 404 2
+check_ci_info_branch curl "$work/bin:$PATH"
+check_ci_info_event curl "$work/bin:$PATH"
 
 if [ -n "$wget_path_works" ]; then
   check_success wget "$work/bin-wget"
@@ -328,6 +435,11 @@ if [ -n "$wget_path_works" ]; then
   check_status wget "$work/bin-wget" 404
   check_branch_path wget "$work/bin-wget"
   check_branch_event wget "$work/bin-wget"
+  check_branch_status wget "$work/bin-wget" 403 3
+  check_branch_status wget "$work/bin-wget" 500 3
+  check_branch_status wget "$work/bin-wget" 404 2
+  check_ci_info_branch wget "$work/bin-wget"
+  check_ci_info_event wget "$work/bin-wget"
 else
   echo "$(basename -- "$0"): skipping the wget cases, because this system has no PATH that contains wget, and the commands the script needs, but not curl."
 fi

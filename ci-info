@@ -644,7 +644,35 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
     # TODO: Can I implement this without a GitHub API request?
     url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}"
     pull_json="$(get_url "${url}" | tr -d '[:cntrl:]')"
+    # "// empty" maps JSON null to the empty string, to avoid yielding "null".
     CI_BRANCH=$(printf '%s' "${pull_json}" | jq -r '.head.ref // empty' 2> /dev/null)
+    if [ -z "$CI_BRANCH" ]; then
+      emit_echo "${SCRIPT_NAME} warning: bad output for ${url}"
+      if [ -n "$auth_token" ]; then
+        emit_echo "auth_token is set."
+      fi
+      emit_echo "---- start of ${http_get_tool} output ----"
+      printf '%s\n' "${pull_json}" | emit_echo_lines
+      emit_echo "---- end of ${http_get_tool} output ----"
+      # GitHub Actions writes the event payload to the file named by
+      # $GITHUB_EVENT_PATH, and if this job was triggered by a pull request
+      # event that payload names the same head branch that the API request
+      # asked about.
+      if [ -r "${GITHUB_EVENT_PATH}" ]; then
+        CI_BRANCH=$(jq -r '.pull_request.head.ref // empty' "${GITHUB_EVENT_PATH}" 2> /dev/null)
+      fi
+      if [ -n "$CI_BRANCH" ]; then
+        emit_echo "${SCRIPT_NAME}: using branch ${CI_BRANCH} from ${GITHUB_EVENT_PATH}."
+      else
+        # Unlike the organization, the branch has no fallback here:
+        # GITHUB_REF_NAME is like "42/merge", which names no branch, and this
+        # clone's HEAD is the merge commit, which is on no branch either.
+        # Report failure rather than printing an empty CI_BRANCH, which a
+        # client would use as if it were a branch name.
+        emit_echo "${SCRIPT_NAME}: cannot determine the branch of ${url}"
+        emit_exit 2
+      fi
+    fi
   fi
   CI_COMMIT_RANGE_END="${GITHUB_SHA}"
 
