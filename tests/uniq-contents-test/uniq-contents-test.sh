@@ -1,73 +1,167 @@
 #!/bin/sh
 
-# Tests `uniq-contents`:  given file names as arguments, it prints the ones
-# with unique contents, keeping the first file of each group of files with
-# identical contents.
+# Tests for `uniq-contents`.
 #
-# Not tested here, because it is currently broken:  an unreadable file is
-# silently dropped, and two unreadable files are declared identical, because
-# the exit status of the hashing command is not checked.
+# The unreadable-file tests are the interesting ones.  `uniq-contents` used
+# to pipe the hashing command into `cut`, which discards the hashing
+# command's exit status because `sh` has no `pipefail`.  An unreadable file
+# therefore hashed to the empty string, which matches the "already seen"
+# `case` pattern even on the first iteration (with `seen` empty, both the
+# case word and the pattern are just spaces).  So every unreadable file --
+# the first one included -- was silently dropped, and the exit status was 0.
+# For a tool whose output is meant to be fed to another command, that is
+# silent data loss.
 
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-UNIQ_CONTENTS="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/uniq-contents"
+UNIQ="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/uniq-contents"
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+trap 'chmod -R u+rwX "$work" 2> /dev/null; rm -rf "$work"' EXIT HUP INT TERM
 
 status=0
 
-# check_equal DESCRIPTION EXPECTED ACTUAL: reports whether two strings match.
-check_equal() {
+pass() {
+  echo "PASS: $1"
+}
+
+fail() {
+  echo "FAIL: $1"
+  status=1
+}
+
+# check_output DESCRIPTION EXPECTED ACTUAL
+check_output() {
   if [ "$2" = "$3" ]; then
-    echo "PASS: $1"
+    pass "$1"
   else
-    echo "FAIL: $1"
-    echo "  expected: <<$2>>"
-    echo "  actual:   <<$3>>"
-    status=1
+    fail "$1"
+    echo "  expected: $2"
+    echo "  actual:   $3"
   fi
 }
 
+### Duplicate contents are removed, keeping the first file in argument order.
+
 printf 'aaa\n' > "$work/a.txt"
 printf 'bbb\n' > "$work/b.txt"
-printf 'aaa\n' > "$work/c.txt"
-printf 'ccc\n' > "$work/d.txt"
+printf 'aaa\n' > "$work/a2.txt"
+out="$("$UNIQ" "$work/a.txt" "$work/b.txt" "$work/a2.txt")"
+check_output "keeps the first of a group of identical files" \
+  "$(printf '%s\n%s' "$work/a.txt" "$work/b.txt")" "$out"
+
+### Distinct files are all printed.
+
+out="$("$UNIQ" "$work/a.txt" "$work/b.txt")"
+check_output "prints all distinct files" \
+  "$(printf '%s\n%s' "$work/a.txt" "$work/b.txt")" "$out"
+
+### Empty files are just another group of identical contents.
+
 : > "$work/empty1.txt"
 : > "$work/empty2.txt"
+out="$("$UNIQ" "$work/empty1.txt" "$work/empty2.txt")"
+check_output "empty files are duplicates of one another" "$work/empty1.txt" "$out"
+
+### A file name containing a space is one argument, not two.
+
+printf 'fff\n' > "$work/has space.txt"
+out="$("$UNIQ" "$work/has space.txt" "$work/a.txt")"
+check_output "a file name containing a space" \
+  "$(printf '%s\n%s' "$work/has space.txt" "$work/a.txt")" "$out"
+
+### No arguments is not an error.
+
+out_status=0
+out="$("$UNIQ")" || out_status=$?
+check_output "no arguments produces no output" "" "$out"
+check_output "no arguments exits 0" "0" "$out_status"
+
+### Unreadable files are reported, not silently dropped or deduplicated.
+
+# root can read a mode-000 file, so this part of the test would not test
+# anything.  Skipping is better than failing.
+if [ "$(id -u)" = 0 ]; then
+  echo "$(basename -- "$0"): skipping the unreadable-file tests, because it is running as root."
+else
+  printf 'ccc\n' > "$work/c.txt"
+  printf 'ddd\n' > "$work/d.txt"
+  chmod 000 "$work/c.txt" "$work/d.txt"
+
+  if out="$("$UNIQ" "$work/a.txt" "$work/c.txt" "$work/d.txt" 2> "$work/err")"; then
+    fail "zero exit status when a file cannot be read"
+  else
+    pass "nonzero exit status when a file cannot be read"
+  fi
+  check_output "omits unreadable files from the output" "$work/a.txt" "$out"
+  # Look for `uniq-contents`'s own message, not merely for the file name:
+  # the shell's "cannot open" message for the failed input redirection also
+  # names the file, so a laxer test would pass even without the fix.
+  for f in "$work/c.txt" "$work/d.txt"; do
+    if grep -qF -- "uniq-contents: cannot read $f" "$work/err"; then
+      pass "reported $(basename -- "$f") on stderr"
+    else
+      fail "did not report $(basename -- "$f") on stderr"
+      cat "$work/err"
+    fi
+  done
+
+  # An unreadable file must not make a later readable file look like a
+  # duplicate of it.
+  out="$("$UNIQ" "$work/c.txt" "$work/b.txt" 2> /dev/null || true)"
+  check_output "an unreadable file does not mask a later readable one" \
+    "$work/b.txt" "$out"
+fi
+
+### A nonexistent file or a directory is reported, not silently skipped.
+
+if out="$("$UNIQ" "$work/nosuch.txt" "$work/a.txt" 2> "$work/err")"; then
+  fail "zero exit status for a nonexistent file"
+else
+  pass "nonzero exit status for a nonexistent file"
+fi
+check_output "omits a nonexistent file from the output" "$work/a.txt" "$out"
+if grep -qF -- "uniq-contents: no such file: $work/nosuch.txt" "$work/err"; then
+  pass "reported a nonexistent file on stderr"
+else
+  fail "did not report a nonexistent file on stderr"
+  cat "$work/err"
+fi
+
 mkdir "$work/adir"
+if out="$("$UNIQ" "$work/adir" "$work/a.txt" 2> "$work/err")"; then
+  fail "zero exit status for a directory"
+else
+  pass "nonzero exit status for a directory"
+fi
+check_output "omits a directory from the output" "$work/a.txt" "$out"
+if grep -qF -- "uniq-contents: not a regular file: $work/adir" "$work/err"; then
+  pass "reported a directory on stderr"
+else
+  fail "did not report a directory on stderr"
+  cat "$work/err"
+fi
 
-cd "$work"
+### A file name containing a backslash is printed and reported literally.
+### The escape sequence matters:  some shells' `echo` (dash's, for one) turns
+### the two characters `\t` into a tab, so a diagnostic that used `echo` would
+### name a file that does not exist.
 
-# The first file of each duplicate group is printed, and the later ones are not.
-actual="$("$UNIQ_CONTENTS" a.txt b.txt c.txt d.txt)"
-check_equal "duplicates are dropped" "a.txt
-b.txt
-d.txt" "$actual"
-
-# "First" means first in argument order, not alphabetical order.
-actual="$("$UNIQ_CONTENTS" c.txt a.txt)"
-check_equal "argument order determines the survivor" "c.txt" "$actual"
-
-# Empty files are just another group of identical contents.
-actual="$("$UNIQ_CONTENTS" empty1.txt empty2.txt)"
-check_equal "empty files are duplicates of one another" "empty1.txt" "$actual"
-
-# Arguments that are not regular files are skipped rather than reported.
-actual="$("$UNIQ_CONTENTS" nosuchfile.txt adir a.txt)"
-check_equal "non-files are skipped" "a.txt" "$actual"
-
-# No arguments is not an error.
-actual_status=0
-actual="$("$UNIQ_CONTENTS")" || actual_status=$?
-check_equal "no arguments produces no output" "" "$actual"
-check_equal "no arguments exits 0" "0" "$actual_status"
-
-# A file whose name contains a space is handled as one argument.
-printf 'ddd\n' > "$work/has space.txt"
-actual="$("$UNIQ_CONTENTS" "has space.txt" a.txt)"
-check_equal "a name containing a space" "has space.txt
-a.txt" "$actual"
+esc='tab\there.txt'
+printf 'eee\n' > "$work/$esc"
+out="$("$UNIQ" "$work/$esc")"
+check_output "prints a file name containing a backslash escape literally" \
+  "$work/$esc" "$out"
+if [ "$(id -u)" != 0 ]; then
+  chmod 000 "$work/$esc"
+  "$UNIQ" "$work/$esc" 2> "$work/err" || true
+  if grep -qF -- "uniq-contents: cannot read $work/$esc" "$work/err"; then
+    pass "reported a file name containing a backslash escape literally"
+  else
+    fail "did not report a file name containing a backslash escape literally"
+    cat "$work/err"
+  fi
+fi
 
 exit "$status"

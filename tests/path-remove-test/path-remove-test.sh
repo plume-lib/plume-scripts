@@ -1,12 +1,11 @@
 #!/bin/sh
 
-# Tests `path-remove`:  it shortens a path environment variable by removing
-# duplicate and non-existent directories, and optionally those matching a
-# regular expression.
+# Tests for `path-remove`.
 #
-# Not tested here, because it is currently broken:  input that mixes
-# colon-separated and space-separated lines, which is joined with whichever
-# separator the last line used.
+# The main point of this test is that the output separator is chosen once, for
+# the whole output, rather than per input line.  `path-remove` merges all its
+# input lines into a single path, so a colon-separated line followed by a
+# space-separated line used to be emitted joined by spaces.
 
 set -eu
 
@@ -16,66 +15,110 @@ PATH_REMOVE="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/path-remove"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
+# `path-remove` drops directories that do not exist, so the test needs real
+# ones.  Their names must contain neither a space nor a colon, so that neither
+# separator can be confused for part of a name.  `mktemp -d` honors `TMPDIR`,
+# so this is not guaranteed and must be checked.
+case "$work" in
+  *[\ :]*)
+    echo "This test requires a temporary directory whose name contains" >&2
+    echo "neither a space nor a colon, but TMPDIR yielded: $work" >&2
+    exit 1
+    ;;
+esac
+
+mkdir "$work/a" "$work/b" "$work/c"
+touch "$work/regular-file"
+a="$work/a"
+b="$work/b"
+c="$work/c"
+
 status=0
 
-# check_equal DESCRIPTION EXPECTED ACTUAL: reports whether two strings match.
-check_equal() {
-  if [ "$2" = "$3" ]; then
-    echo "PASS: $1"
+# check DESCRIPTION EXPECTED INPUT [ARG...]:  runs `path-remove ARG...` on
+# INPUT and checks that its output is EXPECTED.
+check() {
+  description="$1"
+  expected="$2"
+  input="$3"
+  shift 3
+  actual="$(printf '%s' "$input" | "$PATH_REMOVE" "$@")"
+  if [ "$actual" = "$expected" ]; then
+    echo "PASS: $description"
   else
-    echo "FAIL: $1"
-    echo "  expected: <<$2>>"
-    echo "  actual:   <<$3>>"
+    echo "FAIL: $description"
+    echo "  expected: $expected"
+    echo "  actual:   $actual"
     status=1
   fi
 }
 
-mkdir "$work/a" "$work/b" "$work/c"
-touch "$work/regular-file"
+# check_fails DESCRIPTION [ARG...]:  runs `path-remove ARG...` on a
+# one-element input and checks that it exits with a nonzero status.
+check_fails() {
+  description="$1"
+  shift
+  if printf '%s' "$a" | "$PATH_REMOVE" "$@" > /dev/null 2>&1; then
+    echo "FAIL: $description"
+    status=1
+  else
+    echo "PASS: $description"
+  fi
+}
 
-# Duplicates and non-existent directories are removed, and the order of the
-# surviving elements is unchanged.
-actual="$(echo "$work/a:$work/nonexistent:$work/b:$work/a" | "$PATH_REMOVE")"
-check_equal "colon-separated: duplicates and non-existent" "$work/a:$work/b" "$actual"
+### The separator is the same for the whole output, not per input line.
 
-# A space-separated path stays space-separated.
-actual="$(echo "$work/a $work/b $work/a" | "$PATH_REMOVE")"
-check_equal "space-separated path" "$work/a $work/b" "$actual"
+# A colon anywhere in the input makes the whole output colon-separated, no
+# matter which line it appears on:  joining with spaces would run the elements
+# of a colon-separated line together into an unusable path.
 
-# A path element that is a file, not a directory, is removed.
-actual="$(echo "$work/a:$work/regular-file:$work/b" | "$PATH_REMOVE")"
-check_equal "a non-directory is removed" "$work/a:$work/b" "$actual"
+check "colon line before space line" \
+  "$a:$b:$c" \
+  "$a:$b
+$c $a"
+check "space line before colon line" \
+  "$a:$b:$c" \
+  "$a $b
+$c:$a"
 
-# "-r REGEXP" removes every matching element.
-actual="$(echo "$work/a:$work/b:$work/c" | "$PATH_REMOVE" -r 'b$')"
-check_equal "-r removes matching elements" "$work/a:$work/c" "$actual"
+### A space separator is used only if no line contains a colon.
 
-# A single element, with no separator in the input, is passed through.
-actual="$(echo "$work/a" | "$PATH_REMOVE")"
-check_equal "single element" "$work/a" "$actual"
+check "space lines only" \
+  "$a $b $c" \
+  "$a $b
+$c $a"
 
-# If nothing survives, the output is empty rather than a stray separator.
-actual="$(echo "$work/nonexistent1:$work/nonexistent2" | "$PATH_REMOVE")"
-check_equal "nothing survives" "" "$actual"
+### A separatorless line does not determine the separator.
 
-# "-r" without a regexp is an error.
-actual_status=0
-echo "$work/a" | "$PATH_REMOVE" -r > /dev/null 2>&1 || actual_status=$?
-if [ "$actual_status" = 0 ]; then
-  echo "FAIL: -r without an argument should fail"
-  status=1
-else
-  echo "PASS: -r without an argument fails"
-fi
+check "separatorless line before space line" \
+  "$a $b $c" \
+  "$a
+$b $c"
+check "separatorless line before colon line" \
+  "$a:$b:$c" \
+  "$a
+$b:$c"
 
-# An unrecognized argument is an error.
-actual_status=0
-echo "$work/a" | "$PATH_REMOVE" -x > /dev/null 2>&1 || actual_status=$?
-if [ "$actual_status" = 0 ]; then
-  echo "FAIL: an unrecognized argument should fail"
-  status=1
-else
-  echo "PASS: an unrecognized argument fails"
-fi
+### Single-line inputs keep their own separator.
+
+check "colon-separated input" "$a:$b" "$a:$b"
+check "space-separated input" "$a $b" "$a $b"
+check "separatorless input" "$a" "$a"
+
+### The other documented behaviors still hold.
+
+check "removes duplicates" "$a:$b" "$a:$b:$a"
+check "removes nonexistent directories" "$a:$b" "$a:$work/nosuch:$b"
+check "-r removes matching elements" "$a:$c" "$a:$b:$c" -r "/b\$"
+check "removes a path element that is not a directory" "$a:$b" "$a:$work/regular-file:$b"
+
+### If nothing survives, the output is empty rather than a stray separator.
+
+check "nothing survives" "" "$work/nosuch1:$work/nosuch2"
+
+### A malformed command line is an error.
+
+check_fails "-r without an argument fails" -r
+check_fails "an unrecognized argument fails" -x
 
 exit "$status"
