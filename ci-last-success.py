@@ -54,6 +54,9 @@ if DEBUG:
 # However, only a "success" conclusion is evidence that a CI job actually ran.
 SUCCESS_CONCLUSIONS = frozenset(("success", "neutral", "skipped"))
 
+# The largest page size that the GitHub API permits.
+CHECK_RUNS_PER_PAGE = 100
+
 
 def github_api_get(url: str) -> dict:
     """Return the JSON body of a GET request to the GitHub API.
@@ -73,7 +76,7 @@ def github_api_get(url: str) -> dict:
 
 
 def successful(sha: str) -> bool:
-    """Return true if `sha` has at least one CI job and all of them succeeded.
+    """Return true if at least one CI job ran for `sha` and no CI job failed.
 
     A CI system reports to GitHub either as a commit status (as Travis CI does) or as a
     check run (as Azure Pipelines and GitHub Actions do).  Both must be consulted.
@@ -81,30 +84,44 @@ def successful(sha: str) -> bool:
     of zero commit statuses -- for a commit whose check runs all completed successfully.
 
     Returns:
-        true if `sha` has at least one CI job and all of them succeeded.
+        true if at least one CI job ran for `sha` and no CI job failed.
     """
     api_prefix = f"https://api.github.com/repos/{org}/{repo}/commits/{sha}"
     saw_a_job = False
 
+    # GitHub computes the combined `state` over every commit status, so a single
+    # request suffices no matter how many commit statuses there are.
     statuses = github_api_get(f"{api_prefix}/status")
     if statuses["statuses"]:
         if statuses["state"] != "success":
             return False
         saw_a_job = True
 
-    # `per_page=100` because the default page size is 30 and this code reads only
-    # the first page.
-    check_runs = github_api_get(f"{api_prefix}/check-runs?per_page=100")["check_runs"]
-    for check_run in check_runs:
-        if check_run["status"] != "completed":
-            return False
-        conclusion = check_run["conclusion"]
-        if conclusion not in SUCCESS_CONCLUSIONS:
-            return False
-        if conclusion == "success":
-            saw_a_job = True
-
-    return saw_a_job
+    # Unlike the commit statuses, the check runs are combined by this code rather than
+    # by GitHub, so every page of them must be read.  Reading only the first page would
+    # report a commit as successful when a check run beyond that page failed, which
+    # happens for a build matrix with more jobs than fit on a page.
+    page = 1
+    check_runs_seen = 0
+    while True:
+        response = github_api_get(
+            f"{api_prefix}/check-runs?per_page={CHECK_RUNS_PER_PAGE}&page={page}"
+        )
+        check_runs = response["check_runs"]
+        for check_run in check_runs:
+            if check_run["status"] != "completed":
+                return False
+            conclusion = check_run["conclusion"]
+            if conclusion not in SUCCESS_CONCLUSIONS:
+                return False
+            if conclusion == "success":
+                saw_a_job = True
+        check_runs_seen += len(check_runs)
+        # The second disjunct guards against a nonterminating loop if `total_count`
+        # exceeds the number of check runs that the API actually yields.
+        if check_runs_seen >= response["total_count"] or not check_runs:
+            return saw_a_job
+        page += 1
 
 
 def parent(sha: str) -> str | None:

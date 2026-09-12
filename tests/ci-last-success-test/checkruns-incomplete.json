@@ -3,7 +3,7 @@
     "state": "pending",
     "statuses": []
   },
-  "https://api.github.com/repos/plume-lib/plume-scripts/commits/3333333333333333333333333333333333333333/check-runs?per_page=100": {
+  "https://api.github.com/repos/plume-lib/plume-scripts/commits/3333333333333333333333333333333333333333/check-runs?per_page=100&page=1": {
     "total_count": 1,
     "check_runs": [
       { "name": "build", "status": "in_progress", "conclusion": null }
