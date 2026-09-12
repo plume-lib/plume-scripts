@@ -18,8 +18,8 @@ TEST_DIRS = \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test \
-	tmp-directory-test
-	uniq-contents-test
+	tmp-directory-test \
+	uniq-contents-test \
 
 all: test
 
