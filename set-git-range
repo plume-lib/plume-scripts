@@ -538,8 +538,23 @@ _sgr_set_git_range_body() {
     if [ -n "$debug" ]; then
       echo "Setting CI_COMMIT_RANGE_START from CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
     fi
-    CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%.*}
-    CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*.}
+    # Split on the literal separator "..." or "..".
+    case $CI_COMMIT_RANGE in
+      *...*)
+        CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%...*}
+        CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*...}
+        ;;
+      *..*)
+        CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE%%..*}
+        CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE##*..}
+        CI_COMMIT_RANGE="${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}"
+        ;;
+      *)
+        # Not a range at all, but a single commit (or empty).
+        CI_COMMIT_RANGE_START=""
+        CI_COMMIT_RANGE_END=${CI_COMMIT_RANGE}
+        ;;
+    esac
     if [ -z "$CI_COMMIT_RANGE_START" ]; then
       CI_COMMIT_RANGE_START=${CI_COMMIT_RANGE_END}
     fi
