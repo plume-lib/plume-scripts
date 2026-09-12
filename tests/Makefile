@@ -10,6 +10,7 @@ TEST_DIRS = \
 	eval-quoting-test \
 	github-pr-number-test \
 	github-ref-name-test \
+	http-status-test \
 	jacoco-coverage-ratchet-test \
 	jq-null-test \
 	latex-process-inputs-test \

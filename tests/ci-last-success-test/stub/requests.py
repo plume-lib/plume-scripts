@@ -10,6 +10,14 @@ import os
 import pathlib
 
 
+class RequestException(Exception):  # ruff: ignore[error-suffix-on-exception-name]
+    """A stub for `requests.RequestException`.
+
+    `ci-last-success.py` names it in an `except` clause, so it must exist even
+    though this stub never raises it.
+    """
+
+
 class Response:
     """The result of a stubbed HTTP request."""
 

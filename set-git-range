@@ -41,10 +41,13 @@
 # CI_ORGANIZATION, CI_BRANCH, CI_DEFAULT_BRANCH_NAME, and CI_PULL_JSON.
 #
 # It sets no other variables and leaves no functions defined.  It returns 0 on
-# success, or 2 if it cannot determine the commit range; in the latter case
-# CI_COMMIT_RANGE, CI_COMMIT_RANGE_START, and CI_COMMIT_RANGE_END are set to
-# the empty string, and the variables that `set-ci-org-and-branch` sets hold
-# whatever it determined (they are empty if it did not run at all).
+# success, or nonzero if it cannot determine the commit range; in the latter
+# case CI_COMMIT_RANGE, CI_COMMIT_RANGE_START, and CI_COMMIT_RANGE_END are set
+# to the empty string, and the variables that `set-ci-org-and-branch` sets hold
+# whatever it determined (they are empty if it did not run at all).  The
+# failure status is 2, except that `set-ci-org-and-branch`'s own status is
+# passed through unchanged -- so 3 means that a GitHub API request failed in a
+# way that re-running the job might not repeat.
 #
 # If called not under CI, or under CI but not in the main or toplevel
 # clone, then gets information from the local repository.
