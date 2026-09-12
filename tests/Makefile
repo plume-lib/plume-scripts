@@ -13,11 +13,13 @@ TEST_DIRS = \
 	latex-process-inputs-test \
 	lint-diff-test \
 	missing-file-test \
+	path-remove-test \
 	preplace-test \
 	set-git-range-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
-	squeeze-blank-lines-test
+	squeeze-blank-lines-test \
+	uniq-contents-test
 
 all: test
 
