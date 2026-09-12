@@ -63,7 +63,10 @@ DEBUG = False
 PLUSPLUSPLUS_RE = re.compile(r"\+\+\+ (\S*).*")
 
 # This cannot be multiline because files are read one line at a time.
-FILENAME_LINENO_RE = re.compile(r"([^:]*):([0-9]+):.*")
+# The leading "[ \t]*" is necessary because after Gradle outputs all warnings,
+# it prints "> Compilation failed; see the compiler output below." and then
+# prints one warning, indented by two spaces.
+FILENAME_LINENO_RE = re.compile(r"[ \t]*([^:]*):([0-9]+):.*")
 
 INITIAL_WHITESPACE_RE = re.compile(r"[ \t]")
 
@@ -100,7 +103,13 @@ def main() -> None:
     print_multiline_warning = False
 
     for warning_line in warnings:
-        if print_multiline_warning and INITIAL_WHITESPACE_RE.match(warning_line):
+        # A line that itself looks like a warning is not a continuation line,
+        # even if it is indented (as Gradle indents the last warning it prints).
+        if (
+            print_multiline_warning
+            and INITIAL_WHITESPACE_RE.match(warning_line)
+            and not FILENAME_LINENO_RE.match(warning_line)
+        ):
             print(warning_line, end="")
             continue
         print_multiline_warning = False
@@ -275,10 +284,7 @@ def warning_filenames(warning_filename: str) -> set[str]:
         for warning_line in warnings:
             match = FILENAME_LINENO_RE.match(warning_line)
             if match:
-                # lstrip is necessary because after Gradle outputs all warnings,
-                # it prints "> Compilation failed; see the compiler output
-                # below." and then prints one warning, indented by two spaces.
-                result.add(match.group(1).lstrip())
+                result.add(match.group(1))
     return result
 
 

@@ -186,6 +186,27 @@ _scoab_org_from_url() {
   esac
 }
 
+# _scoab_pr_number_from_ref_name: prints the pull request number that
+# $GITHUB_REF_NAME names, or nothing if it names no pull request.  The caller
+# treats no output as "this is not a pull request, or its number is unknown".
+# GITHUB_REF_NAME is like "40/merge" in a GitHub Actions `pull_request` event,
+# but it is a branch or tag name in every other event -- including
+# `pull_request_target` and `workflow_run`, which are pull request events too.
+# Requiring a nonempty run of digits before "/merge" tells the two apart; a
+# branch may be named "release/merge", which is not a pull request.  Without
+# the check, a branch or tag name is used as a pull request number, giving an
+# API URL like ".../pulls/master" that 404s.
+_scoab_pr_number_from_ref_name() {
+  case "${GITHUB_REF_NAME}" in
+    */merge)
+      case "${GITHUB_REF_NAME%/merge}" in
+        '' | *[!0-9]*) ;;
+        *) printf '%s\n' "${GITHUB_REF_NAME%/merge}" ;;
+      esac
+      ;;
+  esac
+}
+
 # Does all the work.  Its caller gives it the shell options it needs, and
 # restores the client's options afterward.
 _scoab_set_org_and_branch_body() {
@@ -354,25 +375,33 @@ _scoab_set_org_and_branch_body() {
 
     # TODO: Can I implement this without a GitHub API request?
     # Is GITHUB_ACTOR equal to CI_ORGANIZATION, maybe??  (Need to observe beyond mernst.)
-    GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
-    api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
-    CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
-    # "// empty" maps JSON null to the empty string, so that a response that
-    # does not describe a pull request (as when the request was throttled)
-    # falls through to the fallbacks below instead of yielding "null".
-    CI_ORGANIZATION=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
+    # An empty pull request number means that $GITHUB_REF_NAME does not name
+    # one, as in a `pull_request_target` event.  Skip the API request rather
+    # than asking about a pull request named after a branch, and use the
+    # fallbacks below.
+    GITHUB_PR_NUMBER=$(_scoab_pr_number_from_ref_name)
+    if [ -n "$GITHUB_PR_NUMBER" ]; then
+      api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${GITHUB_PR_NUMBER}"
+      CI_PULL_JSON="$(_scoab_get_url "${api_url}" | tr -d '[:cntrl:]')"
+      # "// empty" maps JSON null to the empty string, so that a response that
+      # does not describe a pull request (as when the request was throttled)
+      # falls through to the fallbacks below instead of yielding "null".
+      CI_ORGANIZATION=$(printf '%s' "${CI_PULL_JSON}" | jq -r '.head.repo.owner.login // empty' 2> /dev/null)
+      if [ -z "$CI_ORGANIZATION" ]; then
+        # Warn and fall back, rather than failing:  a throttled request should
+        # not fail the whole job.
+        {
+          echo "${SCRIPT_NAME} warning: bad output for ${api_url}"
+          if [ -n "$auth_token" ]; then
+            echo "auth_token is set."
+          fi
+          echo "---- start of ${http_get_tool} output ----"
+          printf '%s\n' "${CI_PULL_JSON}"
+          echo "---- end of ${http_get_tool} output ----"
+        } >&2
+      fi
+    fi
     if [ -z "$CI_ORGANIZATION" ]; then
-      # Warn and fall back, rather than failing:  a throttled request should
-      # not fail the whole job.
-      {
-        echo "${SCRIPT_NAME} warning: bad output for ${api_url}"
-        if [ -n "$auth_token" ]; then
-          echo "auth_token is set."
-        fi
-        echo "---- start of ${http_get_tool} output ----"
-        printf '%s\n' "${CI_PULL_JSON}"
-        echo "---- end of ${http_get_tool} output ----"
-      } >&2
       # GitHub Actions writes the event payload to the file named by
       # $GITHUB_EVENT_PATH, and for a pull request event that payload describes
       # the same pull request that the API request asked about -- including the
@@ -509,10 +538,17 @@ _scoab_set_org_and_branch_body() {
     # Set this here rather than relying on the organization code above to have
     # done so:  that if/elif chain tests different variables in a different
     # order, so it does not always take the arm that corresponds to this one.
-    GITHUB_PR_NUMBER=${GITHUB_REF_NAME%/merge}
+    # Empty if $GITHUB_REF_NAME does not name a pull request, as in a
+    # `pull_request_target` event.  Used only in the diagnostic below, which
+    # says so rather than printing a URL built from a branch name.
+    GITHUB_PR_NUMBER=$(_scoab_pr_number_from_ref_name)
     if [ -n "$debug" ]; then
       {
-        echo "GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER}"
+        if [ -n "$GITHUB_PR_NUMBER" ]; then
+          echo "GitHub Actions pull request https://github.com/${GITHUB_REPOSITORY}/pull/${GITHUB_PR_NUMBER}"
+        else
+          echo "GitHub Actions pull request in ${GITHUB_REPOSITORY}, of unknown number"
+        fi
         echo "  GITHUB_BASE_REF=${GITHUB_BASE_REF}"
         echo "  GITHUB_REF_NAME=${GITHUB_REF_NAME}"
         echo "  GITHUB_SHA=${GITHUB_SHA}"
@@ -545,17 +581,7 @@ _scoab_set_org_and_branch_body() {
     # detached HEAD or a different `ref` has no local branch of that name
     # either, and then a branch or tag name would be used as a pull request
     # number, giving a 404 and an empty CI_BRANCH.
-    pr_number=""
-    case "${GITHUB_REF_NAME}" in
-      */merge)
-        # A pull request number is a nonempty string of digits.  A branch may
-        # be named "release/merge", which is not a pull request.
-        case "${GITHUB_REF_NAME%/merge}" in
-          '' | *[!0-9]*) ;;
-          *) pr_number="${GITHUB_REF_NAME%/merge}" ;;
-        esac
-        ;;
-    esac
+    pr_number=$(_scoab_pr_number_from_ref_name)
     if [ -z "$pr_number" ]; then
       CI_BRANCH="${GITHUB_REF_NAME}"
     else
@@ -630,7 +656,7 @@ fi
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
 unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_redact_tokens \
-  _scoab_org_from_url
+  _scoab_org_from_url _scoab_pr_number_from_ref_name
 if [ -n "$_scoab_had_errexit" ]; then
   set -e
 fi

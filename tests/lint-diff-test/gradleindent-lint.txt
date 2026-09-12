@@ -1,0 +1,11 @@
+> Task :compileJava
+Foo.java:2: warning: [rawtypes] found raw type: List
+  List x;
+  ^
+Foo.java:3: warning: [rawtypes] this line was not changed
+> Compilation failed; see the compiler output below.
+  Bar.java:2: error: cannot find symbol
+  Bar.java:3: error: this line was not changed
+    int w;
+    ^
+  Bar.java:2: error: another error on a changed line
