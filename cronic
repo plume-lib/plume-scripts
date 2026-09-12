@@ -20,10 +20,37 @@ set -eu
 DEBUG=false
 # DEBUG=true
 
-OUT=/tmp/cronic.out.$$
-ERR=/tmp/cronic.err.$$
-REDUCED_ERR=/tmp/cronic.err.reduced.$$
-TRACE=/tmp/cronic.trace.$$
+# A private directory, rather than predictable `/tmp/cronic.*.$$` names: on a
+# shared machine, process ids are guessable and reused, so another user could
+# pre-create those paths as symlinks and have the wrapped command's output
+# written through them.
+CRONIC_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
+OUT=$CRONIC_TMPDIR/out
+ERR=$CRONIC_TMPDIR/err
+REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
+TRACE=$CRONIC_TMPDIR/trace
+
+# Remove the temporary files however this script terminates, including when it
+# is interrupted before it reaches the end.  When DEBUG is true, the files are
+# retained; don't "echo" their location, because that would be appended to
+# stderr.
+# shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
+cleanup() {
+  [ "$DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
+}
+trap cleanup EXIT
+
+# Clean up and then die of the signal, rather than exiting with status
+# 128+signum, so that a supervisor can distinguish "cronic was killed by
+# SIGTERM" from "the wrapped command exited with status 143".  Each handler
+# first removes itself and the EXIT trap, so that the cleanup runs exactly
+# once.  These handlers are not redundant with the EXIT trap:  with no handler
+# installed, bash dies as soon as the signal arrives, abandoning the wrapped
+# command and deleting the directory that the command is still writing into,
+# whereas a handler does not run until the wrapped command has finished.
+trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
+trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
+trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
 EXPECTED=0
 if [ "$1" == "--expected-status" ]; then
@@ -43,17 +70,17 @@ if [ "$1" == "--duplicate-stderr" ]; then
 fi
 
 set +e
-"$@" > $OUT 2> $TRACE
+"$@" > "$OUT" 2> "$TRACE"
 RESULT=$?
 set -e
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
-if grep -q "$PATTERN" $TRACE; then
+if grep -q "$PATTERN" "$TRACE"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,
   # exits with the wrapped command's status, and removes its temporary files.
-  grep -v "$PATTERN" $TRACE > $ERR || true
+  grep -v "$PATTERN" "$TRACE" > "$ERR" || true
 else
   ERR=$TRACE
 fi
@@ -62,10 +89,10 @@ fi
 # For example, git does this, and the POSIX standard requires it for make.
 # The full stderr output is shown, but file REDUCED_ERR is checked for emptiness below.
 # TODO: Expand this.
-cat $ERR \
+cat "$ERR" \
   | grep -v "^Everything up-to-date$" \
-  | grep -v '^make[\[0-9\]\+]: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
-    > $REDUCED_ERR || true
+  | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
+    > "$REDUCED_ERR" || true
 
 if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ERR" ]; }; then
   echo "Cronic detected failure or error output for the command:"
@@ -93,7 +120,7 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ER
   fi
   echo "STANDARD OUTPUT:"
   cat "$OUT"
-  if [ $TRACE != $ERR ]; then
+  if [ "$TRACE" != "$ERR" ]; then
     echo
     echo "TRACE-ERROR OUTPUT:"
     cat "$TRACE"
@@ -107,16 +134,6 @@ if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ER
   echo "END OF CRONIC OUTPUT."
 fi
 
-if [ "$DEBUG" == "true" ]; then
-  # Don't "echo" anything here because it gets appended to stderr.
-  :
-else
-  rm -f "$OUT"
-  if [ ! $ERR == /dev/null ]; then
-    rm -f "$ERR"
-  fi
-  rm -f "$REDUCED_ERR"
-  rm -f "$TRACE"
-fi
+# The temporary files are removed by the EXIT trap.
 
 exit $RESULT

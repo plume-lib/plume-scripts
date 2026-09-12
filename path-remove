@@ -29,23 +29,37 @@ while (scalar(@ARGV) > 0) {
   }
 }
 
-$splitchar = ":";
+# All the input lines are merged into a single output path, so the output
+# separator is decided once, for the whole output:  a colon if any input line
+# contains a colon, otherwise a space if any input line contains a space.
+# (Each line is still split according to its own contents.)  Preferring the
+# colon guarantees that a mix of colon- and space-separated input lines yields
+# a valid colon-separated path rather than a space-separated list in which the
+# elements of the colon-separated lines are run together.  The default matters
+# only if no input line contains a separator.
+$saw_colon = 0;
+$saw_space = 0;
 @result = ();
 while (<>) {
       my @pieces;
+      my $linesplitchar;
       chomp;
       if ($_ =~ /:/) {
+	$linesplitchar = ":";
 	@pieces = split(":");
-	$splitchar = ":";
+	$saw_colon = 1;
       } elsif ($_ =~ / /) {
+	$linesplitchar = " ";
 	@pieces = split(" ");
-	$splitchar = " ";
+	$saw_space = 1;
       } else {
-	# no separators; assume colon, but don't set splitchar.
+	# no separators; assume colon, but don't let this line determine the
+	# output separator.
+	$linesplitchar = ":";
 	@pieces = split(":");
       }
       if ($debug) {
-	print STDERR "splitchar: $splitchar\n";
+	print STDERR "splitchar: $linesplitchar\n";
 	print STDERR "" . scalar(@pieces) . " initial components\n";
 	# print STDERR "Input: $_\n";
       }
@@ -59,8 +73,11 @@ while (<>) {
       }
 }
 
+$splitchar = ($saw_colon || ! $saw_space) ? ":" : " ";
+
 if ($debug) {
   print STDERR "" . scalar(@result) . " final components\n";
+  print STDERR "output separator: $splitchar\n";
 }
 
 print join($splitchar, @result);
