@@ -1,8 +1,8 @@
-.PHONY: test clean all diff-test bad-input-test
+.PHONY: test clean all diff-test bad-input-test atomic-test process-failure-test
 
 all: test
 
-test: diff-test bad-input-test
+test: diff-test bad-input-test atomic-test process-failure-test
 
 diff-test: lines1.output lines1.output2 lines2.output blank.output
 	diff -u lines1.output-goal lines1.output
@@ -12,6 +12,12 @@ diff-test: lines1.output lines1.output2 lines2.output blank.output
 
 bad-input-test: ../../squeeze-blank-lines bad-input-test.sh
 	./bad-input-test.sh
+
+atomic-test: ../../squeeze-blank-lines atomic-test.sh
+	./atomic-test.sh
+
+process-failure-test: ../../squeeze-blank-lines process-failure-test.sh
+	./process-failure-test.sh
 
 lines1.output: ../../squeeze-blank-lines lines1.txt
 	../../squeeze-blank-lines < lines1.txt > $@
