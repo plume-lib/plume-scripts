@@ -44,14 +44,18 @@ temp_files() {
 ### The temporary file names are not derived from the process id.
 
 # The wrapped command's parent is `cronic` itself, so $PPID is the process id
-# that the old names were built from.
+# that the old names were built from.  Check both the hard-coded /tmp that the
+# old names used and the $TMPDIR that this test sets, so that reintroducing the
+# predictable names under either directory is caught.
 cat > "$work/report-ppid" << 'EOF'
 #!/bin/sh
-for file in "/tmp/cronic.out.$PPID" "/tmp/cronic.err.$PPID" \
-  "/tmp/cronic.err.reduced.$PPID" "/tmp/cronic.trace.$PPID"; do
-  if [ -e "$file" ]; then
-    echo "$file" >> "$1"
-  fi
+for dir in "/tmp" "${TMPDIR:-/tmp}"; do
+  for file in "$dir/cronic.out.$PPID" "$dir/cronic.err.$PPID" \
+    "$dir/cronic.err.reduced.$PPID" "$dir/cronic.trace.$PPID"; do
+    if [ -e "$file" ]; then
+      echo "$file" >> "$1"
+    fi
+  done
 done
 EOF
 chmod +x "$work/report-ppid"
