@@ -10,20 +10,23 @@
 
 # Typical use:
 #
-#   if [ -d /tmp/plume-scripts ] ; then
-#     git -C /tmp/plume-scripts pull -q > /dev/null 2>&1
+#   PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
+#   if [ -d "$PLUME_SCRIPTS" ] ; then
+#     git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 #   else
-#     mkdir -p /tmp && git -C /tmp clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#     mkdir -p "$PLUME_SCRIPTS" \
+#       && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #   fi
-#   eval "$(/tmp/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
+#   eval "$("$PLUME_SCRIPTS"/ci-org-and-branch DEFAULT-ORGANIZATION)"
 #
 # Alternatively, to use a specific version of this script rather than the latest:
 #
-#   if [ ! -d /tmp/$USER/plume-scripts ] ; then
-#     mkdir -p /tmp/$USER
-#     git -C /tmp/$USER clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git
+#   PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
+#   if [ ! -d "$PLUME_SCRIPTS" ] ; then
+#     mkdir -p "$PLUME_SCRIPTS" \
+#       && git clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #   fi
-#   eval "$(/tmp/$USER/plume-scripts/ci-org-and-branch DEFAULT-ORGANIZATION)"
+#   eval "$("$PLUME_SCRIPTS"/ci-org-and-branch DEFAULT-ORGANIZATION)"
 
 # Optional argument DEFAULT-ORGANIZATION is used if no organization can be
 # determined; variable CI_DEFAULT_ORGANIZATION is used if it is not supplied.
