@@ -166,6 +166,7 @@ to print every message.
 Given a list of file names as arguments, print the ones with unique
 contents: for each group of files with identical contents, only the
 first one (in argument order) is printed.
+Documentation [at top of file](uniq-contents).
 
 ## Java
 

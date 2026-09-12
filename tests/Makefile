@@ -17,7 +17,8 @@ TEST_DIRS = \
 	preplace-test \
 	sort-compiler-output-test \
 	sort-directory-order-test \
-	squeeze-blank-lines-test
+	squeeze-blank-lines-test \
+	uniq-contents-test
 
 all: test
 
