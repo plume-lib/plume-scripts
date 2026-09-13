@@ -1,0 +1,13 @@
+{
+  "https://api.github.com/repos/plume-lib/plume-scripts/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status": {
+    "state": "pending",
+    "statuses": []
+  },
+  "https://api.github.com/repos/plume-lib/plume-scripts/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100&page=1": {
+    "total_count": 2,
+    "check_runs": [
+      { "name": "build", "status": "completed", "conclusion": "success" },
+      { "name": "superseded-build", "status": "completed", "conclusion": "stale" }
+    ]
+  }
+}

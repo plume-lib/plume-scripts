@@ -265,7 +265,10 @@ _sgr_set_git_range_body() {
       # succeeding jobs and then ci-last-success.py will return just
       # part of the pull request's diffs.
 
-      ## # ci-last-success.py currently doesn't work because api.github.com returns "state: pending".
+      ## # ci-last-success.py is disabled here because it makes at least one
+      ## # unauthenticated GitHub API request per commit -- two when the commit's
+      ## # check runs do not show that CI failed, and more when they span several
+      ## # pages -- so walking back far exhausts the 60-requests-per-hour limit.
       # # TODO: wrap all this in a ci-last-commit.sh shell script.
       # if pip3 list --format columns | tail -n +1 | grep -q '^requests ' ; then
       #   # echo "Python requests package is already installed" >&2
@@ -280,9 +283,7 @@ _sgr_set_git_range_body() {
       #     CI_COMMIT_RANGE_START=${default_commit_range_start}
       #   elif ! git cat-file -e ${CI_COMMIT_RANGE_START}^{commit}; then
       #     # The commit is not in the repository.  Maybe it is older than the
-      #     # commits pulled into this repository.  This can happen when
-      #     # api.github.com incorrectly returns "state: pending" for successful
-      #     # jobs.
+      #     # commits pulled into this repository.
       #     echo "WARNING: ci-last-success.py script returned commit not in repository; using last commit." >&2
       #     CI_COMMIT_RANGE_START=${default_commit_range_start}
       #   else
@@ -293,7 +294,7 @@ _sgr_set_git_range_body() {
       #   CI_COMMIT_RANGE_START=${default_commit_range_start}
       # fi
 
-      ## Use this because ci-last-success.py currently doesn't work.
+      ## Use this because the ci-last-success.py call above is disabled.
       CI_COMMIT_RANGE_START=${default_commit_range_start}
     else
       # Verify the ref rather than parsing it blindly.  If

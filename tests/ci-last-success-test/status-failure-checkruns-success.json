@@ -1,0 +1,10 @@
+{
+  "https://api.github.com/repos/plume-lib/plume-scripts/commits/8888888888888888888888888888888888888888/status": {
+    "state": "failure",
+    "statuses": [{ "context": "continuous-integration/travis-ci", "state": "failure" }]
+  },
+  "https://api.github.com/repos/plume-lib/plume-scripts/commits/8888888888888888888888888888888888888888/check-runs?per_page=100&page=1": {
+    "total_count": 1,
+    "check_runs": [{ "name": "build", "status": "completed", "conclusion": "success" }]
+  }
+}
