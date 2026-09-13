@@ -3,7 +3,7 @@
 all: test
 
 test: test-words test-reldir test-guessstrip test-javaexception test-incomparable \
-  test-mixedpaths test-gradleindent
+  test-mixedpaths test-gradleindent test-quotedsource
 
 
 # "words" test
@@ -102,8 +102,20 @@ gradleindent-lint-pruned.txt: gradleindent.diff gradleindent-lint.txt ../../lint
 	../../lint-diff.py --context=0 gradleindent.diff gradleindent-lint.txt > $@ || true
 
 
+# "quotedsource" test
+
+# A continuation line that quotes source code containing "name:digits:" is a
+# continuation line, not a warning about a file whose name is the text that
+# precedes the line number.
+test-quotedsource: quotedsource-lint-pruned.txt-goal quotedsource-lint-pruned.txt
+	diff $^
+
+quotedsource-lint-pruned.txt: quotedsource.diff quotedsource-lint.txt ../../lint-diff.py
+	../../lint-diff.py --context=0 quotedsource.diff quotedsource-lint.txt > $@ || true
+
+
 # Miscellaneous targets
 
 # The `clean` target would be simpler if all generated files were put in a subdirectory.
 clean:
-	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt mixedpaths-lint-pruned.txt gradleindent-lint-pruned.txt
+	rm -f words1.txt words2.txt words12.diff words-lint.txt words2-lint.txt words2-lint-pruned.txt words2-lint-pruned.txt-goal words2-lint.txt-goal-pruned words2-lint.txt-pruned words2-lint-pruned.txt-goal-nofilename words2-lint-pruned.txt-nofilename reldir-lint-pruned.txt guessstrip-lint-pruned.txt javaexception-lint-pruned.txt incomparable-lint-pruned.txt mixedpaths-lint-pruned.txt gradleindent-lint-pruned.txt quotedsource-lint-pruned.txt

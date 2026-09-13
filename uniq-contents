@@ -3,10 +3,12 @@
 # contents: for each group of files with identical contents, only the
 # first one (in argument order) is printed.
 #
-# Exits with status 1 if any argument could not be read: it does not exist,
-# it is not a regular file, or reading it failed.  Such an argument is
-# reported on stderr and is omitted from the output; the readable files are
-# still processed.
+# Every argument that is not printed is reported on stderr; the other files
+# are still processed.  Exits with status 1 if an argument does not exist or
+# could not be read.  An argument that exists but is not a regular file (a
+# directory, most often) is only warned about, because `uniq-contents *` in a
+# directory that contains a subdirectory is an ordinary invocation, not an
+# error, and a nonzero status would abort a caller that uses `set -e`.
 
 # Pick a hashing command; sha256 makes accidental collisions
 # (calling distinct files identical) astronomically unlikely.
@@ -32,9 +34,9 @@ for f in "$@"; do
     status=1
     continue
   fi
+  # Not an error; see the comment at the top of this file.
   if [ ! -f "$f" ]; then
-    printf '%s: not a regular file: %s\n' "$prog" "$f" >&2
-    status=1
+    printf '%s: warning: not a regular file: %s\n' "$prog" "$f" >&2
     continue
   fi
 

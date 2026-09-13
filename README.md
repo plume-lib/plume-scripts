@@ -21,8 +21,7 @@ PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
 if [ -d "$PLUME_SCRIPTS" ] ; then
   git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 else
-  mkdir -p "$PLUME_SCRIPTS" \
-    && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
+  git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 fi
 ```
 

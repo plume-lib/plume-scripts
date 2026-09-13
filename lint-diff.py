@@ -34,8 +34,7 @@
 #  if [ -d "$PLUME_SCRIPTS" ] ; then
 #   git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 #  else
-#   mkdir -p "$PLUME_SCRIPTS" \
-#    && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
+#   git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #  fi
 #  (command-that-issues-warnings > /tmp/warnings.txt 2>&1) || true
 #  "$PLUME_SCRIPTS"/ci-lint-diff /tmp/warnings.txt
@@ -65,6 +64,16 @@ PLUSPLUSPLUS_RE = re.compile(r"\+\+\+ (\S*).*")
 # it prints "> Compilation failed; see the compiler output below." and then
 # prints one warning, indented by two spaces.
 FILENAME_LINENO_RE = re.compile(r"[ \t]*([^:]*):([0-9]+):.*")
+
+# An indented line that is itself a warning rather than the continuation of
+# one.  Unlike `FILENAME_LINENO_RE`, the file name may not contain a quotation,
+# grouping, or punctuation character, so that a continuation line that quotes
+# source code containing "name:digits:" -- say,
+#   log.error("Config.java:42: bad");
+# -- is still treated as a continuation line, rather than as a warning about a
+# file named `log.error("Config.java`.  Every line that this matches is also
+# matched by `FILENAME_LINENO_RE`, which parses it.
+INDENTED_WARNING_RE = re.compile(r"[ \t]*[^:\s\"'`()\[\]{},;=]*:[0-9]+:")
 
 INITIAL_WHITESPACE_RE = re.compile(r"[ \t]")
 
@@ -106,7 +115,7 @@ def main() -> None:
         if (
             print_multiline_warning
             and INITIAL_WHITESPACE_RE.match(warning_line)
-            and not FILENAME_LINENO_RE.match(warning_line)
+            and not INDENTED_WARNING_RE.match(warning_line)
         ):
             print(warning_line, end="")
             continue

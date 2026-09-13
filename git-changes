@@ -14,8 +14,7 @@
 #   if [ -d "$PLUME_SCRIPTS" ] ; then
 #     git -C "$PLUME_SCRIPTS" pull -q > /dev/null 2>&1
 #   else
-#     mkdir -p "$PLUME_SCRIPTS" \
-#       && git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
+#     git clone --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #   fi
 #   eval "$("$PLUME_SCRIPTS"/git-changes DEFAULT-ORGANIZATION)"
 #
@@ -23,8 +22,7 @@
 #
 #   PLUME_SCRIPTS="/tmp/${USER:-$(id -un)}/plume-scripts"
 #   if [ ! -d "$PLUME_SCRIPTS" ] ; then
-#     mkdir -p "$PLUME_SCRIPTS" \
-#       && git clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
+#     git clone --revision=e768754ffafad4a9f1e26c5305591d4061d890b4 --depth=1 -q https://github.com/plume-lib/plume-scripts.git "$PLUME_SCRIPTS"
 #   fi
 #   eval "$("$PLUME_SCRIPTS"/git-changes DEFAULT-ORGANIZATION)"
 

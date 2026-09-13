@@ -4,8 +4,9 @@ all: test
 
 INPUTS = main.tex intro.tex code.c snippet.tex
 
-test: ../../latex-process-inputs filename-test.sh inline.actual list.actual
+test: ../../latex-process-inputs latex-process-inputs-test.sh filename-test.sh inline.actual list.actual
 	./filename-test.sh
+	./latex-process-inputs-test.sh
 	diff -u inline.goal inline.actual
 	diff -u list.goal list.actual
 
