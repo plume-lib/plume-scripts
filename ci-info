@@ -478,8 +478,9 @@ elif [ -n "$GITHUB_ACTIONS" ] && [ -n "$GITHUB_REPOSITORY" ]; then
   # are case-insensitive, so compare them that way:  a clone of this very
   # repository whose origin spells the owner differently is no disagreement.
   clone_organization=$(org_from_url "$URL")
-  if [ -n "$clone_organization" ] \
-    && [ "$(to_lower "$clone_organization")" != "$(to_lower "$CI_ORGANIZATION")" ]; then
+  clone_organization_lower=$(to_lower "$clone_organization")
+  ci_organization_lower=$(to_lower "$CI_ORGANIZATION")
+  if [ -n "$clone_organization" ] && [ "$clone_organization_lower" != "$ci_organization_lower" ]; then
     emit_echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from GITHUB_REPOSITORY=${GITHUB_REPOSITORY},"
     emit_echo "not ${clone_organization} from the origin of this clone."
   fi
@@ -544,7 +545,6 @@ if [ "$DEBUG" = "--debug" ]; then
     emit_echo "URL is empty (no remote named origin, or this directory is not a git clone)"
   fi
   emit_echo "current branch: $(git branch --show-current)"
-  emit_echo "current repo: $(redact_url "$(git config --get remote.origin.url)")"
 fi
 
 if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then

@@ -363,6 +363,8 @@ _scoab_set_org_and_branch_body() {
   local origin_url
   local origin_head
   local clone_organization
+  local clone_organization_lower
+  local ci_organization_lower
   local GITHUB_PR_NUMBER
   local pr_number
   local local_head_ref
@@ -595,8 +597,9 @@ _scoab_set_org_and_branch_body() {
     # are case-insensitive, so compare them that way:  a clone of this very
     # repository whose origin spells the owner differently is no disagreement.
     clone_organization=$(_scoab_org_from_url "$origin_url")
-    if [ -n "$clone_organization" ] \
-      && [ "$(_scoab_to_lower "$clone_organization")" != "$(_scoab_to_lower "$CI_ORGANIZATION")" ]; then
+    clone_organization_lower=$(_scoab_to_lower "$clone_organization")
+    ci_organization_lower=$(_scoab_to_lower "$CI_ORGANIZATION")
+    if [ -n "$clone_organization" ] && [ "$clone_organization_lower" != "$ci_organization_lower" ]; then
       {
         echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from GITHUB_REPOSITORY=${GITHUB_REPOSITORY},"
         echo "not ${clone_organization} from the origin of this clone."
@@ -666,7 +669,6 @@ _scoab_set_org_and_branch_body() {
         echo "origin_url is empty (no remote named origin, or this directory is not a git clone)"
       fi
       echo "current branch: $(git branch --show-current)"
-      echo "current repo: $(_scoab_redact_url "$(git config --get remote.origin.url)")"
     } >&2
   fi
 

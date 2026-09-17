@@ -110,16 +110,17 @@ messages() {
   run_raw "$1" "$2" 2>&1
 }
 
+# Each script gets every check, so that a failure report names one script and
+# everything that is wrong with it.
 for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+
+  # CI_BRANCH is checked too, so that a change to the organization does not
+  # quietly break the branch in the same code path.
   actual=""
   if ! actual="$(run "$script" testorg/testrepo)"; then
     echo "FAIL: $script: nonzero exit status"
     status=1
-    continue
-  fi
-  # CI_BRANCH is checked too, so that a change to the organization does not
-  # quietly break the branch in the same code path.
-  if [ "$actual" = "testorg feature-branch" ]; then
+  elif [ "$actual" = "testorg feature-branch" ]; then
     echo "PASS: $script in a sibling clone of another organization's repository"
   else
     echo "FAIL: $script in a sibling clone of another organization's repository"
@@ -129,26 +130,23 @@ for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
     echo "  actual CI_ORGANIZATION and CI_BRANCH:   $actual"
     status=1
   fi
-done
 
-# A job that runs in a sibling clone of another organization's repository gets
-# its companion clones from an organization that appears nowhere else in its
-# log, so the scripts say which organization they chose and which they did not.
-for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+  # A job that runs in a sibling clone of another organization's repository
+  # gets its companion clones from an organization that appears nowhere else in
+  # its log, so the scripts say which organization they chose and which they
+  # did not.
   if messages "$script" testorg/testrepo | grep -q 'not otherorg from the origin of this clone'; then
     echo "PASS: $script reports preferring GITHUB_REPOSITORY to this clone's origin"
   else
     echo "FAIL: $script does not report preferring GITHUB_REPOSITORY to this clone's origin"
     status=1
   fi
-done
 
-# An ordinary job -- one whose $GITHUB_REPOSITORY names the repository that this
-# clone's origin names -- has nothing to disagree with, so it says nothing.
-# "OtherOrg" is the same owner as "otherorg":  GitHub owner names are
-# case-insensitive, so a difference in case is not a disagreement.
-for repository in otherorg/otherrepo OtherOrg/otherrepo; do
-  for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+  # An ordinary job -- one whose $GITHUB_REPOSITORY names the repository that
+  # this clone's origin names -- has nothing to disagree with, so it says
+  # nothing.  "OtherOrg" is the same owner as "otherorg":  GitHub owner names
+  # are case-insensitive, so a difference in case is not a disagreement.
+  for repository in otherorg/otherrepo OtherOrg/otherrepo; do
     # The output is captured rather than piped straight into `grep`, so that
     # this check takes the exit status of the script rather than of `grep`:  a
     # script that died before saying anything is not a script that was silent.
@@ -165,30 +163,29 @@ for repository in otherorg/otherrepo OtherOrg/otherrepo; do
       echo "PASS: $script is silent for GITHUB_REPOSITORY=$repository"
     fi
   done
-done
 
-# A runner, a container, or a tool such as `act` may set $GITHUB_ACTIONS and not
-# $GITHUB_REPOSITORY.  There is then no organization in the environment to
-# prefer, so the scripts use this clone's origin -- rather than an empty
-# organization, or a claim not to be using the organization they then use.
-for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+  # A runner, a container, or a tool such as `act` may set $GITHUB_ACTIONS and
+  # not $GITHUB_REPOSITORY.  There is then no organization in the environment
+  # to prefer, so the scripts use this clone's origin -- rather than an empty
+  # organization, or a claim not to be using the organization they then use.
   actual=""
   if ! actual="$(run "$script" "")"; then
     echo "FAIL: $script: nonzero exit status with GITHUB_REPOSITORY unset"
     status=1
-    continue
-  fi
-  reported="$(messages "$script" "")"
-  if [ "$actual" = "otherorg feature-branch" ] \
-    && ! printf '%s\n' "$reported" | grep -q 'from the origin of this clone'; then
-    echo "PASS: $script uses this clone's origin with GITHUB_REPOSITORY unset"
   else
-    echo "FAIL: $script with GITHUB_REPOSITORY unset"
-    echo "  expected CI_ORGANIZATION and CI_BRANCH: otherorg feature-branch"
-    echo "  actual CI_ORGANIZATION and CI_BRANCH:   $actual"
-    echo "  reported: $reported"
-    status=1
+    reported="$(messages "$script" "")"
+    if [ "$actual" = "otherorg feature-branch" ] \
+      && ! printf '%s\n' "$reported" | grep -q 'from the origin of this clone'; then
+      echo "PASS: $script uses this clone's origin with GITHUB_REPOSITORY unset"
+    else
+      echo "FAIL: $script with GITHUB_REPOSITORY unset"
+      echo "  expected CI_ORGANIZATION and CI_BRANCH: otherorg feature-branch"
+      echo "  actual CI_ORGANIZATION and CI_BRANCH:   $actual"
+      echo "  reported: $reported"
+      status=1
+    fi
   fi
+
 done
 
 exit "$status"
