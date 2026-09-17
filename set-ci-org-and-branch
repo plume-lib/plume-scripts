@@ -644,14 +644,18 @@ _scoab_set_org_and_branch_body() {
     # has none, for example).  Fall back to the remote-tracking HEAD that
     # `git clone` recorded locally.  Warn either way:  a client that silently
     # gets an empty default branch name computes something other than what it
-    # asked for, and the resulting diagnostics blame the wrong thing.
+    # asked for, and the resulting diagnostics blame the wrong thing.  Print
+    # what git said, too:  it was captured above, so nothing else would report
+    # it, and without it an authentication failure, an unreachable host, and a
+    # deleted remote all look alike.
     local_head_ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2> /dev/null)
     CI_DEFAULT_BRANCH_NAME=${local_head_ref#origin/}
     if [ -n "$CI_DEFAULT_BRANCH_NAME" ]; then
-      echo "${SCRIPT_NAME}: cannot ask origin for its default branch; using ${CI_DEFAULT_BRANCH_NAME} from refs/remotes/origin/HEAD instead." >&2
+      echo "${SCRIPT_NAME}: cannot ask origin for its default branch; using ${CI_DEFAULT_BRANCH_NAME} from refs/remotes/origin/HEAD instead:" >&2
     else
-      echo "${SCRIPT_NAME}: WARNING: cannot determine the default branch name, from origin or from refs/remotes/origin/HEAD." >&2
+      echo "${SCRIPT_NAME}: WARNING: cannot determine the default branch name, from origin or from refs/remotes/origin/HEAD:" >&2
     fi
+    printf '%s\n' "${origin_head}" | _scoab_redact_tokens >&2
   fi
   if [ -n "$debug" ]; then
     {

@@ -149,7 +149,15 @@ done
 # case-insensitive, so a difference in case is not a disagreement.
 for repository in otherorg/otherrepo OtherOrg/otherrepo; do
   for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
-    if messages "$script" "$repository" | grep -q 'from the origin of this clone'; then
+    # The output is captured rather than piped straight into `grep`, so that
+    # this check takes the exit status of the script rather than of `grep`:  a
+    # script that died before saying anything is not a script that was silent.
+    reported=""
+    if ! reported="$(messages "$script" "$repository")"; then
+      echo "FAIL: $script: nonzero exit status for GITHUB_REPOSITORY=$repository"
+      echo "  reported: $reported"
+      status=1
+    elif printf '%s\n' "$reported" | grep -q 'from the origin of this clone'; then
       echo "FAIL: $script reports a disagreement for GITHUB_REPOSITORY=$repository"
       echo "  origin of the current directory: https://github.com/otherorg/otherrepo.git"
       status=1

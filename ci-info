@@ -517,11 +517,23 @@ fi
 ORIGIN_HEAD=$(git ls-remote --symref origin HEAD 2>&1)
 DEFAULT_BRANCH_NAME=$(printf '%s\n' "${ORIGIN_HEAD}" | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
 if [ -z "$DEFAULT_BRANCH_NAME" ]; then
-  # `git ls-remote` failed, or origin's HEAD is not a symbolic ref.  Print what
-  # git said:  it was captured above, so nothing else would report it, and a
-  # client that silently gets an empty default branch name computes something
-  # other than what it asked for.
-  emit_echo "${SCRIPT_NAME}: WARNING: cannot determine the default branch name from origin:"
+  # `git ls-remote` failed, or origin's HEAD is not a symbolic ref.  The
+  # network may be down, or origin may require credentials that this checkout
+  # does not have (a GitHub Actions job that uses `persist-credentials: false`
+  # has none, for example).  Fall back to the remote-tracking HEAD that
+  # `git clone` recorded locally.  Warn either way:  a client that silently
+  # gets an empty default branch name computes something other than what it
+  # asked for, and the resulting diagnostics blame the wrong thing.  Print
+  # what git said, too:  it was captured above, so nothing else would report
+  # it, and without it an authentication failure, an unreachable host, and a
+  # deleted remote all look alike.
+  local_head_ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2> /dev/null)
+  DEFAULT_BRANCH_NAME=${local_head_ref#origin/}
+  if [ -n "$DEFAULT_BRANCH_NAME" ]; then
+    emit_echo "${SCRIPT_NAME}: cannot ask origin for its default branch; using ${DEFAULT_BRANCH_NAME} from refs/remotes/origin/HEAD instead:"
+  else
+    emit_echo "${SCRIPT_NAME}: WARNING: cannot determine the default branch name, from origin or from refs/remotes/origin/HEAD:"
+  fi
   printf '%s\n' "${ORIGIN_HEAD}" | redact_tokens | emit_echo_lines
 fi
 if [ "$DEBUG" = "--debug" ]; then
