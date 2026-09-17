@@ -443,6 +443,17 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     emit_echo "GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     emit_echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
+elif [ -n "$GITHUB_ACTIONS" ]; then
+  # GitHub Actions, non-pull-request.  $GITHUB_REPOSITORY is the repository the
+  # job is running for.  Prefer it to the fallback below, which reads the origin
+  # of whatever directory the client called this script from:  a client that
+  # clones a companion repository may call from a sibling clone of a different
+  # repository, whose origin names the wrong organization.
+  CI_ORGANIZATION=${GITHUB_REPOSITORY%%/*}
+  if [ "$DEBUG" = "--debug" ]; then
+    emit_echo "GitHub Actions, not a pull request, GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+    emit_echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
+  fi
 fi
 
 ## Git clone

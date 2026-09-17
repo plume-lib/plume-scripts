@@ -1,0 +1,115 @@
+#!/bin/sh
+
+# Tests that the scripts determine CI_ORGANIZATION from GITHUB_REPOSITORY in a
+# GitHub Actions job that is not a pull request.
+#
+# The scripts had no GitHub Actions non-pull-request case for the
+# organization, only for the branch, so the organization came from the
+# fallback that reads the origin of the current directory.  That is the wrong
+# answer for the client this information exists to serve:  `git-clone-related`
+# clones a companion repository from ${CI_ORGANIZATION}, and a client may call
+# it from a sibling clone of a different repository -- as the Checker
+# Framework's `test-daikon-part1.sh` does, cloning Daikon while the current
+# directory is the checker-framework clone.  The organization was then the one
+# in that clone's origin, so a fork's push build silently tested against the
+# upstream companion repository instead of the fork's.
+#
+# The pull request case is not tested here, because determining its
+# organization requires a GitHub API request.
+
+set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+PLUME_SCRIPTS="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
+
+# The scripts need these, and skipping is better than failing:  a missing
+# prerequisite is not a defect in the scripts.
+if [ -z "$(command -v jq 2> /dev/null)" ]; then
+  echo "$(basename -- "$0"): skipping, because jq is not installed."
+  exit 0
+fi
+if [ -z "$(command -v curl 2> /dev/null)" ] && [ -z "$(command -v wget 2> /dev/null)" ]; then
+  echo "$(basename -- "$0"): skipping, because neither curl nor wget is installed."
+  exit 0
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+
+### A clone of some *other* repository, in some other organization
+#
+# This stands in for the sibling clone that a client calls the scripts from.
+# Its origin URL names otherorg, so that reading the origin of the current
+# directory gives a different answer than GITHUB_REPOSITORY does.  An
+# `insteadOf` rewrite points the URL at a local repository, so that the
+# scripts' `git ls-remote origin` needs no network.
+
+git init -q -b main "$work/sibling"
+cd "$work/sibling"
+git config user.email test@example.com
+git config user.name "Test User"
+echo one > file.txt
+git add file.txt
+git commit -q -m "First commit"
+git clone -q --bare . "$work/origin.git"
+git config url."$work/origin.git".insteadOf "https://github.com/otherorg/otherrepo.git"
+git remote add origin "https://github.com/otherorg/otherrepo.git"
+git fetch -q origin
+git remote set-head origin main
+
+### The test
+
+status=0
+
+# run SCRIPT: runs SCRIPT the way its documentation says to, in a simulated
+# GitHub Actions push job whose current directory is the sibling clone, and
+# prints the resulting CI_ORGANIZATION and CI_BRANCH.
+run() {
+  script="$1"
+  # Run with an empty environment except for the GitHub Actions variables, so
+  # that this test behaves the same whether or not it is itself running under
+  # CI.  Other CI services' variables would send the scripts down other code
+  # paths.  GITHUB_HEAD_REF is unset, which is what makes this not a pull
+  # request.  CI_DEFAULT_ORGANIZATION is a third name, distinct from both
+  # testorg and otherorg, so that this test can tell the intended answer from
+  # each of the two fallbacks.
+  # The inner script is single-quoted on purpose:  its arguments are passed
+  # positionally, so that this shell does not expand them into it.
+  # shellcheck disable=SC2016
+  env -i PATH="$PATH" HOME="$HOME" \
+    GITHUB_ACTIONS=true GITHUB_EVENT_NAME=push \
+    GITHUB_REF_NAME=feature-branch GITHUB_REPOSITORY=testorg/testrepo \
+    sh -c '
+      cd "$1" || exit 2
+      if [ "$3" = "set-ci-org-and-branch" ]; then
+        CI_DEFAULT_ORGANIZATION=defaultorg
+        . "$2/$3" || exit 2
+      else
+        eval "$("$2/$3" defaultorg)" || exit 2
+      fi
+      printf "%s %s" "$CI_ORGANIZATION" "$CI_BRANCH"
+    ' sh "$work/sibling" "$PLUME_SCRIPTS" "$script" 2> /dev/null
+}
+
+for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+  actual=""
+  if ! actual="$(run "$script")"; then
+    echo "FAIL: $script: nonzero exit status"
+    status=1
+    continue
+  fi
+  # CI_BRANCH is checked too, so that a change to the organization does not
+  # quietly break the branch in the same code path.
+  if [ "$actual" = "testorg feature-branch" ]; then
+    echo "PASS: $script in a sibling clone of another organization's repository"
+  else
+    echo "FAIL: $script in a sibling clone of another organization's repository"
+    echo "  GITHUB_REPOSITORY: testorg/testrepo"
+    echo "  origin of the current directory: https://github.com/otherorg/otherrepo.git"
+    echo "  expected CI_ORGANIZATION and CI_BRANCH: testorg feature-branch"
+    echo "  actual CI_ORGANIZATION and CI_BRANCH:   $actual"
+    status=1
+  fi
+done
+
+exit "$status"
