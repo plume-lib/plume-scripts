@@ -9,6 +9,7 @@ TEST_DIRS = \
 	ci-last-success-test \
 	cronic-test \
 	eval-quoting-test \
+	github-organization-test \
 	github-pr-number-test \
 	github-ref-name-test \
 	http-status-test \

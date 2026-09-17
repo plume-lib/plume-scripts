@@ -564,6 +564,19 @@ _scoab_set_org_and_branch_body() {
         echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
       } >&2
     fi
+  elif [ -n "$GITHUB_ACTIONS" ]; then
+    # GitHub Actions, non-pull-request.  $GITHUB_REPOSITORY is the repository
+    # the job is running for.  Prefer it to the fallback below, which reads the
+    # origin of whatever directory the client called this script from:  a client
+    # that clones a companion repository may call from a sibling clone of a
+    # different repository, whose origin names the wrong organization.
+    CI_ORGANIZATION=${GITHUB_REPOSITORY%%/*}
+    if [ -n "$debug" ]; then
+      {
+        echo "GitHub Actions, not a pull request, GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+        echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
+      } >&2
+    fi
   fi
 
   ## Git clone
