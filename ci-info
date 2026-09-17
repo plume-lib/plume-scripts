@@ -282,6 +282,11 @@ commit_range_is_usable() {
   git merge-base "$CI_COMMIT_RANGE_START" "$CI_COMMIT_RANGE_END" > /dev/null 2>&1
 }
 
+# to_lower TEXT: prints TEXT with every uppercase letter made lowercase.
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 # org_from_url URL: prints the GitHub organization of a repository URL, or
 # nothing if the argument is not a GitHub repository URL.  The caller treats no
 # output as "unknown" and falls back to $DEFAULT_ORGANIZATION, so it is better
@@ -335,7 +340,7 @@ org_from_url() {
   ofu_host=${ofu_host##*@}
   ofu_host=${ofu_host%%:*}
   # Hostnames are case-insensitive, and git accepts them in any case.
-  ofu_host=$(printf '%s' "${ofu_host}" | tr '[:upper:]' '[:lower:]')
+  ofu_host=$(to_lower "${ofu_host}")
   case $ofu_host in
     github.com | www.github.com) : ;;
     *) return 0 ;;
@@ -455,19 +460,26 @@ elif [ -n "$GITHUB_HEAD_REF" ]; then
     emit_echo "GITHUB_PR_NUMBER=${GITHUB_PR_NUMBER}"
     emit_echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
   fi
-elif [ -n "$GITHUB_ACTIONS" ]; then
+elif [ -n "$GITHUB_ACTIONS" ] && [ -n "$GITHUB_REPOSITORY" ]; then
   # GitHub Actions, non-pull-request.  $GITHUB_REPOSITORY is the repository the
   # job is running for.  Prefer it to the fallback below, which reads the origin
   # of whatever directory the client called this script from:  a client that
   # clones a companion repository may call from a sibling clone of a different
   # repository, whose origin names the wrong organization.
+  # GitHub Actions always sets $GITHUB_REPOSITORY, but a self-hosted runner, a
+  # container, or a tool such as `act` may pass on only $GITHUB_ACTIONS.  The
+  # condition above tests for it, so that such a job falls through to the clone
+  # below rather than getting an empty organization.
   CI_ORGANIZATION=${GITHUB_REPOSITORY%%/*}
   # Report the disagreement, as every other preference for the environment over
   # this clone does.  A job that runs in a sibling clone of another
   # organization's repository would otherwise silently get companion clones
-  # from an organization that appears nowhere in its log.
+  # from an organization that appears nowhere in its log.  GitHub owner names
+  # are case-insensitive, so compare them that way:  a clone of this very
+  # repository whose origin spells the owner differently is no disagreement.
   clone_organization=$(org_from_url "$URL")
-  if [ -n "$clone_organization" ] && [ "$clone_organization" != "$CI_ORGANIZATION" ]; then
+  if [ -n "$clone_organization" ] \
+    && [ "$(to_lower "$clone_organization")" != "$(to_lower "$CI_ORGANIZATION")" ]; then
     emit_echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from GITHUB_REPOSITORY=${GITHUB_REPOSITORY},"
     emit_echo "not ${clone_organization} from the origin of this clone."
   fi
@@ -494,18 +506,30 @@ fi
 
 ### Other information (besides organization)
 
-## Both of these commands for DEFAULT_BRANCH_NAME seem to work.
-# DEFAULT_BRANCH_NAME=$(git ls-remote --symref "$(git config --get remote.origin.url)" HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
-DEFAULT_BRANCH_NAME=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+## `git remote show origin | grep 'HEAD branch' | cut -d' ' -f5` also works,
+## but only in an English locale:  `git remote show` is porcelain, so git
+## translates its output.  `git ls-remote` is plumbing, so its output is stable.
+## The output is kept rather than piped straight into awk, so that the --debug
+## block below can print it without asking origin a second time.  The
+## redirection is inside the substitution, so that git's diagnostics are
+## captured rather than written to this script's stderr:  an old git names the
+## URL, credential and all, in them, hence `redact_tokens` at each use below.
+ORIGIN_HEAD=$(git ls-remote --symref origin HEAD 2>&1)
+DEFAULT_BRANCH_NAME=$(printf '%s\n' "${ORIGIN_HEAD}" | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+if [ -z "$DEFAULT_BRANCH_NAME" ]; then
+  # `git ls-remote` failed, or origin's HEAD is not a symbolic ref.  Print what
+  # git said:  it was captured above, so nothing else would report it, and a
+  # client that silently gets an empty default branch name computes something
+  # other than what it asked for.
+  emit_echo "${SCRIPT_NAME}: WARNING: cannot determine the default branch name from origin:"
+  printf '%s\n' "${ORIGIN_HEAD}" | redact_tokens | emit_echo_lines
+fi
 if [ "$DEBUG" = "--debug" ]; then
   emit_echo "remote's DEFAULT_BRANCH_NAME=$DEFAULT_BRANCH_NAME"
   if [ -n "${URL}" ]; then
-    # The redirection is inside the substitution, so that git's diagnostics
-    # are captured rather than written to this script's stderr.  An old git
-    # names the URL, credential and all, in them, hence `redact_tokens`.
-    echo "HEAD of $(redact_url "${URL}") = $(git ls-remote --symref "${URL}" HEAD 2>&1)" | redact_tokens | emit_echo_lines
+    echo "HEAD of $(redact_url "${URL}") = ${ORIGIN_HEAD}" | redact_tokens | emit_echo_lines
   else
-    emit_echo "URL is empty (this clone has no remote named origin)"
+    emit_echo "URL is empty (no remote named origin, or this directory is not a git clone)"
   fi
   emit_echo "current branch: $(git branch --show-current)"
   emit_echo "current repo: $(redact_url "$(git config --get remote.origin.url)")"

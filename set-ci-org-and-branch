@@ -226,6 +226,11 @@ _scoab_redact_tokens() {
   '
 }
 
+# _scoab_to_lower TEXT: prints TEXT with every uppercase letter made lowercase.
+_scoab_to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 # _scoab_org_from_url URL: prints the GitHub organization of a repository URL,
 # or nothing if the argument is not a GitHub repository URL.  The caller treats
 # no output as "unknown" and falls back to $CI_DEFAULT_ORGANIZATION, so it is
@@ -281,7 +286,7 @@ _scoab_org_from_url() {
   host=${host##*@}
   host=${host%%:*}
   # Hostnames are case-insensitive, and git accepts them in any case.
-  host=$(printf '%s' "${host}" | tr '[:upper:]' '[:lower:]')
+  host=$(_scoab_to_lower "${host}")
   case $host in
     github.com | www.github.com) : ;;
     *) return 0 ;;
@@ -356,6 +361,7 @@ _scoab_set_org_and_branch_body() {
   local get_url_status
   local SLUG
   local origin_url
+  local origin_head
   local clone_organization
   local GITHUB_PR_NUMBER
   local pr_number
@@ -571,19 +577,26 @@ _scoab_set_org_and_branch_body() {
         echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
       } >&2
     fi
-  elif [ -n "$GITHUB_ACTIONS" ]; then
+  elif [ -n "$GITHUB_ACTIONS" ] && [ -n "$GITHUB_REPOSITORY" ]; then
     # GitHub Actions, non-pull-request.  $GITHUB_REPOSITORY is the repository
     # the job is running for.  Prefer it to the fallback below, which reads the
     # origin of whatever directory the client called this script from:  a client
     # that clones a companion repository may call from a sibling clone of a
     # different repository, whose origin names the wrong organization.
+    # GitHub Actions always sets $GITHUB_REPOSITORY, but a self-hosted runner, a
+    # container, or a tool such as `act` may pass on only $GITHUB_ACTIONS.  The
+    # condition above tests for it, so that such a job falls through to the
+    # clone below rather than getting an empty organization.
     CI_ORGANIZATION=${GITHUB_REPOSITORY%%/*}
     # Report the disagreement, as every other preference for the environment
     # over this clone does.  A job that runs in a sibling clone of another
     # organization's repository would otherwise silently get companion clones
-    # from an organization that appears nowhere in its log.
+    # from an organization that appears nowhere in its log.  GitHub owner names
+    # are case-insensitive, so compare them that way:  a clone of this very
+    # repository whose origin spells the owner differently is no disagreement.
     clone_organization=$(_scoab_org_from_url "$origin_url")
-    if [ -n "$clone_organization" ] && [ "$clone_organization" != "$CI_ORGANIZATION" ]; then
+    if [ -n "$clone_organization" ] \
+      && [ "$(_scoab_to_lower "$clone_organization")" != "$(_scoab_to_lower "$CI_ORGANIZATION")" ]; then
       {
         echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from GITHUB_REPOSITORY=${GITHUB_REPOSITORY},"
         echo "not ${clone_organization} from the origin of this clone."
@@ -617,7 +630,13 @@ _scoab_set_org_and_branch_body() {
   ## `git remote show origin | grep 'HEAD branch' | cut -d' ' -f5` also works,
   ## but only in an English locale:  `git remote show` is porcelain, so git
   ## translates its output.  `git ls-remote` is plumbing, so its output is stable.
-  CI_DEFAULT_BRANCH_NAME=$(git ls-remote --symref origin HEAD | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
+  ## The output is kept rather than piped straight into awk, so that the debug
+  ## block below can print it without asking origin a second time.  The
+  ## redirection is inside the substitution, so that git's diagnostics are
+  ## captured rather than written to stderr unredacted:  an old git names the
+  ## URL, credential and all, in them, hence `_scoab_redact_tokens` below.
+  origin_head=$(git ls-remote --symref origin HEAD 2>&1)
+  CI_DEFAULT_BRANCH_NAME=$(printf '%s\n' "${origin_head}" | awk '/^ref:/ {sub(/refs\/heads\//, "", $2); print $2}')
   if [ -z "$CI_DEFAULT_BRANCH_NAME" ]; then
     # `git ls-remote` failed, or origin's HEAD is not a symbolic ref.  The
     # network may be down, or origin may require credentials that this checkout
@@ -638,12 +657,9 @@ _scoab_set_org_and_branch_body() {
     {
       echo "remote's CI_DEFAULT_BRANCH_NAME=$CI_DEFAULT_BRANCH_NAME"
       if [ -n "${origin_url}" ]; then
-        # The redirection is inside the substitution, so that git's
-        # diagnostics are captured rather than written to stderr unredacted.
-        # An old git names the URL, credential and all, in them.
-        echo "HEAD of $(_scoab_redact_url "${origin_url}") = $(git ls-remote --symref "${origin_url}" HEAD 2>&1)" | _scoab_redact_tokens
+        echo "HEAD of $(_scoab_redact_url "${origin_url}") = ${origin_head}" | _scoab_redact_tokens
       else
-        echo "origin_url is empty (this clone has no remote named origin)"
+        echo "origin_url is empty (no remote named origin, or this directory is not a git clone)"
       fi
       echo "current branch: $(git branch --show-current)"
       echo "current repo: $(_scoab_redact_url "$(git config --get remote.origin.url)")"
@@ -868,7 +884,8 @@ fi
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
 unset -f _scoab_set_org_and_branch_body _scoab_get_url _scoab_org_from_url \
-  _scoab_pr_number_from_ref_name _scoab_redact_tokens _scoab_redact_url
+  _scoab_pr_number_from_ref_name _scoab_redact_tokens _scoab_redact_url \
+  _scoab_to_lower
 if [ -n "$_scoab_had_errexit" ]; then
   set -e
 fi

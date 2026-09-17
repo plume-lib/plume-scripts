@@ -61,12 +61,14 @@ git remote set-head origin main
 
 status=0
 
-# run_raw SCRIPT: runs SCRIPT the way its documentation says to, in a simulated
-# GitHub Actions push job whose current directory is the sibling clone.  Prints
-# the resulting CI_ORGANIZATION and CI_BRANCH to standard output, and whatever
-# the script reported to standard error.
+# run_raw SCRIPT REPOSITORY: runs SCRIPT the way its documentation says to, in
+# a simulated GitHub Actions push job whose current directory is the sibling
+# clone and whose $GITHUB_REPOSITORY is REPOSITORY.  Prints the resulting
+# CI_ORGANIZATION and CI_BRANCH to standard output, and whatever the script
+# reported to standard error.
 run_raw() {
   script="$1"
+  repository="$2"
   # Run with an empty environment except for the GitHub Actions variables, so
   # that this test behaves the same whether or not it is itself running under
   # CI.  Other CI services' variables would send the scripts down other code
@@ -79,7 +81,7 @@ run_raw() {
   # shellcheck disable=SC2016
   env -i PATH="$PATH" HOME="$HOME" \
     GITHUB_ACTIONS=true GITHUB_EVENT_NAME=push \
-    GITHUB_REF_NAME=feature-branch GITHUB_REPOSITORY=testorg/testrepo \
+    GITHUB_REF_NAME=feature-branch GITHUB_REPOSITORY="$repository" \
     sh -c '
       cd "$1" || exit 2
       if [ "$3" = "set-ci-org-and-branch" ]; then
@@ -96,19 +98,21 @@ run_raw() {
     ' sh "$work/sibling" "$PLUME_SCRIPTS" "$script"
 }
 
-# run SCRIPT: prints the CI_ORGANIZATION and CI_BRANCH that SCRIPT computes.
+# run SCRIPT REPOSITORY: prints the CI_ORGANIZATION and CI_BRANCH that SCRIPT
+# computes.
 run() {
-  run_raw "$1" 2> /dev/null
+  run_raw "$1" "$2" 2> /dev/null
 }
 
-# messages SCRIPT: prints what SCRIPT reported, along with the variables.
+# messages SCRIPT REPOSITORY: prints what SCRIPT reported, along with the
+# variables.
 messages() {
-  run_raw "$1" 2>&1
+  run_raw "$1" "$2" 2>&1
 }
 
 for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
   actual=""
-  if ! actual="$(run "$script")"; then
+  if ! actual="$(run "$script" testorg/testrepo)"; then
     echo "FAIL: $script: nonzero exit status"
     status=1
     continue
@@ -131,10 +135,50 @@ done
 # its companion clones from an organization that appears nowhere else in its
 # log, so the scripts say which organization they chose and which they did not.
 for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
-  if messages "$script" | grep -q 'not otherorg from the origin of this clone'; then
+  if messages "$script" testorg/testrepo | grep -q 'not otherorg from the origin of this clone'; then
     echo "PASS: $script reports preferring GITHUB_REPOSITORY to this clone's origin"
   else
     echo "FAIL: $script does not report preferring GITHUB_REPOSITORY to this clone's origin"
+    status=1
+  fi
+done
+
+# An ordinary job -- one whose $GITHUB_REPOSITORY names the repository that this
+# clone's origin names -- has nothing to disagree with, so it says nothing.
+# "OtherOrg" is the same owner as "otherorg":  GitHub owner names are
+# case-insensitive, so a difference in case is not a disagreement.
+for repository in otherorg/otherrepo OtherOrg/otherrepo; do
+  for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+    if messages "$script" "$repository" | grep -q 'from the origin of this clone'; then
+      echo "FAIL: $script reports a disagreement for GITHUB_REPOSITORY=$repository"
+      echo "  origin of the current directory: https://github.com/otherorg/otherrepo.git"
+      status=1
+    else
+      echo "PASS: $script is silent for GITHUB_REPOSITORY=$repository"
+    fi
+  done
+done
+
+# A runner, a container, or a tool such as `act` may set $GITHUB_ACTIONS and not
+# $GITHUB_REPOSITORY.  There is then no organization in the environment to
+# prefer, so the scripts use this clone's origin -- rather than an empty
+# organization, or a claim not to be using the organization they then use.
+for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+  actual=""
+  if ! actual="$(run "$script" "")"; then
+    echo "FAIL: $script: nonzero exit status with GITHUB_REPOSITORY unset"
+    status=1
+    continue
+  fi
+  reported="$(messages "$script" "")"
+  if [ "$actual" = "otherorg feature-branch" ] \
+    && ! printf '%s\n' "$reported" | grep -q 'from the origin of this clone'; then
+    echo "PASS: $script uses this clone's origin with GITHUB_REPOSITORY unset"
+  else
+    echo "FAIL: $script with GITHUB_REPOSITORY unset"
+    echo "  expected CI_ORGANIZATION and CI_BRANCH: otherorg feature-branch"
+    echo "  actual CI_ORGANIZATION and CI_BRANCH:   $actual"
+    echo "  reported: $reported"
     status=1
   fi
 done
