@@ -66,9 +66,15 @@
 # Requires the `jq` program, either `curl` or `wget`, and the script
 # `set-ci-org-and-branch` in ${PLUME_SCRIPTS}.
 
-# PROBLEM: The directory from which this script is running must override environment
-# variables, because a CI job may itself call "git clone" and then later call
-# this script from that clone.  Idea: check the directory name.
+# PROBLEM: A CI job may itself call "git clone" and then later call this script
+# from that clone, so the environment and the current directory can describe
+# different repositories.  Which one should win depends on what is being
+# computed.  For a commit ID, the directory wins, because a commit that the
+# environment names need not exist in this clone; this script therefore
+# verifies $GITHUB_SHA before using it.  For the organization, the environment
+# wins, because the job's own repository is what the client is asking about,
+# and a sibling clone's origin names some other organization.  Idea: check the
+# directory name.
 
 # When this file is sourced, "$0" is the client's name rather than this file's
 # name; so if "$0" is this file's name, the client ran it instead of sourcing it.

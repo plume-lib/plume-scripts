@@ -61,10 +61,11 @@ git remote set-head origin main
 
 status=0
 
-# run SCRIPT: runs SCRIPT the way its documentation says to, in a simulated
-# GitHub Actions push job whose current directory is the sibling clone, and
-# prints the resulting CI_ORGANIZATION and CI_BRANCH.
-run() {
+# run_raw SCRIPT: runs SCRIPT the way its documentation says to, in a simulated
+# GitHub Actions push job whose current directory is the sibling clone.  Prints
+# the resulting CI_ORGANIZATION and CI_BRANCH to standard output, and whatever
+# the script reported to standard error.
+run_raw() {
   script="$1"
   # Run with an empty environment except for the GitHub Actions variables, so
   # that this test behaves the same whether or not it is itself running under
@@ -85,10 +86,24 @@ run() {
         CI_DEFAULT_ORGANIZATION=defaultorg
         . "$2/$3" || exit 2
       else
-        eval "$("$2/$3" defaultorg)" || exit 2
+        # The output that a client `eval`s may contain `echo` commands,
+        # because ci-info has no other way to report anything.  Send what
+        # they print to standard error, like the other two scripts, so that
+        # standard output holds only the variables.
+        eval "$("$2/$3" defaultorg)" >&2 || exit 2
       fi
       printf "%s %s" "$CI_ORGANIZATION" "$CI_BRANCH"
-    ' sh "$work/sibling" "$PLUME_SCRIPTS" "$script" 2> /dev/null
+    ' sh "$work/sibling" "$PLUME_SCRIPTS" "$script"
+}
+
+# run SCRIPT: prints the CI_ORGANIZATION and CI_BRANCH that SCRIPT computes.
+run() {
+  run_raw "$1" 2> /dev/null
+}
+
+# messages SCRIPT: prints what SCRIPT reported, along with the variables.
+messages() {
+  run_raw "$1" 2>&1
 }
 
 for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
@@ -108,6 +123,18 @@ for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
     echo "  origin of the current directory: https://github.com/otherorg/otherrepo.git"
     echo "  expected CI_ORGANIZATION and CI_BRANCH: testorg feature-branch"
     echo "  actual CI_ORGANIZATION and CI_BRANCH:   $actual"
+    status=1
+  fi
+done
+
+# A job that runs in a sibling clone of another organization's repository gets
+# its companion clones from an organization that appears nowhere else in its
+# log, so the scripts say which organization they chose and which they did not.
+for script in ci-info ci-org-and-branch set-ci-org-and-branch; do
+  if messages "$script" | grep -q 'not otherorg from the origin of this clone'; then
+    echo "PASS: $script reports preferring GITHUB_REPOSITORY to this clone's origin"
+  else
+    echo "FAIL: $script does not report preferring GITHUB_REPOSITORY to this clone's origin"
     status=1
   fi
 done

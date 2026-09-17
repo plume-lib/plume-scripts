@@ -48,9 +48,15 @@
 # called, it is used as GitHub Personal Access Token when making GitHub API
 # calls.  This can avoid "403 rate limit exceeded" failures.
 
-# PROBLEM: The directory from which git-changes is running must override environment
-# variables, because a CI job may itself call "git clone" and then later call
-# git-changes from that clone.  Idea: check the directory name.
+# PROBLEM: A CI job may itself call "git clone" and then later call git-changes
+# from that clone, so the environment and the current directory can describe
+# different repositories.  Which one should win depends on what is being
+# computed.  For a commit ID, the directory wins, because a commit that the
+# environment names need not exist in this clone; `set-git-range` therefore
+# verifies $GITHUB_SHA before using it.  For the organization, the environment
+# wins, because the job's own repository is what the client is asking about,
+# and a sibling clone's origin names some other organization.  Idea: check the
+# directory name.
 
 # SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 SCRIPT_NAME="$(basename -- "$0")"
@@ -372,6 +378,12 @@ redact_url() {
 
 ### Organization
 
+# The origin of the clone that the client called this script from.  Set here,
+# not where it is first used, because three places want it:  the fallback for
+# the organization, the cross-check of the organization that the CI service
+# reports, and the --debug output.
+URL=$(git config --get remote.origin.url)
+
 ## Continuous integration services
 if [ "$TRAVIS" = "true" ]; then
   CI_ORGANIZATION=${TRAVIS_PULL_REQUEST_SLUG%/*}
@@ -450,6 +462,15 @@ elif [ -n "$GITHUB_ACTIONS" ]; then
   # clones a companion repository may call from a sibling clone of a different
   # repository, whose origin names the wrong organization.
   CI_ORGANIZATION=${GITHUB_REPOSITORY%%/*}
+  # Report the disagreement, as every other preference for the environment over
+  # this clone does.  A job that runs in a sibling clone of another
+  # organization's repository would otherwise silently get companion clones
+  # from an organization that appears nowhere in its log.
+  clone_organization=$(org_from_url "$URL")
+  if [ -n "$clone_organization" ] && [ "$clone_organization" != "$CI_ORGANIZATION" ]; then
+    emit_echo "${SCRIPT_NAME}: using organization ${CI_ORGANIZATION} from GITHUB_REPOSITORY=${GITHUB_REPOSITORY},"
+    emit_echo "not ${clone_organization} from the origin of this clone."
+  fi
   if [ "$DEBUG" = "--debug" ]; then
     emit_echo "GitHub Actions, not a pull request, GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
     emit_echo "CI_ORGANIZATION=${CI_ORGANIZATION}"
@@ -458,7 +479,6 @@ fi
 
 ## Git clone
 if [ -z "$CI_ORGANIZATION" ]; then
-  URL=$(git config --get remote.origin.url)
   CI_ORGANIZATION=$(org_from_url "$URL")
   # TODO: Maybe add a sanity check here.
 fi
@@ -485,7 +505,7 @@ if [ "$DEBUG" = "--debug" ]; then
     # names the URL, credential and all, in them, hence `redact_tokens`.
     echo "HEAD of $(redact_url "${URL}") = $(git ls-remote --symref "${URL}" HEAD 2>&1)" | redact_tokens | emit_echo_lines
   else
-    emit_echo "URL is empty (is set only for non-CI runs)"
+    emit_echo "URL is empty (this clone has no remote named origin)"
   fi
   emit_echo "current branch: $(git branch --show-current)"
   emit_echo "current repo: $(redact_url "$(git config --get remote.origin.url)")"
