@@ -20,8 +20,7 @@ jobs:
           fetch-depth: 1
           show-progress: false
           persist-credentials: false
-      # The `circleci_validate` hook in `prek.toml` needs the CircleCI CLI.
-      # Don't pipe the upstream installer into a shell, since that installer can change arbitrarily.
+      # DON'T pipe the upstream installer into a shell, since that installer can change arbitrarily.
       # Installing under $HOME also means this step needs no root.
       - name: Install the CircleCI CLI
         run: |
