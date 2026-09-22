@@ -1,4 +1,4 @@
-name: Prek checks
+name: Prek style checks
 
 "on": [push, pull_request]
 
@@ -20,10 +20,7 @@ jobs:
           fetch-depth: 1
           show-progress: false
           persist-credentials: false
-      # The `circleci_validate` hook in `prek.toml` needs the CircleCI CLI.
-      # Install a pinned release and verify its checksum, rather than piping
-      # the upstream installer into a shell:  that installer lives on a
-      # mutable branch, so every run would execute whatever it says today.
+      # DON'T pipe the upstream installer into a shell, since that installer can change arbitrarily.
       # Installing under $HOME also means this step needs no root.
       - name: Install the CircleCI CLI
         run: |
