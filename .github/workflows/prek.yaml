@@ -33,4 +33,4 @@ jobs:
           install -m 755 circleci "$HOME/.local/bin/circleci"
           rm -f "$tarball" circleci
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - uses: j178/prek-action@v3.0.0
+      - uses: j178/prek-action@v3.0.1
