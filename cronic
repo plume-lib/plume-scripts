@@ -9,16 +9,11 @@
 #   any non-trace error output or a non-zero result code. Cronic filters
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
-#   debugging. Apart from the options below, Cronic simply executes its
+#   debugging. Apart from its options, Cronic simply executes its
 #   arguments.
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
-# --expected-status N (or --expected-status=N) treats exit status N (0 to 255),
-# rather than 0, as success.
-# --permit-stderr does not treat error output as a failure.
-# --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
-# -- ends the options, so that the command may start with "-".
-# -h or --help prints a usage message.
+# The options are documented in function `cronic_help`; run `cronic --help`.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -46,10 +41,12 @@ cronic_usage() {
 cronic_help() {
   cronic_usage_line
   echo "Runs COMMAND, and produces output only if it fails or writes to stderr."
-  echo "  --expected-status N  treat exit status N (0 to 255), rather than 0, as success"
+  echo "  --expected-status N  treat exit status N (0 to 255), rather than 0, as success;"
+  echo "                       may also be written --expected-status=N"
   echo "  --permit-stderr      do not treat error output as a failure"
-  echo "  --duplicate-stderr   print the error output twice in the report"
-  echo "  --                   end the options"
+  echo "  --duplicate-stderr   print the error output twice in the report, so that it"
+  echo "                       is less likely to be overlooked"
+  echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
   exit 0
 }
