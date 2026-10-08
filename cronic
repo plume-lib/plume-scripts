@@ -9,13 +9,105 @@
 #   any non-trace error output or a non-zero result code. Cronic filters
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
-#   debugging. Cronic has no options, it simply executes its arguments.
-# Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
+#   debugging. Apart from the options below, Cronic simply executes its
+#   arguments.
+# Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
+# --duplicate-stderr options, which may be given in any order.
+# --expected-status N (or --expected-status=N) treats exit status N (0 to 255),
+# rather than 0, as success.
+# --permit-stderr does not treat error output as a failure.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
+# -- ends the options, so that the command may start with "-".
+# -h or --help prints a usage message.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
+
+# The names of this script's functions start with "cronic_".  The wrapped
+# command runs in this shell, so a function named, say, `usage` would run in
+# place of a command of the same name.
+
+# Prints the usage line.
+cronic_usage_line() {
+  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]"
+}
+
+# Exits with status 64 (EX_USAGE in sysexits.h) rather than the conventional 2,
+# because a wrapped command is much more likely to exit with status 2, and a
+# caller that checks for a particular status should not mistake a misuse of
+# this script for the command's own result.
+cronic_usage() {
+  cronic_usage_line >&2
+  exit 64
+}
+
+# Prints a usage message to standard output and exits with status 0.
+cronic_help() {
+  cronic_usage_line
+  echo "Runs COMMAND, and produces output only if it fails or writes to stderr."
+  echo "  --expected-status N  treat exit status N (0 to 255), rather than 0, as success"
+  echo "  --permit-stderr      do not treat error output as a failure"
+  echo "  --duplicate-stderr   print the error output twice in the report"
+  echo "  --                   end the options"
+  echo "  -h, --help           print this message"
+  exit 0
+}
+
+# Sets EXPECTED to its argument, or reports a usage error if the argument is
+# not a valid exit status.
+cronic_set_expected() {
+  EXPECTED=$1
+  # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
+  # octal.  At most 255, because no exit status is larger.
+  if ! [[ $EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$EXPECTED" -gt 255 ]; then
+    echo "$0: --expected-status requires an integer from 0 to 255, got \"$EXPECTED\"" >&2
+    cronic_usage
+  fi
+}
+
+# The options are parsed before the temporary directory is created, so that
+# `--help` and a usage error neither create nor depend on it.
+EXPECTED=0
+PERMITSTDERR=0
+DUPLICATE_STDERR=0
+while [ $# -gt 0 ]; do
+  case $1 in
+    --expected-status)
+      shift
+      [ $# -gt 0 ] || cronic_usage
+      cronic_set_expected "$1"
+      shift
+      ;;
+    --expected-status=*)
+      cronic_set_expected "${1#*=}"
+      shift
+      ;;
+    --permit-stderr)
+      shift
+      PERMITSTDERR=1
+      ;;
+    --duplicate-stderr)
+      shift
+      DUPLICATE_STDERR=1
+      ;;
+    -h | --help)
+      cronic_help
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "$0: unknown option \"$1\"" >&2
+      cronic_usage
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+[ $# -gt 0 ] || cronic_usage
 
 DEBUG=false
 # DEBUG=true
@@ -35,10 +127,10 @@ TRACE=$CRONIC_TMPDIR/trace
 # retained; don't "echo" their location, because that would be appended to
 # stderr.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
-cleanup() {
+cronic_cleanup() {
   [ "$DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
 }
-trap cleanup EXIT
+trap cronic_cleanup EXIT
 
 # Clean up and then die of the signal, rather than exiting with status
 # 128+signum, so that a supervisor can distinguish "cronic was killed by
@@ -48,26 +140,9 @@ trap cleanup EXIT
 # installed, bash dies as soon as the signal arrives, abandoning the wrapped
 # command and deleting the directory that the command is still writing into,
 # whereas a handler does not run until the wrapped command has finished.
-trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
-trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
-trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
-
-EXPECTED=0
-if [ "$1" == "--expected-status" ]; then
-  shift
-  EXPECTED=$1
-  shift
-fi
-PERMITSTDERR=0
-if [ "$1" == "--permit-stderr" ]; then
-  shift
-  PERMITSTDERR=1
-fi
-DUPLICATE_STDERR=0
-if [ "$1" == "--duplicate-stderr" ]; then
-  shift
-  DUPLICATE_STDERR=1
-fi
+trap 'cronic_cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
+trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
+trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
 set +e
 "$@" > "$OUT" 2> "$TRACE"
