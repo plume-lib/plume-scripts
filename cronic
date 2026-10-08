@@ -9,20 +9,19 @@
 #   any non-trace error output or a non-zero result code. Cronic filters
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
-#   debugging. Cronic has no options, it simply executes its arguments.
-# Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
+#   debugging. Apart from the options below, Cronic simply executes its
+#   arguments.
+# Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
+# --duplicate-stderr options, which may be given in any order.
+# --expected-status N treats exit status N (0 to 255), rather than 0, as success.
+# --permit-stderr does not treat error output as a failure.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
+# -- ends the options, so that the command may start with "--".
 
-# Which of `-e` and `-u` the caller had on, before this script turns them on
-# for itself.  The wrapped command runs with the caller's settings of these
-# options rather than this script's; see where it is run, below.
-CALLER_E_U_OPTIONS=
-case $- in
-  *e*) CALLER_E_U_OPTIONS+=e ;;
-esac
-case $- in
-  *u*) CALLER_E_U_OPTIONS+=u ;;
-esac
+# The caller's shell options, before this script turns on `-e` and `-u` for
+# itself.  The wrapped command runs with the caller's settings of these options
+# rather than this script's; see where it is run, below.
+CALLER_OPTIONS=$-
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -68,46 +67,67 @@ trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 # caller that checks for a particular status should not mistake a misuse of
 # this script for the command's own result.
 usage() {
-  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] COMMAND [ARG...]" >&2
+  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]" >&2
   exit 64
 }
 
 EXPECTED=0
-if [ "${1:-}" == "--expected-status" ]; then
-  shift
-  [ $# -gt 0 ] || usage
-  EXPECTED=$1
-  shift
-  if ! [[ $EXPECTED =~ ^[0-9]+$ ]]; then
-    echo "$0: --expected-status requires a non-negative integer, got \"$EXPECTED\"" >&2
-    usage
-  fi
-fi
 PERMITSTDERR=0
-if [ "${1:-}" == "--permit-stderr" ]; then
-  shift
-  PERMITSTDERR=1
-fi
 DUPLICATE_STDERR=0
-if [ "${1:-}" == "--duplicate-stderr" ]; then
-  shift
-  DUPLICATE_STDERR=1
-fi
+while [ $# -gt 0 ]; do
+  case $1 in
+    --expected-status)
+      shift
+      [ $# -gt 0 ] || usage
+      EXPECTED=$1
+      shift
+      # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
+      # octal.  At most 255, because no exit status is larger.
+      if ! [[ $EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$EXPECTED" -gt 255 ]; then
+        echo "$0: --expected-status requires an integer from 0 to 255, got \"$EXPECTED\"" >&2
+        usage
+      fi
+      ;;
+    --permit-stderr)
+      shift
+      PERMITSTDERR=1
+      ;;
+    --duplicate-stderr)
+      shift
+      DUPLICATE_STDERR=1
+      ;;
+    --)
+      shift
+      break
+      ;;
+    --*)
+      echo "$0: unknown option \"$1\"" >&2
+      usage
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 [ $# -gt 0 ] || usage
 
 # Run the command with the caller's `-e` and `-u` settings rather than this
 # script's.  If the caller exported SHELLOPTS, then the command would otherwise
 # inherit this script's `-e` and `-u` options, and a bash script that reads an
 # unset variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
-# The command runs in this shell, not via `exec` in a subshell, so that it can
-# be a shell function or builtin.
+# The command runs in a subshell, rather than via `exec`, so that it can be a
+# shell builtin or an exported shell function; and in a subshell rather than in
+# this shell, so that a builtin such as `exit` or `exec` cannot end this script
+# before it reports.  The redirections are on the command itself, not on the
+# subshell, so that the trace of the `set` commands goes to this script's
+# stderr rather than into the command's.
 RESULT=0
-set +eu
-if [ -n "$CALLER_E_U_OPTIONS" ]; then
-  set "-$CALLER_E_U_OPTIONS"
-fi
-"$@" > "$OUT" 2> "$TRACE" || RESULT=$?
-set -eu
+(
+  set +eu
+  case $CALLER_OPTIONS in *e*) set -e ;; esac
+  case $CALLER_OPTIONS in *u*) set -u ;; esac
+  "$@" > "$OUT" 2> "$TRACE"
+) || RESULT=$?
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
 if grep -q "$PATTERN" "$TRACE"; then

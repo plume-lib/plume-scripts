@@ -204,11 +204,34 @@ check "--permit-stderr without a command" 64 "message:^Usage: " \
 # A non-integer expected status is a usage error, rather than a value that
 # makes every exit status look expected.
 check "--expected-status with a non-integer value" 64 \
-  "message:requires a non-negative integer" \
+  "message:requires an integer from 0 to 255" \
   --expected-status x "$work/trace-only" 1
+# So is a value that no exit status can equal, or that the shell's integer
+# comparisons cannot handle.
+check "--expected-status larger than 255" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status 256 "$work/trace-only" 1
+check "--expected-status too large for an integer comparison" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status 99999999999999999999 "$work/trace-only" 1
+check "--expected-status with a leading zero" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status 09 "$work/trace-only" 1
+
+# The options may be given in any order.
+check "options out of order" 3 silent \
+  --permit-stderr --expected-status 3 "$work/trace-and-stderr" 3
+# An unknown option is a usage error, rather than a command to run.
+check "unknown option" 64 "message:unknown option" \
+  --no-such-option "$work/trace-only" 0
+# `--` ends the options.
+check "-- before the command" 0 silent -- "$work/trace-only" 0
 
 # The command may be a shell builtin.
 check "builtin command" 0 silent :
+# A builtin that would end the shell does not prevent the report.
+check "exit builtin" 3 report exit 3
+check "exec builtin" 3 report exec "$work/trace-only" 3
 
 # When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
 # the wrapped command, but the caller's options do.
@@ -228,8 +251,20 @@ check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
 # With xtrace exported, the report's trace section is the command's own trace,
 # with nothing that `cronic` did to set up the command's options.  `cronic`'s
 # own trace goes to its stderr, which is discarded here.
+before="$(temp_files)"
+xtrace_status=0
 "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0 \
-  > "$work/output" 2> /dev/null
+  > "$work/output" 2> /dev/null || xtrace_status=$?
+after="$(temp_files)"
+if [ "$xtrace_status" != 0 ]; then
+  echo "FAIL: exported SHELLOPTS with xtrace: exit status $xtrace_status, expected 0"
+  status=1
+fi
+if [ "$before" != "$after" ]; then
+  echo "FAIL: exported SHELLOPTS with xtrace: temporary files were left behind:"
+  echo "$after"
+  status=1
+fi
 sed -n '/^TRACE-ERROR OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
 cat > "$work/trace-section.goal" << 'EOF'
 TRACE-ERROR OUTPUT:
