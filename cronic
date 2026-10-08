@@ -21,8 +21,9 @@
 # rather than this script's; see where it is run, below.
 #  * The caller's exported variables whose names start with `CRONIC_`, which
 #    this script's own variables would otherwise hide.
-#  * The caller's shell options.  `set +o` reports `-e` as off, because bash
-#    turns `-e` off in a command substitution, so `$-` supplies it.
+#  * The caller's shell options.  `set +o` reports `-e` and verbose as off,
+#    because bash turns them off in a command substitution, so `$-` supplies
+#    them.
 # If the caller exported SHELLOPTS, then this script does not trace itself or
 # echo its input:  that output would go to this script's stderr, and cron would
 # send email for every run.  An exported `verbose` nonetheless echoes the lines
@@ -31,25 +32,34 @@
 # `bash -x cronic` traces this script only if SHELLOPTS is not exported.
 # The redirection discards the trace of these commands.
 {
+  # The command substitution keeps the loop variable out of this script.
   CRONIC_CALLER_VARIABLES=$(
+    # shellcheck disable=SC2034 # `name` is used indirectly, as `${!name@a}`.
     for name in "${!CRONIC_@}"; do
-      declaration=$(declare -p "$name")
-      attributes=${declaration#declare -}
-      case ${attributes%% *} in
-        *x*) echo "$declaration" ;;
+      case ${!name@a} in
+        *x*) echo "${!name@A}" ;;
       esac
     done
   )
-  # xtrace and verbose come last, so that restoring them does not trace or echo
-  # the restoring of the other options.
-  CRONIC_CALLER_OPTIONS=$(
-    set +o | grep -v -e ' verbose$' -e ' xtrace$'
-    set +o | grep -e ' verbose$' -e ' xtrace$'
-  )
+  # verbose and xtrace come last, in one command, so that restoring them neither
+  # echoes nor traces the restoring of any option.
+  CRONIC_CALLER_OPTIONS=$(set +o)
+  CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/$'\n'set [-+]o verbose/}
+  CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/$'\n'set [-+]o xtrace/}
   case $- in
     *e*) CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/set +o errexit/set -o errexit} ;;
   esac
-  if printenv SHELLOPTS > /dev/null; then set +vx; fi
+  CRONIC_CALLER_OPTIONS+=$'\n''set '
+  case $- in
+    *v*) CRONIC_CALLER_OPTIONS+='-o verbose ' ;;
+    *) CRONIC_CALLER_OPTIONS+='+o verbose ' ;;
+  esac
+  case $- in
+    *x*) CRONIC_CALLER_OPTIONS+='-o xtrace' ;;
+    *) CRONIC_CALLER_OPTIONS+='+o xtrace' ;;
+  esac
+  declare -p CRONIC_CALLER_OPTIONS > /tmp/claude-1000/-home-mernst-java-plume-lib-plume-scripts-fork-mernst-branch-cronic-nounset/67c1b40c-9d5a-4131-9329-e8ef37f9e5dc/scratchpad/opts
+  if [[ ${SHELLOPTS@a} == *x* ]]; then set +vx; fi
 } 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
@@ -100,6 +110,12 @@ if [ "${1-}" == "--expected-status" ]; then
   shift
   CRONIC_EXPECTED=$1
   shift
+  # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
+  # octal.  At most 255, because no exit status is larger.
+  if ! [[ $CRONIC_EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$CRONIC_EXPECTED" -gt 255 ]; then
+    echo "cronic: --expected-status requires an integer from 0 to 255, got \"$CRONIC_EXPECTED\"" >&2
+    exit 2
+  fi
 fi
 CRONIC_PERMITSTDERR=0
 if [ "${1-}" == "--permit-stderr" ]; then
@@ -149,17 +165,91 @@ set -e
 
 # A trace line starts with PS4 after expansion, with its first character
 # repeated once per level of nesting.  Expansion changes from line to line, so
-# the pattern matches only the literal text before the first `$`, backquote, or
-# backslash in PS4, with its regular-expression metacharacters escaped.  If
-# there is no such text, then no line is treated as a trace line.
-CRONIC_PS4_LITERAL=${PS4-}
-CRONIC_PS4_LITERAL=${CRONIC_PS4_LITERAL%%[\$\`\\]*}
-if [ -n "$CRONIC_PS4_LITERAL" ]; then
-  CRONIC_PS4_FIRST=$(printf '%s' "${CRONIC_PS4_LITERAL:0:1}" | sed 's/[]*.^[]/\\&/g')
-  CRONIC_PS4_REST=$(printf '%s' "${CRONIC_PS4_LITERAL:1}" | sed 's/[]*.^[]/\\&/g')
-  CRONIC_PATTERN="^$CRONIC_PS4_FIRST\\+$CRONIC_PS4_REST"
-fi
-if [ -n "$CRONIC_PS4_LITERAL" ] && grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
+# the pattern matches PS4's literal text exactly, with its regular-expression
+# metacharacters escaped, and matches anything where PS4 has a `$` expansion, a
+# backquoted command, or a backslash escape.  Quote characters are removed, as
+# bash removes them when it expands PS4.  If PS4 does not start with literal
+# text, then no line is treated as a trace line.
+CRONIC_PATTERN=
+case ${PS4-} in
+  '' | [\$\`\\\'\"]*) ;;
+  *)
+    CRONIC_REST=${PS4:1}
+    CRONIC_PATTERN=^
+    case $PS4 in
+      [.*[^]*) CRONIC_PATTERN+=\\ ;;
+    esac
+    CRONIC_PATTERN+="${PS4:0:1}\\+"
+    # shellcheck disable=SC2016 # These are regular expressions, not expansions.
+    CRONIC_RE_NAME='^\$[A-Za-z_][A-Za-z0-9_]*(.*)$'
+    # shellcheck disable=SC2016 # These are regular expressions, not expansions.
+    CRONIC_RE_COMMAND='^`[^`]*`?(.*)$'
+    CRONIC_RE_SINGLE_QUOTED="^'([^']*)'?(.*)\$"
+    while [ -n "$CRONIC_REST" ]; do
+      CRONIC_LITERAL=
+      # shellcheck disable=SC1003,SC2016 # The patterns are literal text.
+      case $CRONIC_REST in
+        '${'* | '$('*)
+          # Skip to the matching close brace or parenthesis.
+          CRONIC_OPEN=${CRONIC_REST:1:1}
+          if [ "$CRONIC_OPEN" = "{" ]; then CRONIC_CLOSE="}"; else CRONIC_CLOSE=")"; fi
+          CRONIC_DEPTH=0
+          CRONIC_I=1
+          while [ "$CRONIC_I" -lt ${#CRONIC_REST} ]; do
+            case ${CRONIC_REST:CRONIC_I:1} in
+              "$CRONIC_OPEN") CRONIC_DEPTH=$((CRONIC_DEPTH + 1)) ;;
+              "$CRONIC_CLOSE") CRONIC_DEPTH=$((CRONIC_DEPTH - 1)) ;;
+            esac
+            CRONIC_I=$((CRONIC_I + 1))
+            if [ "$CRONIC_DEPTH" -eq 0 ]; then break; fi
+          done
+          CRONIC_REST=${CRONIC_REST:CRONIC_I}
+          ;;
+        '$'?*)
+          if [[ $CRONIC_REST =~ $CRONIC_RE_NAME ]]; then
+            CRONIC_REST=${BASH_REMATCH[1]}
+          else
+            CRONIC_REST=${CRONIC_REST:2}
+          fi
+          ;;
+        '`'*)
+          [[ $CRONIC_REST =~ $CRONIC_RE_COMMAND ]]
+          CRONIC_REST=${BASH_REMATCH[1]}
+          ;;
+        '\'*)
+          CRONIC_REST=${CRONIC_REST:2}
+          ;;
+        \'*)
+          [[ $CRONIC_REST =~ $CRONIC_RE_SINGLE_QUOTED ]]
+          CRONIC_LITERAL=${BASH_REMATCH[1]}
+          CRONIC_REST=${BASH_REMATCH[2]}
+          ;;
+        \"*)
+          CRONIC_REST=${CRONIC_REST:1}
+          continue
+          ;;
+        *)
+          CRONIC_LITERAL=${CRONIC_REST:0:1}
+          CRONIC_REST=${CRONIC_REST:1}
+          ;;
+      esac
+      if [ -n "$CRONIC_LITERAL" ]; then
+        while [ -n "$CRONIC_LITERAL" ]; do
+          case $CRONIC_LITERAL in
+            [.*[^\$\\]*) CRONIC_PATTERN+=\\ ;;
+          esac
+          CRONIC_PATTERN+=${CRONIC_LITERAL:0:1}
+          CRONIC_LITERAL=${CRONIC_LITERAL:1}
+        done
+      elif [ "${CRONIC_PATTERN: -2}" != ".*" ]; then
+        CRONIC_PATTERN+=".*"
+      fi
+    done
+    # A trailing `.*` matches nothing more than the empty string does.
+    CRONIC_PATTERN=${CRONIC_PATTERN%.\*}
+    ;;
+esac
+if [ -n "$CRONIC_PATTERN" ] && grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,

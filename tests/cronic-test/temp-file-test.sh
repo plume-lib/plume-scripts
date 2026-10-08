@@ -43,26 +43,38 @@ temp_files() {
 
 ### The temporary file names are not derived from the process id.
 
-# The wrapped command's parent is `cronic` itself, so $PPID is the process id
-# that the old names were built from.  Check both the hard-coded /tmp that the
-# old names used and the $TMPDIR that this test sets, so that reintroducing the
-# predictable names under either directory is caught.
+# The old names were built from `cronic`'s process id.  `cronic` runs the
+# wrapped command in a subshell, so `cronic` is an ancestor of the wrapped
+# command but not necessarily its parent; check the process id of every
+# ancestor.  Check both the hard-coded /tmp that the old names used and the
+# $TMPDIR that this test sets, so that reintroducing the predictable names under
+# either directory is caught.  The test fails if no ancestor is checked, so
+# that a broken `ps` cannot make it pass vacuously.
 cat > "$work/report-ppid" << 'EOF'
 #!/bin/sh
-for dir in "/tmp" "${TMPDIR:-/tmp}"; do
-  for file in "$dir/cronic.out.$PPID" "$dir/cronic.err.$PPID" \
-    "$dir/cronic.err.reduced.$PPID" "$dir/cronic.trace.$PPID"; do
-    if [ -e "$file" ]; then
-      echo "$file" >> "$1"
-    fi
+pid=$PPID
+while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+  echo "$pid" >> "$2"
+  for dir in "/tmp" "${TMPDIR:-/tmp}"; do
+    for file in "$dir/cronic.out.$pid" "$dir/cronic.err.$pid" \
+      "$dir/cronic.err.reduced.$pid" "$dir/cronic.trace.$pid"; do
+      if [ -e "$file" ]; then
+        echo "$file" >> "$1"
+      fi
+    done
   done
+  pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
 done
 EOF
 chmod +x "$work/report-ppid"
 
-"$CRONIC" "$work/report-ppid" "$work/predictable" > "$work/output" 2>&1 \
+"$CRONIC" "$work/report-ppid" "$work/predictable" "$work/ancestors" \
+  > "$work/output" 2>&1 \
   || fail "nonzero exit status: $(cat "$work/output")"
-if [ -e "$work/predictable" ]; then
+# At least `cronic` and this test are ancestors of the wrapped command.
+if [ "$(wc -l < "$work/ancestors" 2> /dev/null || echo 0)" -lt 2 ]; then
+  fail "the ancestors of the wrapped command were not checked"
+elif [ -e "$work/predictable" ]; then
   fail "temporary file names are predictable from the process id:"
   cat "$work/predictable"
 else

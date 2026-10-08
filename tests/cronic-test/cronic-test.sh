@@ -82,6 +82,15 @@ exit "$1"
 EOF
 chmod +x "$work/make-noise-and-stderr"
 
+# A command that writes, to stderr, lines that start with `+` but are not trace
+# lines.
+cat > "$work/plus-stderr" << 'EOF'
+#!/bin/sh
+echo "+++ b/file" 1>&2
+echo "++ conflict" 1>&2
+EOF
+chmod +x "$work/plus-stderr"
+
 # A bash command that reads an unset variable.
 cat > "$work/read-unset" << 'EOF'
 #!/bin/bash
@@ -240,6 +249,21 @@ for args in "" "--expected-status" "--permit-stderr"; do
   fi
 done
 
+# An --expected-status argument that is not an exit status is an error.
+for value in abc -1 256 010 ""; do
+  usage_status=0
+  "$CRONIC" --expected-status "$value" true > "$work/output" 2> "$work/stderr" \
+    || usage_status=$?
+  if [ "$usage_status" = 2 ] && grep -q "^cronic: " "$work/stderr" \
+    && [ "$(wc -l < "$work/stderr")" = 1 ]; then
+    echo "PASS: cronic --expected-status \"$value\""
+  else
+    echo "FAIL: cronic --expected-status \"$value\": exit status $usage_status, stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
+done
+
 # Trace lines are recognized when PS4 contains regular-expression
 # metacharacters, and when PS4 contains expansions.
 PS4='[trace] '
@@ -252,6 +276,16 @@ PS4='+${LINENO}: '
 check "PS4 with expansions, trace-only stderr" 0 silent "$work/trace-only" 0
 check "PS4 with expansions, trace lines and real stderr" 0 \
   "report:^a real error$" "$work/trace-and-stderr" 0
+# An error line that starts with PS4's first character, but does not otherwise
+# look like a trace line, is reported.
+check "PS4 with expansions, error line that starts with +" 0 \
+  "report:^+++ b/file$" "$work/plus-stderr"
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${BASH_SOURCE}:${LINENO}: '
+check "PS4 with several expansions, trace-only stderr" 0 silent \
+  "$work/trace-only" 0
+check "PS4 with several expansions, error line that starts with +" 0 \
+  "report:^+++ b/file$" "$work/plus-stderr"
 unset PS4
 
 # The command may be a shell builtin.
