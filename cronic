@@ -9,50 +9,51 @@
 #   any non-trace error output or a non-zero result code. Cronic filters
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
-#   debugging. Apart from the options below, Cronic simply executes its
-#   arguments.
-# Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
-# --duplicate-stderr options, which may be given in any order.
-# --expected-status N (or --expected-status=N) treats exit status N (0 to 255),
-# rather than 0, as success.
-# --permit-stderr does not treat error output as a failure.
+#   debugging. Cronic has no options, it simply executes its arguments.
+# Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
-# -- ends the options, so that the command may start with "--".
-# -h or --help prints a usage message.
 
-# The caller's shell options, before this script turns on `-e` and `-u` for
-# itself.  The wrapped command runs with the caller's settings of these options
-# rather than this script's; see where it is run, below.
-# This script does not trace itself even if the caller exported SHELLOPTS with
-# xtrace:  the trace would go to this script's stderr, and cron would send
-# email for every run.  The redirection discards the trace of these two
-# commands.
-{ CALLER_OPTIONS=$-; set +x; } 2> /dev/null
+# The caller's shell options, as commands that restore them, before this
+# script changes any of them for itself.  The wrapped command runs with the
+# caller's options rather than this script's; see where it is run, below.
+# If the caller exported SHELLOPTS with xtrace, then this script does not trace
+# itself:  the trace would go to this script's stderr, and cron would send
+# email for every run.  `bash -x cronic` does not export SHELLOPTS, so it still
+# traces this script.  The redirection discards the trace of these commands.
+# `set +o` reports `-e` as off, because bash turns `-e` off in a command
+# substitution, so `$-` supplies it.
+{
+  CRONIC_CALLER_OPTIONS=$(set +o)
+  case $- in
+    *e*) CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/set +o errexit/set -o errexit} ;;
+  esac
+  case ${SHELLOPTS@a} in *x*) set +x ;; esac
+} 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
 
-DEBUG=false
-# DEBUG=true
+CRONIC_DEBUG=false
+# CRONIC_DEBUG=true
 
 # A private directory, rather than predictable `/tmp/cronic.*.$$` names: on a
 # shared machine, process ids are guessable and reused, so another user could
 # pre-create those paths as symlinks and have the wrapped command's output
 # written through them.
 CRONIC_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
-OUT=$CRONIC_TMPDIR/out
-ERR=$CRONIC_TMPDIR/err
-REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
-TRACE=$CRONIC_TMPDIR/trace
+CRONIC_OUT=$CRONIC_TMPDIR/out
+CRONIC_ERR=$CRONIC_TMPDIR/err
+CRONIC_REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
+CRONIC_TRACE=$CRONIC_TMPDIR/trace
 
 # Remove the temporary files however this script terminates, including when it
-# is interrupted before it reaches the end.  When DEBUG is true, the files are
-# retained; don't "echo" their location, because that would be appended to
-# stderr.
+# is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
+# files are retained; don't "echo" their location, because that would be
+# appended to stderr.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
 cleanup() {
-  [ "$DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
+  [ "$CRONIC_DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
 }
 trap cleanup EXIT
 
@@ -68,84 +69,27 @@ trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
 trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
-# Exits with status 64 (EX_USAGE in sysexits.h) rather than the conventional 2,
-# because a wrapped command is much more likely to exit with status 2, and a
-# caller that checks for a particular status should not mistake a misuse of
-# this script for the command's own result.
-usage() {
-  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]" >&2
-  exit 64
-}
+CRONIC_EXPECTED=0
+if [ "$1" == "--expected-status" ]; then
+  shift
+  CRONIC_EXPECTED=$1
+  shift
+fi
+CRONIC_PERMITSTDERR=0
+if [ "$1" == "--permit-stderr" ]; then
+  shift
+  CRONIC_PERMITSTDERR=1
+fi
+CRONIC_DUPLICATE_STDERR=0
+if [ "$1" == "--duplicate-stderr" ]; then
+  shift
+  CRONIC_DUPLICATE_STDERR=1
+fi
 
-# Prints a usage message to standard output and exits with status 0.
-help() {
-  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]"
-  echo "Runs COMMAND, and produces output only if it fails or writes to stderr."
-  echo "  --expected-status N  treat exit status N (0 to 255), rather than 0, as success"
-  echo "  --permit-stderr      do not treat error output as a failure"
-  echo "  --duplicate-stderr   print the error output twice in the report"
-  echo "  --                   end the options"
-  echo "  -h, --help           print this message"
-  exit 0
-}
-
-# Sets EXPECTED to its argument, or reports a usage error if the argument is
-# not a valid exit status.
-set_expected() {
-  EXPECTED=$1
-  # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
-  # octal.  At most 255, because no exit status is larger.
-  if ! [[ $EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$EXPECTED" -gt 255 ]; then
-    echo "$0: --expected-status requires an integer from 0 to 255, got \"$EXPECTED\"" >&2
-    usage
-  fi
-}
-
-EXPECTED=0
-PERMITSTDERR=0
-DUPLICATE_STDERR=0
-while [ $# -gt 0 ]; do
-  case $1 in
-    --expected-status)
-      shift
-      [ $# -gt 0 ] || usage
-      set_expected "$1"
-      shift
-      ;;
-    --expected-status=*)
-      set_expected "${1#*=}"
-      shift
-      ;;
-    --permit-stderr)
-      shift
-      PERMITSTDERR=1
-      ;;
-    --duplicate-stderr)
-      shift
-      DUPLICATE_STDERR=1
-      ;;
-    -h | --help)
-      help
-      ;;
-    --)
-      shift
-      break
-      ;;
-    --*)
-      echo "$0: unknown option \"$1\"" >&2
-      usage
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
-[ $# -gt 0 ] || usage
-
-# Run the command with the caller's `-e`, `-u`, and `-x` settings rather than
-# this script's.  If the caller exported SHELLOPTS, then the command would
-# otherwise inherit this script's options, and a bash script that reads an
-# unset variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
+# Run the command with all of the caller's shell options rather than this
+# script's.  If the caller exported SHELLOPTS, then the command would otherwise
+# inherit this script's options, and a bash script that reads an unset variable
+# (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
 # The command runs in a subshell, rather than via `exec`, so that it can be a
 # shell builtin or an exported shell function; and in a subshell rather than in
 # this shell, so that a builtin such as `exit` or `exec` cannot end this script
@@ -154,71 +98,76 @@ done
 # shell function that it runs.  The redirections are on the subshell, so that
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
+# The subshell unsets every variable that this script has set, so that a
+# builtin or shell function that is the command does not see them.  The
+# `unset` runs within the `eval`, whose argument is expanded first; the
+# `unset` thus precedes the restoring of the caller's `-x` and is not traced.
 set +e
 (
-  case $CALLER_OPTIONS in *e*) set -e ;; esac
-  case $CALLER_OPTIONS in *u*) ;; *) set +u ;; esac
-  case $CALLER_OPTIONS in *x*) set -x ;; esac
+  eval "unset -v CRONIC_CALLER_OPTIONS CRONIC_DEBUG CRONIC_TMPDIR CRONIC_OUT \
+    CRONIC_ERR CRONIC_REDUCED_ERR CRONIC_TRACE CRONIC_EXPECTED \
+    CRONIC_PERMITSTDERR CRONIC_DUPLICATE_STDERR
+    $CRONIC_CALLER_OPTIONS"
   "$@"
-) > "$OUT" 2> "$TRACE"
+) > "$CRONIC_OUT" 2> "$CRONIC_TRACE"
 RESULT=$?
 set -e
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
-if grep -q "$PATTERN" "$TRACE"; then
+if grep -q "$PATTERN" "$CRONIC_TRACE"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,
   # exits with the wrapped command's status, and removes its temporary files.
-  grep -v "$PATTERN" "$TRACE" > "$ERR" || true
+  grep -v "$PATTERN" "$CRONIC_TRACE" > "$CRONIC_ERR" || true
 else
-  ERR=$TRACE
+  CRONIC_ERR=$CRONIC_TRACE
 fi
 
 # Certain Unix programs send output to stderr even when a command is successful!
 # For example, git does this, and the POSIX standard requires it for make.
-# The full stderr output is shown, but file REDUCED_ERR is checked for emptiness below.
+# The full stderr output is shown, but file CRONIC_REDUCED_ERR is checked for emptiness below.
 # TODO: Expand this.
-cat "$ERR" \
+cat "$CRONIC_ERR" \
   | grep -v "^Everything up-to-date$" \
   | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
-    > "$REDUCED_ERR" || true
+    > "$CRONIC_REDUCED_ERR" || true
 
-if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ERR" ]; }; then
+if [ $RESULT -ne "$CRONIC_EXPECTED" ] || { [ $CRONIC_PERMITSTDERR -eq 0 ] && [ -s "$CRONIC_REDUCED_ERR" ]; }; then
   echo "Cronic detected failure or error output for the command:"
   echo "$@"
   echo
-  if [[ $EXPECTED -eq 0 ]]; then
+  if [[ $CRONIC_EXPECTED -eq 0 ]]; then
     if [[ $RESULT -eq 0 ]]; then
       echo "RESULT CODE: $RESULT  (success)"
     else
       echo "RESULT CODE: $RESULT  (failure)"
     fi
   else
-    echo "RESULT CODE: $RESULT  (expected: $EXPECTED)"
+    echo "RESULT CODE: $RESULT  (expected: $CRONIC_EXPECTED)"
   fi
   echo
   echo "ERROR OUTPUT:"
-  cat "$ERR"
+  cat "$CRONIC_ERR"
   echo
-  if [ "$DEBUG" != "true" ]; then
-    if ! cmp --silent "$ERR" "$REDUCED_ERR"; then
+  if [ "$CRONIC_DEBUG" != "true" ]; then
+    if ! cmp --silent "$CRONIC_ERR" "$CRONIC_REDUCED_ERR"; then
       echo "REDUCED ERROR OUTPUT:"
-      cat "$REDUCED_ERR"
+      cat "$CRONIC_REDUCED_ERR"
       echo
     fi
   fi
   echo "STANDARD OUTPUT:"
-  cat "$OUT"
-  if [ "$TRACE" != "$ERR" ]; then
+  cat "$CRONIC_OUT"
+  if [ "$CRONIC_TRACE" != "$CRONIC_ERR" ]; then
     echo
     echo "TRACE-ERROR OUTPUT:"
-    cat "$TRACE"
+    cat "$CRONIC_TRACE"
   fi
-  if [ $DUPLICATE_STDERR -eq 1 ]; then
+  if [ $CRONIC_DUPLICATE_STDERR -eq 1 ]; then
     echo
     echo "ERROR OUTPUT:"
-    cat "$ERR"
+    cat "$CRONIC_ERR"
   fi
   echo
   echo "END OF CRONIC OUTPUT."

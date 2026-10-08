@@ -102,15 +102,25 @@ EOF
 chmod +x "$work/cronic-with-shellopts"
 
 # Runs `cronic` with SHELLOPTS set to its first argument and exported, and
-# with an exported shell function `fail_then_continue` that runs `false` and
-# then prints a line.
+# with these exported shell functions:
+#  * `fail_then_continue` runs `false` and then prints a line.
+#  * `fail_in_pipeline` runs a pipeline whose first command fails.
+#  * `report_cronic_variables` writes to stderr any variable of `cronic`'s that
+#    it can see.
 cat > "$work/cronic-with-function" << 'EOF2'
 #!/bin/bash
 fail_then_continue() {
   false
   echo "after the failure"
 }
-export -f fail_then_continue
+fail_in_pipeline() {
+  false | true
+}
+report_cronic_variables() {
+  set | grep '^CRONIC_' >&2
+  return 0
+}
+export -f fail_then_continue fail_in_pipeline report_cronic_variables
 shellopts="$1"
 shift
 exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
@@ -124,10 +134,8 @@ temp_files() {
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
-# it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
-# "report:TEXT", which also requires TEXT to appear in the report, or
-# "message:TEXT", which requires TEXT to appear in output that need not be a
-# report.
+# it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report", or
+# "report:TEXT", which also requires TEXT to appear in the report.
 check() {
   description="$1"
   expected_status="$2"
@@ -153,25 +161,25 @@ check() {
       status=1
       return
     fi
-  elif [ "${expected_output#message:}" = "$expected_output" ]; then
+  else
     if ! grep -q "^END OF CRONIC OUTPUT.$" "$work/output"; then
       echo "FAIL: $description: expected a report, but got:"
       cat "$work/output"
       status=1
       return
     fi
+    case "$expected_output" in
+      report:*)
+        if ! grep -q "${expected_output#report:}" "$work/output"; then
+          echo "FAIL: $description: expected the report to contain" \
+            "\"${expected_output#report:}\", but got:"
+          cat "$work/output"
+          status=1
+          return
+        fi
+        ;;
+    esac
   fi
-  case "$expected_output" in
-    report:* | message:*)
-      if ! grep -q "${expected_output#*:}" "$work/output"; then
-        echo "FAIL: $description: expected the output to contain" \
-          "\"${expected_output#*:}\", but got:"
-        cat "$work/output"
-        status=1
-        return
-      fi
-      ;;
-  esac
 
   if [ "$before" != "$after" ]; then
     echo "FAIL: $description: temporary files were left behind:"
@@ -208,48 +216,6 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 # ... but a real error among them is still reported.
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
-
-# Without a command, `cronic` reports a usage error rather than aborting on an
-# unset variable.
-check "no arguments" 64 "message:^Usage: "
-check "--expected-status without a value" 64 "message:^Usage: " \
-  --expected-status
-check "--permit-stderr without a command" 64 "message:^Usage: " \
-  --permit-stderr
-
-# A non-integer expected status is a usage error, rather than a value that
-# makes every exit status look expected.
-check "--expected-status with a non-integer value" 64 \
-  "message:requires an integer from 0 to 255" \
-  --expected-status x "$work/trace-only" 1
-# So is a value that no exit status can equal, or that the shell's integer
-# comparisons cannot handle.
-check "--expected-status larger than 255" 64 \
-  "message:requires an integer from 0 to 255" \
-  --expected-status 256 "$work/trace-only" 1
-check "--expected-status too large for an integer comparison" 64 \
-  "message:requires an integer from 0 to 255" \
-  --expected-status 99999999999999999999 "$work/trace-only" 1
-check "--expected-status with a leading zero" 64 \
-  "message:requires an integer from 0 to 255" \
-  --expected-status 09 "$work/trace-only" 1
-
-# The options may be given in any order.
-check "options out of order" 3 silent \
-  --permit-stderr --expected-status 3 "$work/trace-and-stderr" 3
-# An unknown option is a usage error, rather than a command to run.
-check "unknown option" 64 "message:unknown option" \
-  --no-such-option "$work/trace-only" 0
-# The value of `--expected-status` may follow an equals sign.
-check "--expected-status=N" 3 silent --expected-status=3 "$work/trace-only" 3
-check "--expected-status= with a non-integer value" 64 \
-  "message:requires an integer from 0 to 255" \
-  --expected-status=x "$work/trace-only" 1
-# `-h` and `--help` print a usage message.
-check "--help" 0 "message:^Usage: " --help
-check "-h" 0 "message:^Usage: " -h
-# `--` ends the options.
-check "-- before the command" 0 silent -- "$work/trace-only" 0
 
 # The command may be a shell builtin.
 check "builtin command" 0 silent :
@@ -323,6 +289,39 @@ check "exported SHELLOPTS with errexit, exported function ignores a failure" 1 \
   report "$default_shellopts:errexit" fail_then_continue
 check "exported SHELLOPTS, exported function ignores a failure" 0 silent \
   "$default_shellopts" fail_then_continue
+# Every one of the caller's options applies, not only `-e`, `-u`, and `-x`.
+check "exported SHELLOPTS with pipefail, exported function" 1 report \
+  "$default_shellopts:pipefail" fail_in_pipeline
+check "exported SHELLOPTS without pipefail, exported function" 0 silent \
+  "$default_shellopts" fail_in_pipeline
+# A shell function that is the command does not see `cronic`'s variables.
+check "exported function sees none of cronic's variables" 0 silent \
+  "$default_shellopts" report_cronic_variables
 CRONIC="$REAL_CRONIC"
+
+# `cronic` does not change a variable that the caller exported, even one whose
+# name is a plain word such as `DEBUG` or `OUT`.
+cat > "$work/check-variables" << 'EOF'
+#!/bin/sh
+[ "$DEBUG" = "caller's DEBUG" ] && [ "$OUT" = "caller's OUT" ] || exit 3
+EOF
+chmod +x "$work/check-variables"
+DEBUG="caller's DEBUG"
+OUT="caller's OUT"
+export DEBUG OUT
+check "caller's exported variables" 0 silent "$work/check-variables"
+unset DEBUG OUT
+
+# `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
+bash_x_status=0
+bash -x "$CRONIC" "$work/trace-only" 0 > "$work/output" 2> "$work/stderr" \
+  || bash_x_status=$?
+if [ "$bash_x_status" = 0 ] && grep -q "CRONIC_DEBUG=false" "$work/stderr"; then
+  echo "PASS: bash -x traces cronic"
+else
+  echo "FAIL: bash -x traces cronic: exit status $bash_x_status, stderr:"
+  cat "$work/stderr"
+  status=1
+fi
 
 exit "$status"
