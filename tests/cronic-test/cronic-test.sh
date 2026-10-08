@@ -151,8 +151,10 @@ temp_files() {
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
-# it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report", or
-# "report:TEXT", which also requires TEXT to appear in the report.
+# it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
+# "report:TEXT", which also requires TEXT to appear in the report, or
+# "message:TEXT", which requires TEXT to appear in output that need not be a
+# report.
 check() {
   description="$1"
   expected_status="$2"
@@ -178,25 +180,25 @@ check() {
       status=1
       return
     fi
-  else
+  elif [ "${expected_output#message:}" = "$expected_output" ]; then
     if ! grep -q "^END OF CRONIC OUTPUT.$" "$work/output"; then
       echo "FAIL: $description: expected a report, but got:"
       cat "$work/output"
       status=1
       return
     fi
-    case "$expected_output" in
-      report:*)
-        if ! grep -q "${expected_output#report:}" "$work/output"; then
-          echo "FAIL: $description: expected the report to contain" \
-            "\"${expected_output#report:}\", but got:"
-          cat "$work/output"
-          status=1
-          return
-        fi
-        ;;
-    esac
   fi
+  case "$expected_output" in
+    report:* | message:*)
+      if ! grep -q "${expected_output#*:}" "$work/output"; then
+        echo "FAIL: $description: expected the output to contain" \
+          "\"${expected_output#*:}\", but got:"
+        cat "$work/output"
+        status=1
+        return
+      fi
+      ;;
+  esac
 
   if [ "$before" != "$after" ]; then
     echo "FAIL: $description: temporary files were left behind:"
@@ -234,35 +236,80 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
 
-# A missing command or a missing option value is an error, not a crash.
-for args in "" "--expected-status" "--permit-stderr"; do
-  usage_status=0
-  # shellcheck disable=SC2086 # Split args into words, or into none.
-  "$CRONIC" $args > "$work/output" 2> "$work/stderr" || usage_status=$?
-  if [ "$usage_status" = 2 ] && grep -q "^cronic: " "$work/stderr" \
-    && ! grep -q "unbound variable" "$work/stderr"; then
-    echo "PASS: cronic $args with no command"
-  else
-    echo "FAIL: cronic $args with no command: exit status $usage_status, stderr:"
-    cat "$work/stderr"
-    status=1
-  fi
-done
+# Without a command, `cronic` reports a usage error rather than aborting on an
+# unset variable.
+check "no arguments" 64 "message:^Usage: "
+check "--expected-status without a value" 64 "message:^Usage: " \
+  --expected-status
+check "--permit-stderr without a command" 64 "message:^Usage: " \
+  --permit-stderr
 
-# An --expected-status argument that is not an exit status is an error.
-for value in abc -1 256 010 ""; do
-  usage_status=0
-  "$CRONIC" --expected-status "$value" true > "$work/output" 2> "$work/stderr" \
-    || usage_status=$?
-  if [ "$usage_status" = 2 ] && grep -q "^cronic: " "$work/stderr" \
-    && [ "$(wc -l < "$work/stderr")" = 1 ]; then
-    echo "PASS: cronic --expected-status \"$value\""
-  else
-    echo "FAIL: cronic --expected-status \"$value\": exit status $usage_status, stderr:"
-    cat "$work/stderr"
-    status=1
-  fi
+# A non-integer expected status is a usage error, rather than a value that
+# makes every exit status look expected.
+check "--expected-status with a non-integer value" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status x "$work/trace-only" 1
+# So is a value that no exit status can equal, or that the shell's integer
+# comparisons cannot handle.
+check "--expected-status larger than 255" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status 256 "$work/trace-only" 1
+check "--expected-status too large for an integer comparison" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status 99999999999999999999 "$work/trace-only" 1
+check "--expected-status with a leading zero" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status 09 "$work/trace-only" 1
+
+# The options may be given in any order.
+check "options out of order" 3 silent \
+  --permit-stderr --expected-status 3 "$work/trace-and-stderr" 3
+# An unknown option is a usage error, rather than a command to run.
+check "unknown option" 64 "message:unknown option" \
+  --no-such-option "$work/trace-only" 0
+check "unknown single-dash option" 64 "message:unknown option" \
+  -v "$work/trace-only" 0
+# The value of `--expected-status` may follow an equals sign.
+check "--expected-status=N" 3 silent --expected-status=3 "$work/trace-only" 3
+check "--expected-status= with a non-integer value" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status=x "$work/trace-only" 1
+# `-h` and `--help` print a usage message.
+check "--help" 0 "message:^Usage: " --help
+check "-h" 0 "message:^Usage: " -h
+# `--` ends the options, so the command may start with "-".
+check "-- before the command" 0 silent -- "$work/trace-only" 0
+ln -s "$work/trace-only" "$work/-dash-command"
+saved_path="$PATH"
+PATH="$work:$PATH"
+check "-- before a command that starts with a dash" 3 report -- -dash-command 3
+PATH="$saved_path"
+
+# `--help` and a usage error work even when no temporary directory can be
+# created.
+saved_tmpdir="$TMPDIR"
+TMPDIR="$work/no-such-directory"
+check "--help without a temporary directory" 0 "message:^Usage: " --help
+check "usage error without a temporary directory" 64 "message:^Usage: "
+TMPDIR="$saved_tmpdir"
+
+# A command whose name is a plain word that a script might use for a shell
+# function runs the program of that name, not one of `cronic`'s functions.
+mkdir "$work/bin"
+for name in cleanup set_expected usage; do
+  cat > "$work/bin/$name" << 'EOF'
+#!/bin/sh
+exit 3
+EOF
+  chmod +x "$work/bin/$name"
 done
+saved_path="$PATH"
+PATH="$work/bin:$PATH"
+check "command named cleanup" 3 silent --expected-status 3 cleanup
+check "command named set_expected" 3 silent --expected-status 3 set_expected
+check "command named usage" 3 silent --expected-status 3 usage
+PATH="$saved_path"
+
 
 # Trace lines are recognized when PS4 contains regular-expression
 # metacharacters, and when PS4 contains expansions.
@@ -296,7 +343,6 @@ check "exec builtin" 3 report exec "$work/trace-only" 3
 
 # A program whose name is that of a function of `cronic`'s runs rather than the
 # function.
-mkdir "$work/bin"
 cat > "$work/bin/cronic_cleanup" << 'EOF'
 #!/bin/sh
 echo "the program named cronic_cleanup ran" 1>&2

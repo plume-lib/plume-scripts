@@ -9,12 +9,13 @@
 #   any non-trace error output or a non-zero result code. Cronic filters
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
-#   debugging.
-# Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
-# --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
-# Usage:  cronic [--expected-status N] [--permit-stderr] [--duplicate-stderr] COMMAND [ARG...]
-# The options must appear in that order.  COMMAND runs in a subshell, with the
-# caller's variables and shell options rather than this script's.
+#   debugging. Apart from its options, Cronic simply executes its
+#   arguments.
+# Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
+# --duplicate-stderr options, which may be given in any order.
+# The options are documented in function `cronic_help`; run `cronic --help`.
+# COMMAND runs in a subshell, with the caller's variables and shell options
+# rather than this script's.
 
 # The caller's state, as commands that restore it, before this script changes
 # any of it for itself.  The wrapped command runs with the caller's state
@@ -58,13 +59,99 @@
     *x*) CRONIC_CALLER_OPTIONS+='-o xtrace' ;;
     *) CRONIC_CALLER_OPTIONS+='+o xtrace' ;;
   esac
-  declare -p CRONIC_CALLER_OPTIONS > /tmp/claude-1000/-home-mernst-java-plume-lib-plume-scripts-fork-mernst-branch-cronic-nounset/67c1b40c-9d5a-4131-9329-e8ef37f9e5dc/scratchpad/opts
   if [[ ${SHELLOPTS@a} == *x* ]]; then set +vx; fi
 } 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
+
+# The names of this script's functions start with "cronic_", and the names of
+# its variables start with "CRONIC_", so that the subshell that runs the
+# wrapped command can remove them all; see where it is run, below.
+
+# Prints the usage line.
+cronic_usage_line() {
+  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]"
+}
+
+# Exits with status 64 (EX_USAGE in sysexits.h) rather than the conventional 2,
+# because a wrapped command is much more likely to exit with status 2, and a
+# caller that checks for a particular status should not mistake a misuse of
+# this script for the command's own result.
+cronic_usage() {
+  cronic_usage_line >&2
+  exit 64
+}
+
+# Prints a usage message to standard output and exits with status 0.
+cronic_help() {
+  cronic_usage_line
+  echo "Runs COMMAND, and produces output only if it fails or writes to stderr."
+  echo "  --expected-status N  treat exit status N (0 to 255), rather than 0, as success;"
+  echo "                       may also be written --expected-status=N"
+  echo "  --permit-stderr      do not treat error output as a failure"
+  echo "  --duplicate-stderr   print the error output twice in the report, so that it"
+  echo "                       is less likely to be overlooked"
+  echo "  --                   end the options, so that COMMAND may start with \"-\""
+  echo "  -h, --help           print this message"
+  exit 0
+}
+
+# Sets CRONIC_EXPECTED to its argument, or reports a usage error if the argument is
+# not a valid exit status.
+cronic_set_expected() {
+  CRONIC_EXPECTED=$1
+  # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
+  # octal.  At most 255, because no exit status is larger.
+  if ! [[ $CRONIC_EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$CRONIC_EXPECTED" -gt 255 ]; then
+    echo "$0: --expected-status requires an integer from 0 to 255, got \"$CRONIC_EXPECTED\"" >&2
+    cronic_usage
+  fi
+}
+
+# The options are parsed before the temporary directory is created, so that
+# `--help` and a usage error neither create nor depend on it.
+CRONIC_EXPECTED=0
+CRONIC_PERMITSTDERR=0
+CRONIC_DUPLICATE_STDERR=0
+while [ $# -gt 0 ]; do
+  case $1 in
+    --expected-status)
+      shift
+      [ $# -gt 0 ] || cronic_usage
+      cronic_set_expected "$1"
+      shift
+      ;;
+    --expected-status=*)
+      cronic_set_expected "${1#*=}"
+      shift
+      ;;
+    --permit-stderr)
+      shift
+      CRONIC_PERMITSTDERR=1
+      ;;
+    --duplicate-stderr)
+      shift
+      CRONIC_DUPLICATE_STDERR=1
+      ;;
+    -h | --help)
+      cronic_help
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "$0: unknown option \"$1\"" >&2
+      cronic_usage
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+[ $# -gt 0 ] || cronic_usage
 
 CRONIC_DEBUG=false
 # CRONIC_DEBUG=true
@@ -101,37 +188,6 @@ trap 'cronic_cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
 trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
-CRONIC_EXPECTED=0
-if [ "${1-}" == "--expected-status" ]; then
-  if [ $# -lt 2 ]; then
-    echo "cronic: --expected-status requires an argument" >&2
-    exit 2
-  fi
-  shift
-  CRONIC_EXPECTED=$1
-  shift
-  # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
-  # octal.  At most 255, because no exit status is larger.
-  if ! [[ $CRONIC_EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$CRONIC_EXPECTED" -gt 255 ]; then
-    echo "cronic: --expected-status requires an integer from 0 to 255, got \"$CRONIC_EXPECTED\"" >&2
-    exit 2
-  fi
-fi
-CRONIC_PERMITSTDERR=0
-if [ "${1-}" == "--permit-stderr" ]; then
-  shift
-  CRONIC_PERMITSTDERR=1
-fi
-CRONIC_DUPLICATE_STDERR=0
-if [ "${1-}" == "--duplicate-stderr" ]; then
-  shift
-  CRONIC_DUPLICATE_STDERR=1
-fi
-if [ $# -eq 0 ]; then
-  echo "cronic: no command given" >&2
-  exit 2
-fi
-
 # Run the command with all of the caller's shell options rather than this
 # script's.  If the caller exported SHELLOPTS, then the command would otherwise
 # inherit this script's options, and a bash script that reads an unset variable
@@ -145,8 +201,8 @@ fi
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
 # The subshell unsets every variable whose name starts with `CRONIC_`, and this
-# script's function, so that a builtin or shell function that is the command
-# does not see this script's variables and function, and so that the function
+# script's functions, so that a builtin or shell function that is the command
+# does not see this script's variables and functions, and so that a function
 # does not take precedence over a program of the same name.  Then the subshell
 # restores the caller's variables and options.  The subshell first turns off
 # this script's xtrace and verbose, so that the restoring is not traced or
@@ -155,7 +211,7 @@ set +e
 (
   { set +vx; } 2> /dev/null
   eval "unset -v \"\${!CRONIC_@}\"
-    unset -f cronic_cleanup
+    unset -f cronic_cleanup cronic_usage_line cronic_usage cronic_help cronic_set_expected
     $CRONIC_CALLER_VARIABLES
     $CRONIC_CALLER_OPTIONS"
   "$@"
