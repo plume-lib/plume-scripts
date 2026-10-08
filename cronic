@@ -13,16 +13,15 @@
 # Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
 
-# The shell options in effect before this script changes any of them.  The
-# wrapped command runs with exactly these options, so that the options this
-# script sets for itself (such as `-e` and `-u` below) do not reach the command
-# through an exported SHELLOPTS or BASHOPTS, whereas options that the caller
-# exported on purpose do.
-CALLER_SHELL_OPTIONS="$(set +o; shopt -p)"
-# Bash turns off `-e` within a command substitution, so `set +o` above always
-# reports it as off.
+# Which of `-e` and `-u` the caller had on, before this script turns them on
+# for itself.  The wrapped command runs with the caller's settings of these
+# options rather than this script's; see where it is run, below.
+CALLER_E_U_OPTIONS=
 case $- in
-  *e*) CALLER_SHELL_OPTIONS+=$'\nset -o errexit' ;;
+  *e*) CALLER_E_U_OPTIONS+=e ;;
+esac
+case $- in
+  *u*) CALLER_E_U_OPTIONS+=u ;;
 esac
 
 # Exit if a command exits with a non-zero status, and treat unset variables
@@ -64,9 +63,13 @@ trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
 trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
+# Exits with status 64 (EX_USAGE in sysexits.h) rather than the conventional 2,
+# because a wrapped command is much more likely to exit with status 2, and a
+# caller that checks for a particular status should not mistake a misuse of
+# this script for the command's own result.
 usage() {
   echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] COMMAND [ARG...]" >&2
-  exit 2
+  exit 64
 }
 
 EXPECTED=0
@@ -75,6 +78,10 @@ if [ "${1:-}" == "--expected-status" ]; then
   [ $# -gt 0 ] || usage
   EXPECTED=$1
   shift
+  if ! [[ $EXPECTED =~ ^[0-9]+$ ]]; then
+    echo "$0: --expected-status requires a non-negative integer, got \"$EXPECTED\"" >&2
+    usage
+  fi
 fi
 PERMITSTDERR=0
 if [ "${1:-}" == "--permit-stderr" ]; then
@@ -88,15 +95,19 @@ if [ "${1:-}" == "--duplicate-stderr" ]; then
 fi
 [ $# -gt 0 ] || usage
 
-# Run the command with the caller's shell options rather than this script's.
-# If the caller exported SHELLOPTS, then the command would otherwise inherit
-# this script's `-e` and `-u` options, and a bash script that reads an unset
-# variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
+# Run the command with the caller's `-e` and `-u` settings rather than this
+# script's.  If the caller exported SHELLOPTS, then the command would otherwise
+# inherit this script's `-e` and `-u` options, and a bash script that reads an
+# unset variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
+# The command runs in this shell, not via `exec` in a subshell, so that it can
+# be a shell function or builtin.
 RESULT=0
-(
-  eval "$CALLER_SHELL_OPTIONS"
-  exec "$@"
-) > "$OUT" 2> "$TRACE" || RESULT=$?
+set +eu
+if [ -n "$CALLER_E_U_OPTIONS" ]; then
+  set "-$CALLER_E_U_OPTIONS"
+fi
+"$@" > "$OUT" 2> "$TRACE" || RESULT=$?
+set -eu
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
 if grep -q "$PATTERN" "$TRACE"; then

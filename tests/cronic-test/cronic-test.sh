@@ -12,7 +12,7 @@
 
 set -eu
 
-# Don't let the user's environment file run in `cronic` or in the bash commands
+# Do not let the user's environment file run in `cronic` or in the bash commands
 # below.  It could write to stderr, especially when an exported SHELLOPTS turns
 # on `-u` for it.
 unset BASH_ENV
@@ -53,7 +53,7 @@ chmod +x "$work/trace-and-stderr"
 # A command whose stderr is nothing but `make` directory-change notices.  Both
 # the top-level form (`make:`) and the recursive form (`make[1]:`) appear; both
 # must be filtered out of the reduced error output.
-cat > "$work/make-noise" <<'EOF'
+cat > "$work/make-noise" << 'EOF'
 #!/bin/sh
 echo "make: Entering directory '/tmp/x'" 1>&2
 echo "make[1]: Entering directory '/tmp/x/sub'" 1>&2
@@ -64,7 +64,7 @@ EOF
 chmod +x "$work/make-noise"
 
 # A command that writes a real error among the `make` directory-change notices.
-cat > "$work/make-noise-and-stderr" <<'EOF'
+cat > "$work/make-noise-and-stderr" << 'EOF'
 #!/bin/sh
 echo "make: Entering directory '/tmp/x'" 1>&2
 echo "make[1]: Entering directory '/tmp/x/sub'" 1>&2
@@ -76,7 +76,7 @@ EOF
 chmod +x "$work/make-noise-and-stderr"
 
 # A bash command that reads an unset variable.
-cat > "$work/read-unset" <<'EOF'
+cat > "$work/read-unset" << 'EOF'
 #!/bin/bash
 unset CRONIC_TEST_UNSET_VARIABLE
 echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
@@ -85,7 +85,7 @@ EOF
 chmod +x "$work/read-unset"
 
 # A bash command in which a command fails before the script exits.
-cat > "$work/ignore-failure" <<'EOF'
+cat > "$work/ignore-failure" << 'EOF'
 #!/bin/bash
 false
 exit "$1"
@@ -93,11 +93,11 @@ EOF
 chmod +x "$work/ignore-failure"
 
 # Runs `cronic` with SHELLOPTS set to its first argument and exported.
-cat > "$work/cronic-with-shellopts" <<'EOF'
+cat > "$work/cronic-with-shellopts" << 'EOF'
 #!/bin/sh
 shellopts="$1"
 shift
-SHELLOPTS="$shellopts" exec "$REAL_CRONIC" "$@"
+exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
 EOF
 chmod +x "$work/cronic-with-shellopts"
 
@@ -195,11 +195,20 @@ check "make directory-change notices and real stderr, exit 0" 0 \
 
 # Without a command, `cronic` reports a usage error rather than aborting on an
 # unset variable.
-check "no arguments" 2 "message:^Usage: "
-check "--expected-status without a value" 2 "message:^Usage: " \
+check "no arguments" 64 "message:^Usage: "
+check "--expected-status without a value" 64 "message:^Usage: " \
   --expected-status
-check "--permit-stderr without a command" 2 "message:^Usage: " \
+check "--permit-stderr without a command" 64 "message:^Usage: " \
   --permit-stderr
+
+# A non-integer expected status is a usage error, rather than a value that
+# makes every exit status look expected.
+check "--expected-status with a non-integer value" 64 \
+  "message:requires a non-negative integer" \
+  --expected-status x "$work/trace-only" 1
+
+# The command may be a shell builtin.
+check "builtin command" 0 silent :
 
 # When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
 # the wrapped command, but the caller's options do.
@@ -216,6 +225,27 @@ check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
   "$default_shellopts:errexit" "$work/ignore-failure" 0
+# With xtrace exported, the report's trace section is the command's own trace,
+# with nothing that `cronic` did to set up the command's options.  `cronic`'s
+# own trace goes to its stderr, which is discarded here.
+"$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0 \
+  > "$work/output" 2> /dev/null
+sed -n '/^TRACE-ERROR OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+cat > "$work/trace-section.goal" << 'EOF'
+TRACE-ERROR OUTPUT:
++ set -x
++ echo 'a real error'
+a real error
++ exit 0
+
+EOF
+if cmp -s "$work/trace-section.goal" "$work/trace-section"; then
+  echo "PASS: exported SHELLOPTS with xtrace, trace output"
+else
+  echo "FAIL: exported SHELLOPTS with xtrace, trace output: got:"
+  cat "$work/output"
+  status=1
+fi
 CRONIC="$REAL_CRONIC"
 
 exit "$status"
