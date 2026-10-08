@@ -223,6 +223,20 @@ check "builtin command" 0 silent :
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
 
+# A program whose name is a common word, such as `cleanup`, runs rather than
+# any function of `cronic`'s.
+mkdir "$work/bin"
+cat > "$work/bin/cleanup" << 'EOF'
+#!/bin/sh
+echo "the program named cleanup ran" 1>&2
+exit 4
+EOF
+chmod +x "$work/bin/cleanup"
+saved_path="$PATH"
+PATH="$work/bin:$PATH"
+check "program named cleanup" 4 "report:^the program named cleanup ran$" cleanup
+PATH="$saved_path"
+
 # When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
 # the wrapped command, but the caller's options do.
 REAL_CRONIC="$CRONIC"
@@ -282,6 +296,20 @@ else
   status=1
 fi
 
+# With verbose exported, a successful command produces no report:  `cronic`
+# does not echo, into the command's error output, the commands that restore the
+# caller's options.  (`cronic` does echo its own first lines to its stderr.)
+verbose_status=0
+"$CRONIC" "$default_shellopts:verbose" true > "$work/output" 2> /dev/null \
+  || verbose_status=$?
+if [ "$verbose_status" = 0 ] && [ ! -s "$work/output" ]; then
+  echo "PASS: exported SHELLOPTS with verbose"
+else
+  echo "FAIL: exported SHELLOPTS with verbose: exit status $verbose_status, output:"
+  cat "$work/output"
+  status=1
+fi
+
 # The caller's `-e` applies within an exported shell function that is the
 # command, and the caller's lack of `-e` does too.
 CRONIC="$work/cronic-with-function"
@@ -299,18 +327,23 @@ check "exported function sees none of cronic's variables" 0 silent \
   "$default_shellopts" report_cronic_variables
 CRONIC="$REAL_CRONIC"
 
-# `cronic` does not change a variable that the caller exported, even one whose
-# name is a plain word such as `DEBUG` or `OUT`.
+# `cronic` does not change a variable that the caller exported, whether its name
+# is a plain word such as `DEBUG` or `OUT` or is the name of one of `cronic`'s
+# own variables.
 cat > "$work/check-variables" << 'EOF'
 #!/bin/sh
-[ "$DEBUG" = "caller's DEBUG" ] && [ "$OUT" = "caller's OUT" ] || exit 3
+[ "$DEBUG" = "caller's DEBUG" ] && [ "$OUT" = "caller's OUT" ] \
+  && [ "$CRONIC_DEBUG" = "caller's CRONIC_DEBUG" ] \
+  && [ "$CRONIC_TMPDIR" = "caller's CRONIC_TMPDIR" ] || exit 3
 EOF
 chmod +x "$work/check-variables"
 DEBUG="caller's DEBUG"
 OUT="caller's OUT"
-export DEBUG OUT
+CRONIC_DEBUG="caller's CRONIC_DEBUG"
+CRONIC_TMPDIR="caller's CRONIC_TMPDIR"
+export DEBUG OUT CRONIC_DEBUG CRONIC_TMPDIR
 check "caller's exported variables" 0 silent "$work/check-variables"
-unset DEBUG OUT
+unset DEBUG OUT CRONIC_DEBUG CRONIC_TMPDIR
 
 # `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
 bash_x_status=0
@@ -321,6 +354,28 @@ if [ "$bash_x_status" = 0 ] && grep -q "CRONIC_DEBUG=false" "$work/stderr"; then
 else
   echo "FAIL: bash -x traces cronic: exit status $bash_x_status, stderr:"
   cat "$work/stderr"
+  status=1
+fi
+
+# Under `bash -x cronic`, the report's trace section contains nothing that
+# `cronic` did to set up the command.  The command does not inherit xtrace, so
+# its own `set -x` is not traced.
+bash -x "$CRONIC" "$work/trace-and-stderr" 0 > "$work/output" 2> /dev/null \
+  || true
+sed -n '/^TRACE-ERROR OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+cat > "$work/bash-x-trace-section.goal" << EOF
+TRACE-ERROR OUTPUT:
++ $work/trace-and-stderr 0
++ echo 'a real error'
+a real error
++ exit 0
+
+EOF
+if cmp -s "$work/bash-x-trace-section.goal" "$work/trace-section"; then
+  echo "PASS: bash -x cronic, trace output"
+else
+  echo "FAIL: bash -x cronic, trace output: got:"
+  cat "$work/output"
   status=1
 fi
 

@@ -13,21 +13,30 @@
 # Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
 
-# The caller's shell options, as commands that restore them, before this
-# script changes any of them for itself.  The wrapped command runs with the
-# caller's options rather than this script's; see where it is run, below.
-# If the caller exported SHELLOPTS with xtrace, then this script does not trace
-# itself:  the trace would go to this script's stderr, and cron would send
-# email for every run.  `bash -x cronic` does not export SHELLOPTS, so it still
-# traces this script.  The redirection discards the trace of these commands.
-# `set +o` reports `-e` as off, because bash turns `-e` off in a command
-# substitution, so `$-` supplies it.
+# The caller's state, as commands that restore it, before this script changes
+# any of it for itself.  The wrapped command runs with the caller's state
+# rather than this script's; see where it is run, below.
+#  * The caller's exported variables whose names start with `CRONIC_`, which
+#    this script's own variables would otherwise hide.
+#  * The caller's shell options.  `set +o` reports `-e` as off, because bash
+#    turns `-e` off in a command substitution, so `$-` supplies it.
+# If the caller exported SHELLOPTS, then this script does not trace itself or
+# echo its input:  that output would go to this script's stderr, and cron would
+# send email for every run.  An exported `verbose` nonetheless echoes the lines
+# of this script that bash reads before it reaches the `set +vx`.  Bash cannot
+# tell whether xtrace came from SHELLOPTS or from the command line, so
+# `bash -x cronic` traces this script only if SHELLOPTS is not exported.
+# The redirection discards the trace of these commands.
 {
+  CRONIC_CALLER_VARIABLES=$(
+    names=("${!CRONIC_@}")
+    [ ${#names[@]} -eq 0 ] || declare -p "${names[@]}"
+  )
   CRONIC_CALLER_OPTIONS=$(set +o)
   case $- in
     *e*) CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/set +o errexit/set -o errexit} ;;
   esac
-  case ${SHELLOPTS@a} in *x*) set +x ;; esac
+  if printenv SHELLOPTS > /dev/null; then set +vx; fi
 } 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
@@ -51,11 +60,14 @@ CRONIC_TRACE=$CRONIC_TMPDIR/trace
 # is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
 # files are retained; don't "echo" their location, because that would be
 # appended to stderr.
+# Every function in this script has a name that starts with `cronic_`.  The
+# wrapped command runs in a subshell in which this script's functions are still
+# defined, and a function would take precedence over a program of the same name.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
-cleanup() {
+cronic_cleanup() {
   [ "$CRONIC_DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
 }
-trap cleanup EXIT
+trap cronic_cleanup EXIT
 
 # Clean up and then die of the signal, rather than exiting with status
 # 128+signum, so that a supervisor can distinguish "cronic was killed by
@@ -65,9 +77,9 @@ trap cleanup EXIT
 # installed, bash dies as soon as the signal arrives, abandoning the wrapped
 # command and deleting the directory that the command is still writing into,
 # whereas a handler does not run until the wrapped command has finished.
-trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
-trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
-trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
+trap 'cronic_cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
+trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
+trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
 CRONIC_EXPECTED=0
 if [ "$1" == "--expected-status" ]; then
@@ -98,16 +110,17 @@ fi
 # shell function that it runs.  The redirections are on the subshell, so that
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
-# The subshell unsets every variable that this script has set, so that a
-# builtin or shell function that is the command does not see them.  The
-# `unset` runs within the `eval`, whose argument is expanded first; the
-# `unset` thus precedes the restoring of the caller's `-x` and is not traced.
+# The subshell unsets every variable whose name starts with `CRONIC_`, so that a
+# builtin or shell function that is the command does not see this script's
+# variables, and then restores the caller's variables and options.  The
+# redirection discards any trace or echo of doing so.
 set +e
 (
-  eval "unset -v CRONIC_CALLER_OPTIONS CRONIC_DEBUG CRONIC_TMPDIR CRONIC_OUT \
-    CRONIC_ERR CRONIC_REDUCED_ERR CRONIC_TRACE CRONIC_EXPECTED \
-    CRONIC_PERMITSTDERR CRONIC_DUPLICATE_STDERR
-    $CRONIC_CALLER_OPTIONS"
+  {
+    eval "unset -v \"\${!CRONIC_@}\"
+      $CRONIC_CALLER_VARIABLES
+      $CRONIC_CALLER_OPTIONS"
+  } 2> /dev/null
   "$@"
 ) > "$CRONIC_OUT" 2> "$CRONIC_TRACE"
 RESULT=$?
