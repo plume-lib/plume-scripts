@@ -99,24 +99,27 @@ check() {
     return
   fi
 
-  if [ "$expected_output" = "silent" ]; then
-    if [ -s "$work/output" ]; then
-      echo "FAIL: $description: expected no output, but got:"
-      cat "$work/output"
-      status=1
-      return
-    fi
-  elif [ "${expected_output#message:}" = "$expected_output" ]; then
-    if ! grep -q "^END OF CRONIC OUTPUT.$" "$work/output"; then
-      echo "FAIL: $description: expected a report, but got:"
-      cat "$work/output"
-      status=1
-      return
-    fi
-  fi
+  case "$expected_output" in
+    silent)
+      if [ -s "$work/output" ]; then
+        echo "FAIL: $description: expected no output, but got:"
+        cat "$work/output"
+        status=1
+        return
+      fi
+      ;;
+    report*)
+      if ! grep -q "^END OF CRONIC OUTPUT.$" "$work/output"; then
+        echo "FAIL: $description: expected a report, but got:"
+        cat "$work/output"
+        status=1
+        return
+      fi
+      ;;
+  esac
   case "$expected_output" in
     report:* | message:*)
-      if ! grep -q "${expected_output#*:}" "$work/output"; then
+      if ! grep -q -e "${expected_output#*:}" "$work/output"; then
         echo "FAIL: $description: expected the output to contain" \
           "\"${expected_output#*:}\", but got:"
         cat "$work/output"
@@ -165,7 +168,8 @@ check "make directory-change notices and real stderr, exit 0" 0 \
 # Without a command, `cronic` reports a usage error rather than aborting on an
 # unset variable.
 check "no arguments" 64 "message:^Usage: "
-check "--expected-status without a value" 64 "message:^Usage: " \
+check "--expected-status without a value" 64 \
+  "message:--expected-status requires a value" \
   --expected-status
 check "--permit-stderr without a command" 64 "message:^Usage: " \
   --permit-stderr
@@ -219,10 +223,15 @@ check "--help without a temporary directory" 0 "message:^Usage: " --help
 check "usage error without a temporary directory" 64 "message:^Usage: "
 TMPDIR="$saved_tmpdir"
 
-# A command whose name is a plain word that a script might use for a shell
-# function runs the program of that name, not one of `cronic`'s functions.
+# A command with the same name as one of `cronic`'s shell functions runs the
+# program of that name, not the function.
+function_names=$(sed -n 's/^\(cronic_[a-z_]*\)() {$/\1/p' "$CRONIC")
+if [ -z "$function_names" ]; then
+  echo "FAIL: found no shell functions in $CRONIC"
+  status=1
+fi
 mkdir "$work/bin"
-for name in cleanup set_expected usage; do
+for name in $function_names; do
   cat > "$work/bin/$name" << 'EOF'
 #!/bin/sh
 exit 3
@@ -231,9 +240,9 @@ EOF
 done
 saved_path="$PATH"
 PATH="$work/bin:$PATH"
-check "command named cleanup" 3 silent --expected-status 3 cleanup
-check "command named set_expected" 3 silent --expected-status 3 set_expected
-check "command named usage" 3 silent --expected-status 3 usage
+for name in $function_names; do
+  check "command named $name" 3 silent --expected-status 3 "$name"
+done
 PATH="$saved_path"
 
 exit "$status"

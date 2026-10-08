@@ -19,10 +19,6 @@
 # as an error.
 set -eu
 
-# The names of this script's functions start with "cronic_".  The wrapped
-# command runs in this shell, so a function named, say, `usage` would run in
-# place of a command of the same name.
-
 # Prints the usage line.
 cronic_usage_line() {
   echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]"
@@ -72,7 +68,10 @@ while [ $# -gt 0 ]; do
   case $1 in
     --expected-status)
       shift
-      [ $# -gt 0 ] || cronic_usage
+      if [ $# -eq 0 ]; then
+        echo "$0: --expected-status requires a value" >&2
+        cronic_usage
+      fi
       cronic_set_expected "$1"
       shift
       ;;
@@ -142,7 +141,10 @@ trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
 set +e
-"$@" > "$OUT" 2> "$TRACE"
+# `command` because the wrapped command runs in this shell, where a function of
+# this script, such as `cronic_usage`, would otherwise run in place of a
+# program of the same name.
+command -- "$@" > "$OUT" 2> "$TRACE"
 RESULT=$?
 set -e
 
