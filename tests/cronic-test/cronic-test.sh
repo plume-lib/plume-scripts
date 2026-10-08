@@ -101,6 +101,22 @@ exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
 EOF
 chmod +x "$work/cronic-with-shellopts"
 
+# Runs `cronic` with SHELLOPTS set to its first argument and exported, and
+# with an exported shell function `fail_then_continue` that runs `false` and
+# then prints a line.
+cat > "$work/cronic-with-function" << 'EOF2'
+#!/bin/bash
+fail_then_continue() {
+  false
+  echo "after the failure"
+}
+export -f fail_then_continue
+shellopts="$1"
+shift
+exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
+EOF2
+chmod +x "$work/cronic-with-function"
+
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
@@ -224,6 +240,14 @@ check "options out of order" 3 silent \
 # An unknown option is a usage error, rather than a command to run.
 check "unknown option" 64 "message:unknown option" \
   --no-such-option "$work/trace-only" 0
+# The value of `--expected-status` may follow an equals sign.
+check "--expected-status=N" 3 silent --expected-status=3 "$work/trace-only" 3
+check "--expected-status= with a non-integer value" 64 \
+  "message:requires an integer from 0 to 255" \
+  --expected-status=x "$work/trace-only" 1
+# `-h` and `--help` print a usage message.
+check "--help" 0 "message:^Usage: " --help
+check "-h" 0 "message:^Usage: " -h
 # `--` ends the options.
 check "-- before the command" 0 silent -- "$work/trace-only" 0
 
@@ -248,16 +272,25 @@ check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
   "$default_shellopts:errexit" "$work/ignore-failure" 0
-# With xtrace exported, the report's trace section is the command's own trace,
-# with nothing that `cronic` did to set up the command's options.  `cronic`'s
-# own trace goes to its stderr, which is discarded here.
+# With xtrace exported, a successful command with only trace output on stderr
+# produces no output at all:  `cronic` does not trace itself.
+check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
+  "$default_shellopts:xtrace" "$work/trace-only" 0
+# With xtrace exported, the report's trace section is the trace of running the
+# command, followed by the command's own trace, with nothing that `cronic` did
+# to set up the command's options.
 before="$(temp_files)"
 xtrace_status=0
 "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0 \
-  > "$work/output" 2> /dev/null || xtrace_status=$?
+  > "$work/output" 2> "$work/stderr" || xtrace_status=$?
 after="$(temp_files)"
 if [ "$xtrace_status" != 0 ]; then
   echo "FAIL: exported SHELLOPTS with xtrace: exit status $xtrace_status, expected 0"
+  status=1
+fi
+if [ -s "$work/stderr" ]; then
+  echo "FAIL: exported SHELLOPTS with xtrace: cronic wrote to stderr:"
+  cat "$work/stderr"
   status=1
 fi
 if [ "$before" != "$after" ]; then
@@ -266,8 +299,9 @@ if [ "$before" != "$after" ]; then
   status=1
 fi
 sed -n '/^TRACE-ERROR OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
-cat > "$work/trace-section.goal" << 'EOF'
+cat > "$work/trace-section.goal" << EOF
 TRACE-ERROR OUTPUT:
++ $work/trace-and-stderr 0
 + set -x
 + echo 'a real error'
 a real error
@@ -281,6 +315,14 @@ else
   cat "$work/output"
   status=1
 fi
+
+# The caller's `-e` applies within an exported shell function that is the
+# command, and the caller's lack of `-e` does too.
+CRONIC="$work/cronic-with-function"
+check "exported SHELLOPTS with errexit, exported function ignores a failure" 1 \
+  report "$default_shellopts:errexit" fail_then_continue
+check "exported SHELLOPTS, exported function ignores a failure" 0 silent \
+  "$default_shellopts" fail_then_continue
 CRONIC="$REAL_CRONIC"
 
 exit "$status"
