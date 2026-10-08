@@ -13,6 +13,18 @@
 # Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
 
+# The shell options in effect before this script changes any of them.  The
+# wrapped command runs with exactly these options, so that the options this
+# script sets for itself (such as `-e` and `-u` below) do not reach the command
+# through an exported SHELLOPTS or BASHOPTS, whereas options that the caller
+# exported on purpose do.
+CALLER_SHELL_OPTIONS="$(set +o; shopt -p)"
+# Bash turns off `-e` within a command substitution, so `set +o` above always
+# reports it as off.
+case $- in
+  *e*) CALLER_SHELL_OPTIONS+=$'\nset -o errexit' ;;
+esac
+
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
@@ -52,31 +64,39 @@ trap 'cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
 trap 'cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
+usage() {
+  echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] COMMAND [ARG...]" >&2
+  exit 2
+}
+
 EXPECTED=0
-if [ "$1" == "--expected-status" ]; then
+if [ "${1:-}" == "--expected-status" ]; then
   shift
+  [ $# -gt 0 ] || usage
   EXPECTED=$1
   shift
 fi
 PERMITSTDERR=0
-if [ "$1" == "--permit-stderr" ]; then
+if [ "${1:-}" == "--permit-stderr" ]; then
   shift
   PERMITSTDERR=1
 fi
 DUPLICATE_STDERR=0
-if [ "$1" == "--duplicate-stderr" ]; then
+if [ "${1:-}" == "--duplicate-stderr" ]; then
   shift
   DUPLICATE_STDERR=1
 fi
+[ $# -gt 0 ] || usage
 
-# Run the command without this script's `-e` and `-u` options.  If the caller
-# exported SHELLOPTS, then the command would otherwise inherit those options,
-# and a bash script that reads an unset variable (as `/usr/bin/texi2dvi` does
-# when /bin/sh is bash) would fail.
-set +eu
-"$@" > "$OUT" 2> "$TRACE"
-RESULT=$?
-set -eu
+# Run the command with the caller's shell options rather than this script's.
+# If the caller exported SHELLOPTS, then the command would otherwise inherit
+# this script's `-e` and `-u` options, and a bash script that reads an unset
+# variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
+RESULT=0
+(
+  eval "$CALLER_SHELL_OPTIONS"
+  exec "$@"
+) > "$OUT" 2> "$TRACE" || RESULT=$?
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
 if grep -q "$PATTERN" "$TRACE"; then
