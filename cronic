@@ -69,10 +69,14 @@ if [ "$1" == "--duplicate-stderr" ]; then
   DUPLICATE_STDERR=1
 fi
 
-set +e
+# Run the command without this script's `-e` and `-u` options.  If the caller
+# exported SHELLOPTS, then the command would otherwise inherit those options,
+# and a bash script that reads an unset variable (as `/usr/bin/texi2dvi` does
+# when /bin/sh is bash) would fail.
+set +eu
 "$@" > "$OUT" 2> "$TRACE"
 RESULT=$?
-set -e
+set -eu
 
 PATTERN="^${PS4:0:1}\\+${PS4:1}"
 if grep -q "$PATTERN" "$TRACE"; then

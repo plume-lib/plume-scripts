@@ -70,6 +70,15 @@ exit "$1"
 EOF
 chmod +x "$work/make-noise-and-stderr"
 
+# A bash command that reads an unset variable.
+cat > "$work/read-unset" <<'EOF'
+#!/bin/bash
+unset CRONIC_TEST_UNSET_VARIABLE
+echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
+exit "$1"
+EOF
+chmod +x "$work/read-unset"
+
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
@@ -159,5 +168,18 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 # ... but a real error among them is still reported.
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
+
+# When SHELLOPTS is exported, `cronic`'s own `-u` option does not reach the
+# wrapped command.
+cat > "$work/cronic-with-shellopts" <<EOF
+#!/bin/sh
+exec env SHELLOPTS=braceexpand:hashall:interactive-comments "$CRONIC" "\$@"
+EOF
+chmod +x "$work/cronic-with-shellopts"
+saved_cronic="$CRONIC"
+CRONIC="$work/cronic-with-shellopts"
+check "exported SHELLOPTS, command reads an unset variable" 0 silent \
+  "$work/read-unset" 0
+CRONIC="$saved_cronic"
 
 exit "$status"
