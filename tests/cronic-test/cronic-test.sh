@@ -16,6 +16,13 @@ set -eu
 # below.  It could write to stderr, especially when an exported SHELLOPTS turns
 # on `-u` for it.
 unset BASH_ENV
+# Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
+# to the commands below.  If SHELLOPTS is exported, then run this script again
+# without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
+if env | grep -q '^SHELLOPTS='; then
+  env -u SHELLOPTS "$0" "$@"
+  exit
+fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
@@ -105,8 +112,8 @@ chmod +x "$work/cronic-with-shellopts"
 # with these exported shell functions:
 #  * `fail_then_continue` runs `false` and then prints a line.
 #  * `fail_in_pipeline` runs a pipeline whose first command fails.
-#  * `report_cronic_variables` writes to stderr any variable of `cronic`'s that
-#    it can see.
+#  * `report_cronic_variables` writes to stderr any variable or function of
+#    `cronic`'s that it can see.
 cat > "$work/cronic-with-function" << 'EOF2'
 #!/bin/bash
 fail_then_continue() {
@@ -118,6 +125,7 @@ fail_in_pipeline() {
 }
 report_cronic_variables() {
   set | grep '^CRONIC_' >&2
+  declare -F | grep ' cronic_' >&2
   return 0
 }
 export -f fail_then_continue fail_in_pipeline report_cronic_variables
@@ -217,24 +225,54 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
 
+# A missing command or a missing option value is an error, not a crash.
+for args in "" "--expected-status" "--permit-stderr"; do
+  usage_status=0
+  # shellcheck disable=SC2086 # Split args into words, or into none.
+  "$CRONIC" $args > "$work/output" 2> "$work/stderr" || usage_status=$?
+  if [ "$usage_status" = 2 ] && grep -q "^cronic: " "$work/stderr" \
+    && ! grep -q "unbound variable" "$work/stderr"; then
+    echo "PASS: cronic $args with no command"
+  else
+    echo "FAIL: cronic $args with no command: exit status $usage_status, stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
+done
+
+# Trace lines are recognized when PS4 contains regular-expression
+# metacharacters, and when PS4 contains expansions.
+PS4='[trace] '
+export PS4
+check "PS4 with metacharacters, trace-only stderr" 0 silent "$work/trace-only" 0
+check "PS4 with metacharacters, trace lines and real stderr" 0 \
+  "report:^a real error$" "$work/trace-and-stderr" 0
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${LINENO}: '
+check "PS4 with expansions, trace-only stderr" 0 silent "$work/trace-only" 0
+check "PS4 with expansions, trace lines and real stderr" 0 \
+  "report:^a real error$" "$work/trace-and-stderr" 0
+unset PS4
+
 # The command may be a shell builtin.
 check "builtin command" 0 silent :
 # A builtin that would end the shell does not prevent the report.
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
 
-# A program whose name is a common word, such as `cleanup`, runs rather than
-# any function of `cronic`'s.
+# A program whose name is that of a function of `cronic`'s runs rather than the
+# function.
 mkdir "$work/bin"
-cat > "$work/bin/cleanup" << 'EOF'
+cat > "$work/bin/cronic_cleanup" << 'EOF'
 #!/bin/sh
-echo "the program named cleanup ran" 1>&2
+echo "the program named cronic_cleanup ran" 1>&2
 exit 4
 EOF
-chmod +x "$work/bin/cleanup"
+chmod +x "$work/bin/cronic_cleanup"
 saved_path="$PATH"
 PATH="$work/bin:$PATH"
-check "program named cleanup" 4 "report:^the program named cleanup ran$" cleanup
+check "program named cronic_cleanup" 4 \
+  "report:^the program named cronic_cleanup ran$" cronic_cleanup
 PATH="$saved_path"
 
 # When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
@@ -322,9 +360,17 @@ check "exported SHELLOPTS with pipefail, exported function" 1 report \
   "$default_shellopts:pipefail" fail_in_pipeline
 check "exported SHELLOPTS without pipefail, exported function" 0 silent \
   "$default_shellopts" fail_in_pipeline
-# A shell function that is the command does not see `cronic`'s variables.
-check "exported function sees none of cronic's variables" 0 silent \
+# A shell function that is the command does not see `cronic`'s variables or
+# function.
+check "exported function sees none of cronic's variables or function" 0 silent \
   "$default_shellopts" report_cronic_variables
+# ... nor a variable that is not exported, which BASH_ENV set within `cronic`.
+echo "CRONIC_FROM_BASH_ENV=unexported" > "$work/bash-env"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "exported function does not see unexported variable from BASH_ENV" 0 \
+  silent "$default_shellopts" report_cronic_variables
+unset BASH_ENV
 CRONIC="$REAL_CRONIC"
 
 # `cronic` does not change a variable that the caller exported, whether its name

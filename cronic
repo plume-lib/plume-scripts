@@ -9,9 +9,12 @@
 #   any non-trace error output or a non-zero result code. Cronic filters
 #   Bash execution traces (or anything matching PS4) from the error output,
 #   so jobs can be run with execution tracing to aid forensic
-#   debugging. Cronic has no options, it simply executes its arguments.
+#   debugging.
 # Extended by Michael Ernst to add --expected-status, --permit-stderr, and --duplicate-stderr flags.
 # --duplicate-stderr prints stderr twice so that it is less likely to be overlooked.
+# Usage:  cronic [--expected-status N] [--permit-stderr] [--duplicate-stderr] COMMAND [ARG...]
+# The options must appear in that order.  COMMAND runs in a subshell, with the
+# caller's variables and shell options rather than this script's.
 
 # The caller's state, as commands that restore it, before this script changes
 # any of it for itself.  The wrapped command runs with the caller's state
@@ -29,10 +32,20 @@
 # The redirection discards the trace of these commands.
 {
   CRONIC_CALLER_VARIABLES=$(
-    names=("${!CRONIC_@}")
-    [ ${#names[@]} -eq 0 ] || declare -p "${names[@]}"
+    for name in "${!CRONIC_@}"; do
+      declaration=$(declare -p "$name")
+      attributes=${declaration#declare -}
+      case ${attributes%% *} in
+        *x*) echo "$declaration" ;;
+      esac
+    done
   )
-  CRONIC_CALLER_OPTIONS=$(set +o)
+  # xtrace and verbose come last, so that restoring them does not trace or echo
+  # the restoring of the other options.
+  CRONIC_CALLER_OPTIONS=$(
+    set +o | grep -v -e ' verbose$' -e ' xtrace$'
+    set +o | grep -e ' verbose$' -e ' xtrace$'
+  )
   case $- in
     *e*) CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/set +o errexit/set -o errexit} ;;
   esac
@@ -60,9 +73,6 @@ CRONIC_TRACE=$CRONIC_TMPDIR/trace
 # is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
 # files are retained; don't "echo" their location, because that would be
 # appended to stderr.
-# Every function in this script has a name that starts with `cronic_`.  The
-# wrapped command runs in a subshell in which this script's functions are still
-# defined, and a function would take precedence over a program of the same name.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
 cronic_cleanup() {
   [ "$CRONIC_DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
@@ -82,20 +92,28 @@ trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
 CRONIC_EXPECTED=0
-if [ "$1" == "--expected-status" ]; then
+if [ "${1-}" == "--expected-status" ]; then
+  if [ $# -lt 2 ]; then
+    echo "cronic: --expected-status requires an argument" >&2
+    exit 2
+  fi
   shift
   CRONIC_EXPECTED=$1
   shift
 fi
 CRONIC_PERMITSTDERR=0
-if [ "$1" == "--permit-stderr" ]; then
+if [ "${1-}" == "--permit-stderr" ]; then
   shift
   CRONIC_PERMITSTDERR=1
 fi
 CRONIC_DUPLICATE_STDERR=0
-if [ "$1" == "--duplicate-stderr" ]; then
+if [ "${1-}" == "--duplicate-stderr" ]; then
   shift
   CRONIC_DUPLICATE_STDERR=1
+fi
+if [ $# -eq 0 ]; then
+  echo "cronic: no command given" >&2
+  exit 2
 fi
 
 # Run the command with all of the caller's shell options rather than this
@@ -110,29 +128,43 @@ fi
 # shell function that it runs.  The redirections are on the subshell, so that
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
-# The subshell unsets every variable whose name starts with `CRONIC_`, so that a
-# builtin or shell function that is the command does not see this script's
-# variables, and then restores the caller's variables and options.  The
-# redirection discards any trace or echo of doing so.
+# The subshell unsets every variable whose name starts with `CRONIC_`, and this
+# script's function, so that a builtin or shell function that is the command
+# does not see this script's variables and function, and so that the function
+# does not take precedence over a program of the same name.  Then the subshell
+# restores the caller's variables and options.  The subshell first turns off
+# this script's xtrace and verbose, so that the restoring is not traced or
+# echoed; any error in the restoring goes to the command's error output.
 set +e
 (
-  {
-    eval "unset -v \"\${!CRONIC_@}\"
-      $CRONIC_CALLER_VARIABLES
-      $CRONIC_CALLER_OPTIONS"
-  } 2> /dev/null
+  { set +vx; } 2> /dev/null
+  eval "unset -v \"\${!CRONIC_@}\"
+    unset -f cronic_cleanup
+    $CRONIC_CALLER_VARIABLES
+    $CRONIC_CALLER_OPTIONS"
   "$@"
 ) > "$CRONIC_OUT" 2> "$CRONIC_TRACE"
-RESULT=$?
+CRONIC_RESULT=$?
 set -e
 
-PATTERN="^${PS4:0:1}\\+${PS4:1}"
-if grep -q "$PATTERN" "$CRONIC_TRACE"; then
+# A trace line starts with PS4 after expansion, with its first character
+# repeated once per level of nesting.  Expansion changes from line to line, so
+# the pattern matches only the literal text before the first `$`, backquote, or
+# backslash in PS4, with its regular-expression metacharacters escaped.  If
+# there is no such text, then no line is treated as a trace line.
+CRONIC_PS4_LITERAL=${PS4-}
+CRONIC_PS4_LITERAL=${CRONIC_PS4_LITERAL%%[\$\`\\]*}
+if [ -n "$CRONIC_PS4_LITERAL" ]; then
+  CRONIC_PS4_FIRST=$(printf '%s' "${CRONIC_PS4_LITERAL:0:1}" | sed 's/[]*.^[]/\\&/g')
+  CRONIC_PS4_REST=$(printf '%s' "${CRONIC_PS4_LITERAL:1}" | sed 's/[]*.^[]/\\&/g')
+  CRONIC_PATTERN="^$CRONIC_PS4_FIRST\\+$CRONIC_PS4_REST"
+fi
+if [ -n "$CRONIC_PS4_LITERAL" ] && grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,
   # exits with the wrapped command's status, and removes its temporary files.
-  grep -v "$PATTERN" "$CRONIC_TRACE" > "$CRONIC_ERR" || true
+  grep -v "$CRONIC_PATTERN" "$CRONIC_TRACE" > "$CRONIC_ERR" || true
 else
   CRONIC_ERR=$CRONIC_TRACE
 fi
@@ -146,18 +178,18 @@ cat "$CRONIC_ERR" \
   | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
     > "$CRONIC_REDUCED_ERR" || true
 
-if [ $RESULT -ne "$CRONIC_EXPECTED" ] || { [ $CRONIC_PERMITSTDERR -eq 0 ] && [ -s "$CRONIC_REDUCED_ERR" ]; }; then
+if [ $CRONIC_RESULT -ne "$CRONIC_EXPECTED" ] || { [ $CRONIC_PERMITSTDERR -eq 0 ] && [ -s "$CRONIC_REDUCED_ERR" ]; }; then
   echo "Cronic detected failure or error output for the command:"
   echo "$@"
   echo
   if [[ $CRONIC_EXPECTED -eq 0 ]]; then
-    if [[ $RESULT -eq 0 ]]; then
-      echo "RESULT CODE: $RESULT  (success)"
+    if [[ $CRONIC_RESULT -eq 0 ]]; then
+      echo "RESULT CODE: $CRONIC_RESULT  (success)"
     else
-      echo "RESULT CODE: $RESULT  (failure)"
+      echo "RESULT CODE: $CRONIC_RESULT  (failure)"
     fi
   else
-    echo "RESULT CODE: $RESULT  (expected: $CRONIC_EXPECTED)"
+    echo "RESULT CODE: $CRONIC_RESULT  (expected: $CRONIC_EXPECTED)"
   fi
   echo
   echo "ERROR OUTPUT:"
@@ -188,4 +220,4 @@ fi
 
 # The temporary files are removed by the EXIT trap.
 
-exit $RESULT
+exit $CRONIC_RESULT
