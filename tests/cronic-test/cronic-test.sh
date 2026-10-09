@@ -143,22 +143,6 @@ exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
 EOF2
 chmod +x "$work/cronic-with-shellopts"
 
-# Runs `cronic` with exported shell functions named like the builtins that
-# `cronic` uses to restore the caller's options.  Each function writes to
-# stderr and then runs the builtin.
-cat > "$work/cronic-with-builtin-functions" << 'EOF'
-#!/bin/bash
-for name in compgen eval export printf set unset; do
-  builtin eval "$name() {
-    echo \"the function $name ran\" >&2
-    builtin $name \"\$@\"
-  }"
-  builtin export -f "$name"
-done
-exec "$REAL_CRONIC" "$@"
-EOF
-chmod +x "$work/cronic-with-builtin-functions"
-
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
@@ -548,12 +532,6 @@ EOF
 check_trace_section "bash -x cronic, trace output" \
   "$work/bash-x-trace-section.goal" \
   bash -x "$CRONIC" "$work/trace-and-stderr" 0
-
-# A function that the caller exported with the name of a builtin does not run
-# in place of the builtin when `cronic` restores the caller's options.
-CRONIC="$work/cronic-with-builtin-functions"
-check "caller's exported functions named like builtins" 0 silent true
-CRONIC="$REAL_CRONIC"
 
 # Bash writes its trace lines to a separate file, so they are not error
 # output, whatever PS4 is.

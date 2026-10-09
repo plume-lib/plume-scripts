@@ -18,6 +18,9 @@
 # script's.  Names that start with `cronic_` are reserved for this script:
 # COMMAND does not see a variable or function with such a name, even one that
 # the caller exported.
+# This script assumes that the caller has not exported a function with the name
+# of a builtin or program that this script uses, such as `set` or `cat`; such a
+# function would run in place of the builtin or program.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
@@ -27,9 +30,9 @@
 # options, and its `shopt` options, without any restoring; an option that this
 # script changes must be added here.  `$-` reports the options without the
 # cost of a command substitution, such as `$(set +o)`, in which bash would also
-# report errexit as off.  The options are
-# restored in one command, so that restoring verbose and xtrace neither echoes
-# nor traces the restoring of the others.
+# report errexit as off.  The options are restored in one command, so that
+# restoring verbose and xtrace neither echoes nor traces the restoring of the
+# others.
 # If the caller exported SHELLOPTS, then this script does not trace itself or
 # echo its input:  that output would go to this script's stderr, and cron would
 # send email for every run.  An exported `verbose` nonetheless echoes the lines
@@ -37,11 +40,8 @@
 # tell whether xtrace came from SHELLOPTS or from the command line, so
 # `bash -x cronic` traces this script only if SHELLOPTS is not exported.
 # The redirection discards the trace of these commands.
-# Builtins are called via `builtin`, here and where the caller's options are
-# restored, so that a function that the caller exported with the name of a
-# builtin, such as `set` or `unset`, does not run in its place.
 {
-  cronic_caller_options='builtin set'
+  cronic_caller_options='set'
   for cronic_option in e:errexit u:nounset v:verbose x:xtrace; do
     case $- in
       *"${cronic_option%%:*}"*) cronic_caller_options+=" -o ${cronic_option#*:}" ;;
@@ -50,14 +50,26 @@
   done
   # The filter makes `compgen` match SHELLOPTS exactly, not every exported
   # variable whose name starts with SHELLOPTS.
-  if builtin compgen -e -X '!SHELLOPTS' SHELLOPTS > /dev/null; then
-    builtin set +vx
+  if compgen -e -X '!SHELLOPTS' SHELLOPTS > /dev/null; then
+    set +vx
+  fi
+  # Unset every function whose name starts with `cronic_`, all of which the
+  # caller exported, because this script has not yet defined any.  Then the
+  # only such functions are this script's, which the subshell that runs the
+  # command unsets by name.  Testing the status of `compgen` first avoids the
+  # cost of a process substitution when there is no such function.  Each name
+  # is read whole, rather than split from an unquoted expansion, so that a name
+  # that contains a glob character is not expanded to file names.
+  if compgen -A function cronic_ > /dev/null; then
+    while read -r cronic_name; do
+      unset -f "$cronic_name"
+    done < <(compgen -A function cronic_)
   fi
 } 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
-builtin set -eu
+set -eu
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -220,31 +232,26 @@ fi
 # is the command does not see this script's variables and functions, and so
 # that a function does not take precedence over a program of the same name.
 # This script's functions are listed, rather than found by
-# `compgen -A function cronic_`, to avoid the cost of a command substitution;
-# the test suite checks that the list is complete.  A command substitution
-# finds any other such function, such as one that the caller exported, but
-# only when the status of `compgen` shows that there is one.
+# `compgen -A function cronic_`, to avoid the cost of a command substitution.
+# The list must name every function that this script defines before this
+# point; the test suite fails if the command can see one that it omits.
 # Then the subshell restores the caller's options.  The subshell first turns
 # off this script's xtrace and verbose, so that the restoring is not traced or
 # echoed; any error in the restoring goes to the command's error output.
-builtin set +e
+set +e
 (
-  { builtin set +vx; } 2> /dev/null
+  { set +vx; } 2> /dev/null
   if [[ -n $cronic_xtrace_fd ]]; then
-    builtin export BASH_XTRACEFD=$cronic_xtrace_fd
+    export BASH_XTRACEFD=$cronic_xtrace_fd
   fi
-  builtin unset -f cronic_usage_line cronic_usage cronic_help \
+  unset -f cronic_usage_line cronic_usage cronic_help \
     cronic_set_expected cronic_cleanup
-  if builtin compgen -A function cronic_ > /dev/null; then
-    # shellcheck disable=SC2046 # Each name is one word.
-    builtin unset -f $(builtin compgen -A function cronic_)
-  fi
-  builtin eval "builtin unset -v \"\${!cronic_@}\"
+  eval "unset -v \"\${!cronic_@}\"
     $cronic_caller_options"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
-builtin set -e
+set -e
 
 if [ -n "$cronic_xtrace_fd" ]; then
   exec {cronic_xtrace_fd}>&-
@@ -253,7 +260,7 @@ fi
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.
 cronic_bre_quote() {
-  builtin printf '%s\n' "$1" | LC_ALL=C sed 's/[*.[^]/\\&/g'
+  printf '%s\n' "$1" | LC_ALL=C sed 's/[*.[^]/\\&/g'
 }
 
 # Prints a basic regular expression that matches the trace lines, for PS4, that
@@ -274,7 +281,7 @@ cronic_trace_pattern() {
   local LC_ALL=C
   [[ $PS4 =~ ^([$'\xc0'-$'\xff'][$'\x80'-$'\xbf']*|.) ]]
   local first=${BASH_REMATCH[0]}
-  builtin printf '^\\(%s\\)\\+%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "${PS4#"$first"}")"
+  printf '^\\(%s\\)\\+%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "${PS4#"$first"}")"
 }
 
 cronic_pattern=$(cronic_trace_pattern)
