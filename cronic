@@ -14,6 +14,7 @@
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
 # The options are documented in function `cronic_help`; run `cronic --help`.
+# Trace lines are filtered only if PS4 contains no `$`, backquote, or backslash.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -148,8 +149,21 @@ command -- "$@" > "$OUT" 2> "$TRACE"
 RESULT=$?
 set -e
 
-PATTERN="^${PS4:0:1}\\+${PS4:1}"
-if grep -q "$PATTERN" "$TRACE"; then
+# A trace line starts with PS4 after expansion, with PS4's first character
+# repeated once per level of nesting.  If PS4 contains a `$`, backquote, or
+# backslash, then its expansion can differ from line to line, so no line is
+# treated as a trace line:  any pattern for such a PS4 could also match, and
+# hide, a real error.
+# The `sed` command escapes PS4's basic-regular-expression metacharacters, then
+# makes the first (possibly escaped) character repeatable.
+PATTERN=
+case ${PS4-} in
+  '' | *[\$\`\\]*) ;;
+  *)
+    PATTERN=^$(printf '%s\n' "$PS4" | sed 's/[*.[^$]/\\&/g; s/^\\\{0,1\}./&\\+/')
+    ;;
+esac
+if [ -n "$PATTERN" ] && grep -q "$PATTERN" "$TRACE"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,
