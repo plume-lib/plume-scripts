@@ -498,6 +498,30 @@ export DEBUG OUT CRONIC_DEBUG CRONIC_TMPDIR
 check "caller's exported variables" 0 silent "$work/check-variables"
 unset DEBUG OUT CRONIC_DEBUG CRONIC_TMPDIR
 
+# `cronic` does not remove a function that the caller exported, whether its
+# name is one of `cronic`'s own functions or merely starts like them.  The
+# function is visible both to the command and to the command's children.
+cat > "$work/cronic-with-cronic-functions" << 'EOF'
+#!/bin/bash
+cronic_mine() {
+  exit 3
+}
+cronic_usage() {
+  exit 4
+}
+export -f cronic_mine cronic_usage
+exec "$1" "${@:2}"
+EOF
+chmod +x "$work/cronic-with-cronic-functions"
+CRONIC="$work/cronic-with-cronic-functions"
+check "caller's exported function named cronic_mine" 3 silent \
+  "$REAL_CRONIC" --expected-status 3 cronic_mine
+check "caller's exported function named cronic_mine, in a child" 3 silent \
+  "$REAL_CRONIC" --expected-status 3 bash -c cronic_mine
+check "caller's exported function named cronic_usage" 4 silent \
+  "$REAL_CRONIC" --expected-status 4 cronic_usage
+CRONIC="$REAL_CRONIC"
+
 # `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
 bash_x_status=0
 bash -x "$CRONIC" "$work/trace-only" 0 > "$work/output" 2> "$work/stderr" \

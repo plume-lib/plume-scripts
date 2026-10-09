@@ -23,11 +23,13 @@
 # The caller's state, as commands that restore it, before this script changes
 # any of it for itself.  The wrapped command runs with the caller's state
 # rather than this script's; see where it is run, below.
-#  * The caller's exported variables whose names start with `CRONIC_`, which
-#    this script's own variables would otherwise hide.
-#  * The caller's shell options.  `set +o` reports `-e` and verbose as off,
-#    because bash turns them off in a command substitution, so `$-` supplies
-#    them.
+#  * The caller's exported variables whose names start with `CRONIC_`, and
+#    exported functions whose names start with `cronic_`, which this script's
+#    own variables and functions would otherwise hide.
+#  * The caller's `set -o` shell options.  `set +o` reports `-e` and verbose as
+#    off, because bash turns them off in a command substitution, so `$-`
+#    supplies them.  This script changes no `shopt` option, so the command
+#    inherits the caller's `shopt` options without any restoring.
 # If the caller exported SHELLOPTS, then this script does not trace itself or
 # echo its input:  that output would go to this script's stderr, and cron would
 # send email for every run.  An exported `verbose` nonetheless echoes the lines
@@ -38,31 +40,36 @@
 {
   # `compgen -e` lists exported variables, and fails if there are none, in which
   # case `declare -p` with no names would print every variable.  The `if` makes
-  # the status 0, as `errexit` requires.  The command substitution keeps `names`
-  # out of this script.
+  # the status 0, as `errexit` requires.  `declare -F` marks an exported
+  # function with `x`.  The command substitution keeps `names`, `flags`, and
+  # `name` out of this script.
   CRONIC_CALLER_VARIABLES=$(
     if names=$(compgen -e CRONIC_); then
       # shellcheck disable=SC2086 # Each name is one word.
       declare -p $names
     fi
+    declare -F | while read -r _ flags name; do
+      case "$flags $name" in
+        -*x*' 'cronic_*)
+          declare -f "$name"
+          echo "export -f $name"
+          ;;
+      esac
+    done
   )
-  # verbose and xtrace come last, in one command, so that restoring them neither
-  # echoes nor traces the restoring of any option.
+  # `$-` supplies errexit, verbose, and xtrace.  They come last, in one
+  # command, so that restoring verbose and xtrace neither echoes nor traces the
+  # restoring of any other option.
   CRONIC_CALLER_OPTIONS=$(set +o)
-  CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/$'\n'set [-+]o verbose/}
-  CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/$'\n'set [-+]o xtrace/}
-  case $- in
-    *e*) CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/set +o errexit/set -o errexit} ;;
-  esac
-  CRONIC_CALLER_OPTIONS+=$'\n''set '
-  case $- in
-    *v*) CRONIC_CALLER_OPTIONS+='-o verbose ' ;;
-    *) CRONIC_CALLER_OPTIONS+='+o verbose ' ;;
-  esac
-  case $- in
-    *x*) CRONIC_CALLER_OPTIONS+='-o xtrace' ;;
-    *) CRONIC_CALLER_OPTIONS+='+o xtrace' ;;
-  esac
+  CRONIC_CALLER_SET='set'
+  for CRONIC_OPTION in e:errexit v:verbose x:xtrace; do
+    CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/$'\n'set [-+]o ${CRONIC_OPTION#*:}/}
+    case $- in
+      *"${CRONIC_OPTION%%:*}"*) CRONIC_CALLER_SET+=" -o ${CRONIC_OPTION#*:}" ;;
+      *) CRONIC_CALLER_SET+=" +o ${CRONIC_OPTION#*:}" ;;
+    esac
+  done
+  CRONIC_CALLER_OPTIONS+=$'\n'$CRONIC_CALLER_SET
   if [[ $(declare -p SHELLOPTS) =~ ^declare\ -[a-zA-Z]*x ]]; then set +vx; fi
 } 2> /dev/null
 
@@ -173,19 +180,6 @@ CRONIC_ERR=$CRONIC_TMPDIR/err
 CRONIC_REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
 CRONIC_TRACE=$CRONIC_TMPDIR/trace
 
-# Appends its argument to CRONIC_PATTERN, as a basic regular expression that
-# matches the argument literally.
-cronic_append_literal() {
-  local text=$1
-  while [ -n "$text" ]; do
-    case $text in
-      [.[*^\$\\]*) CRONIC_PATTERN+=\\ ;;
-    esac
-    CRONIC_PATTERN+=${text:0:1}
-    text=${text:1}
-  done
-}
-
 # Remove the temporary files however this script terminates, including when it
 # is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
 # files are retained; don't "echo" their location, because that would be
@@ -208,7 +202,7 @@ trap 'cronic_cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
 trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
-# Run the command with all of the caller's shell options rather than this
+# Run the command with the caller's `set -o` shell options rather than this
 # script's.  If the caller exported SHELLOPTS, then the command would otherwise
 # inherit this script's options, and a bash script that reads an unset variable
 # (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
@@ -245,14 +239,13 @@ set -e
 # backslash, then its expansion can differ from line to line, so no line is
 # treated as a trace line:  any pattern for such a PS4 could also match, and
 # hide, a real error.
+# The `sed` command escapes PS4's basic-regular-expression metacharacters, then
+# makes the first (possibly escaped) character repeatable.
 CRONIC_PATTERN=
 case ${PS4-} in
   '' | *[\$\`\\]*) ;;
   *)
-    CRONIC_PATTERN=^
-    cronic_append_literal "${PS4:0:1}"
-    CRONIC_PATTERN+='\+'
-    cronic_append_literal "${PS4:1}"
+    CRONIC_PATTERN=^$(printf '%s\n' "$PS4" | sed 's/[*.[^$]/\\&/g; s/^\\\{0,1\}./&\\+/')
     ;;
 esac
 if [ -n "$CRONIC_PATTERN" ] && grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
