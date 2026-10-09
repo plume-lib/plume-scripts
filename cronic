@@ -22,9 +22,9 @@
 # The caller's state, as commands that restore it, before this script changes
 # any of it for itself.  The wrapped command runs with the caller's state
 # rather than this script's; see where it is run, below.
-#  * The caller's exported variables whose names start with `CRONIC_`, and
-#    exported functions whose names start with `cronic_`, which this script's
-#    own variables and functions would otherwise hide.
+#  * The caller's exported variables and functions whose names start with
+#    `cronic_`, which this script's own variables and functions would otherwise
+#    hide.
 #  * The caller's `set -o` shell options.  `set +o` reports `-e` and verbose as
 #    off, because bash turns them off in a command substitution, so `$-`
 #    supplies them.  This script changes no `shopt` option, so the command
@@ -42,8 +42,8 @@
   # the status 0, as `errexit` requires.  `declare -F` marks an exported
   # function with `x`.  The command substitution keeps `names`, `flags`, and
   # `name` out of this script.
-  CRONIC_CALLER_VARIABLES=$(
-    if names=$(compgen -e CRONIC_); then
+  cronic_caller_variables=$(
+    if names=$(compgen -e cronic_); then
       # shellcheck disable=SC2086 # Each name is one word.
       declare -p $names
     fi
@@ -59,16 +59,16 @@
   # `$-` supplies errexit, verbose, and xtrace.  They come last, in one
   # command, so that restoring verbose and xtrace neither echoes nor traces the
   # restoring of any other option.
-  CRONIC_CALLER_OPTIONS=$(set +o)
-  CRONIC_CALLER_SET='set'
-  for CRONIC_OPTION in e:errexit v:verbose x:xtrace; do
-    CRONIC_CALLER_OPTIONS=${CRONIC_CALLER_OPTIONS/$'\n'set [-+]o ${CRONIC_OPTION#*:}/}
+  cronic_caller_options=$(set +o)
+  cronic_caller_set='set'
+  for cronic_option in e:errexit v:verbose x:xtrace; do
+    cronic_caller_options=${cronic_caller_options/$'\n'set [-+]o ${cronic_option#*:}/}
     case $- in
-      *"${CRONIC_OPTION%%:*}"*) CRONIC_CALLER_SET+=" -o ${CRONIC_OPTION#*:}" ;;
-      *) CRONIC_CALLER_SET+=" +o ${CRONIC_OPTION#*:}" ;;
+      *"${cronic_option%%:*}"*) cronic_caller_set+=" -o ${cronic_option#*:}" ;;
+      *) cronic_caller_set+=" +o ${cronic_option#*:}" ;;
     esac
   done
-  CRONIC_CALLER_OPTIONS+=$'\n'$CRONIC_CALLER_SET
+  cronic_caller_options+=$'\n'$cronic_caller_set
   if [[ $(declare -p SHELLOPTS) =~ ^declare\ -[a-zA-Z]*x ]]; then set +vx; fi
 } 2> /dev/null
 
@@ -76,9 +76,13 @@
 # as an error.
 set -eu
 
-# The names of this script's functions start with "cronic_", and the names of
-# its variables start with "CRONIC_", so that the subshell that runs the
-# wrapped command can remove them all; see where it is run, below.
+# The names of this script's variables are lowercase, because an assignment to
+# a variable that the caller exported would change the value that the wrapped
+# command sees, and by convention exported (environment) variables are
+# uppercase.  The names of this script's functions and variables also start
+# with "cronic_", to further reduce the chance of a clash, and so that the
+# subshell that runs the wrapped command can remove them all; see where it is
+# run, below.
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -108,23 +112,23 @@ cronic_help() {
   exit 0
 }
 
-# Sets CRONIC_EXPECTED to its argument, or reports a usage error if the argument is
-# not a valid exit status.
+# Sets cronic_expected to its argument, or reports a usage error if the
+# argument is not a valid exit status.
 cronic_set_expected() {
-  CRONIC_EXPECTED=$1
+  cronic_expected=$1
   # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
   # octal.  At most 255, because no exit status is larger.
-  if ! [[ $CRONIC_EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$CRONIC_EXPECTED" -gt 255 ]; then
-    echo "$0: --expected-status requires an integer from 0 to 255, got \"$CRONIC_EXPECTED\"" >&2
+  if ! [[ $cronic_expected =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$cronic_expected" -gt 255 ]; then
+    echo "$0: --expected-status requires an integer from 0 to 255, got \"$cronic_expected\"" >&2
     cronic_usage
   fi
 }
 
 # The options are parsed before the temporary directory is created, so that
 # `--help` and a usage error neither create nor depend on it.
-CRONIC_EXPECTED=0
-CRONIC_PERMITSTDERR=0
-CRONIC_DUPLICATE_STDERR=0
+cronic_expected=0
+cronic_permitstderr=0
+cronic_duplicate_stderr=0
 while [ $# -gt 0 ]; do
   case $1 in
     --expected-status)
@@ -142,11 +146,11 @@ while [ $# -gt 0 ]; do
       ;;
     --permit-stderr)
       shift
-      CRONIC_PERMITSTDERR=1
+      cronic_permitstderr=1
       ;;
     --duplicate-stderr)
       shift
-      CRONIC_DUPLICATE_STDERR=1
+      cronic_duplicate_stderr=1
       ;;
     -h | --help)
       cronic_help
@@ -166,26 +170,26 @@ while [ $# -gt 0 ]; do
 done
 [ $# -gt 0 ] || cronic_usage
 
-CRONIC_DEBUG=false
-# CRONIC_DEBUG=true
+cronic_debug=false
+# cronic_debug=true
 
 # A private directory, rather than predictable `/tmp/cronic.*.$$` names: on a
 # shared machine, process ids are guessable and reused, so another user could
 # pre-create those paths as symlinks and have the wrapped command's output
 # written through them.
-CRONIC_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
-CRONIC_OUT=$CRONIC_TMPDIR/out
-CRONIC_ERR=$CRONIC_TMPDIR/err
-CRONIC_REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
-CRONIC_TRACE=$CRONIC_TMPDIR/trace
+cronic_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
+cronic_out=$cronic_tmpdir/out
+cronic_err=$cronic_tmpdir/err
+cronic_reduced_err=$cronic_tmpdir/err.reduced
+cronic_trace=$cronic_tmpdir/trace
 
 # Remove the temporary files however this script terminates, including when it
-# is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
+# is interrupted before it reaches the end.  When cronic_debug is true, the
 # files are retained; don't "echo" their location, because that would be
 # appended to stderr.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
 cronic_cleanup() {
-  [ "$CRONIC_DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
+  [ "$cronic_debug" = "true" ] || rm -rf "$cronic_tmpdir"
 }
 trap cronic_cleanup EXIT
 
@@ -213,7 +217,7 @@ trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 # shell function that it runs.  The redirections are on the subshell, so that
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
-# The subshell unsets every variable whose name starts with `CRONIC_` and every
+# The subshell unsets every variable whose name starts with `cronic_` and every
 # function whose name starts with `cronic_`, so that a builtin or shell function
 # that is the command does not see this script's variables and functions, and
 # so that a function does not take precedence over a program of the same name.
@@ -224,70 +228,71 @@ trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 set +e
 (
   { set +vx; } 2> /dev/null
-  eval "unset -v \"\${!CRONIC_@}\"
+  eval "unset -v \"\${!cronic_@}\"
     unset -f \$(compgen -A function cronic_)
-    $CRONIC_CALLER_VARIABLES
-    $CRONIC_CALLER_OPTIONS"
+    $cronic_caller_variables
+    $cronic_caller_options"
   "$@"
-) > "$CRONIC_OUT" 2> "$CRONIC_TRACE"
-CRONIC_RESULT=$?
+) > "$cronic_out" 2> "$cronic_trace"
+cronic_result=$?
 set -e
 
-CRONIC_PATTERN="^${PS4:0:1}\\+${PS4:1}"
-if grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
+cronic_pattern="^${PS4:0:1}\\+${PS4:1}"
+if grep -q "$cronic_pattern" "$cronic_trace"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,
   # exits with the wrapped command's status, and removes its temporary files.
-  grep -v "$CRONIC_PATTERN" "$CRONIC_TRACE" > "$CRONIC_ERR" || true
+  grep -v "$cronic_pattern" "$cronic_trace" > "$cronic_err" || true
 else
-  CRONIC_ERR=$CRONIC_TRACE
+  cronic_err=$cronic_trace
 fi
 
 # Certain Unix programs send output to stderr even when a command is successful!
 # For example, git does this, and the POSIX standard requires it for make.
-# The full stderr output is shown, but file CRONIC_REDUCED_ERR is checked for emptiness below.
+# The full stderr output is shown, but file cronic_reduced_err is checked for
+# emptiness below.
 # TODO: Expand this.
-cat "$CRONIC_ERR" \
+cat "$cronic_err" \
   | grep -v "^Everything up-to-date$" \
   | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
-    > "$CRONIC_REDUCED_ERR" || true
+    > "$cronic_reduced_err" || true
 
-if [ $CRONIC_RESULT -ne "$CRONIC_EXPECTED" ] || { [ $CRONIC_PERMITSTDERR -eq 0 ] && [ -s "$CRONIC_REDUCED_ERR" ]; }; then
+if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
   echo "Cronic detected failure or error output for the command:"
   echo "$@"
   echo
-  if [[ $CRONIC_EXPECTED -eq 0 ]]; then
-    if [[ $CRONIC_RESULT -eq 0 ]]; then
-      echo "RESULT CODE: $CRONIC_RESULT  (success)"
+  if [[ $cronic_expected -eq 0 ]]; then
+    if [[ $cronic_result -eq 0 ]]; then
+      echo "RESULT CODE: $cronic_result  (success)"
     else
-      echo "RESULT CODE: $CRONIC_RESULT  (failure)"
+      echo "RESULT CODE: $cronic_result  (failure)"
     fi
   else
-    echo "RESULT CODE: $CRONIC_RESULT  (expected: $CRONIC_EXPECTED)"
+    echo "RESULT CODE: $cronic_result  (expected: $cronic_expected)"
   fi
   echo
   echo "ERROR OUTPUT:"
-  cat "$CRONIC_ERR"
+  cat "$cronic_err"
   echo
-  if [ "$CRONIC_DEBUG" != "true" ]; then
-    if ! cmp --silent "$CRONIC_ERR" "$CRONIC_REDUCED_ERR"; then
+  if [ "$cronic_debug" != "true" ]; then
+    if ! cmp --silent "$cronic_err" "$cronic_reduced_err"; then
       echo "REDUCED ERROR OUTPUT:"
-      cat "$CRONIC_REDUCED_ERR"
+      cat "$cronic_reduced_err"
       echo
     fi
   fi
   echo "STANDARD OUTPUT:"
-  cat "$CRONIC_OUT"
-  if [ "$CRONIC_TRACE" != "$CRONIC_ERR" ]; then
+  cat "$cronic_out"
+  if [ "$cronic_trace" != "$cronic_err" ]; then
     echo
     echo "TRACE-ERROR OUTPUT:"
-    cat "$CRONIC_TRACE"
+    cat "$cronic_trace"
   fi
-  if [ $CRONIC_DUPLICATE_STDERR -eq 1 ]; then
+  if [ $cronic_duplicate_stderr -eq 1 ]; then
     echo
     echo "ERROR OUTPUT:"
-    cat "$CRONIC_ERR"
+    cat "$cronic_err"
   fi
   echo
   echo "END OF CRONIC OUTPUT."
@@ -295,4 +300,4 @@ fi
 
 # The temporary files are removed by the EXIT trap.
 
-exit $CRONIC_RESULT
+exit $cronic_result

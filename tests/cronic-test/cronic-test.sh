@@ -124,7 +124,7 @@ fail_in_pipeline() {
   false | true
 }
 report_cronic_variables() {
-  set | grep '^CRONIC_' >&2
+  set | grep '^cronic_' >&2
   declare -F | grep ' cronic_' >&2
   return 0
 }
@@ -420,7 +420,7 @@ check "exported SHELLOPTS without pipefail, exported function" 0 silent \
 check "exported function sees none of cronic's variables or function" 0 silent \
   "$default_shellopts" report_cronic_variables
 # ... nor a variable that is not exported, which BASH_ENV set within `cronic`.
-echo "CRONIC_FROM_BASH_ENV=unexported" > "$work/bash-env"
+echo "cronic_from_bash_env=unexported" > "$work/bash-env"
 BASH_ENV="$work/bash-env"
 export BASH_ENV
 check "exported function does not see unexported variable from BASH_ENV" 0 \
@@ -428,23 +428,54 @@ check "exported function does not see unexported variable from BASH_ENV" 0 \
 unset BASH_ENV
 CRONIC="$REAL_CRONIC"
 
-# `cronic` does not change a variable that the caller exported, whether its name
-# is a plain word such as `DEBUG` or `OUT` or is the name of one of `cronic`'s
-# own variables.
+# `cronic` does not change a variable that the caller exported.  For each
+# variable that `cronic` assigns, the caller exports that name in uppercase,
+# both with and without any "cronic_" prefix (for example, `CRONIC_OUT` and
+# `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
+variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
+if [ -z "$variable_names" ]; then
+  echo "FAIL: found no variables in $CRONIC"
+  status=1
+fi
+exported_names=
+for name in $variable_names; do
+  upper=$(echo "$name" | tr '[:lower:]' '[:upper:]')
+  for exported in "$upper" "${upper#CRONIC_}"; do
+    [ "$exported" = TMPDIR ] && continue
+    exported_names="$exported_names $exported"
+  done
+done
 cat > "$work/check-variables" << 'EOF'
 #!/bin/sh
-[ "$DEBUG" = "caller's DEBUG" ] && [ "$OUT" = "caller's OUT" ] \
-  && [ "$CRONIC_DEBUG" = "caller's CRONIC_DEBUG" ] \
-  && [ "$CRONIC_TMPDIR" = "caller's CRONIC_TMPDIR" ] || exit 3
+for name; do
+  eval "value=\${$name-}"
+  [ "$value" = "caller's $name" ] || exit 3
+done
 EOF
 chmod +x "$work/check-variables"
-DEBUG="caller's DEBUG"
-OUT="caller's OUT"
-CRONIC_DEBUG="caller's CRONIC_DEBUG"
-CRONIC_TMPDIR="caller's CRONIC_TMPDIR"
-export DEBUG OUT CRONIC_DEBUG CRONIC_TMPDIR
-check "caller's exported variables" 0 silent "$work/check-variables"
-unset DEBUG OUT CRONIC_DEBUG CRONIC_TMPDIR
+for name in $exported_names; do
+  eval "$name=\"caller's \$name\""
+  export "${name?}"
+done
+# shellcheck disable=SC2086  # each name is a separate argument.
+check "caller's exported variables" 0 silent "$work/check-variables" $exported_names
+# shellcheck disable=SC2086  # each name is a separate argument.
+unset $exported_names
+
+# The command sees a variable that the caller exported even if its name is that
+# of one of `cronic`'s own variables, though that is unconventional.
+cat > "$work/check-cronic-variables" << 'EOF'
+#!/bin/sh
+[ "$cronic_debug" = "caller's cronic_debug" ] \
+  && [ "$cronic_tmpdir" = "caller's cronic_tmpdir" ] || exit 3
+EOF
+chmod +x "$work/check-cronic-variables"
+cronic_debug="caller's cronic_debug"
+cronic_tmpdir="caller's cronic_tmpdir"
+export cronic_debug cronic_tmpdir
+check "caller's exported variables named like cronic's" 0 silent \
+  "$work/check-cronic-variables"
+unset cronic_debug cronic_tmpdir
 
 # `cronic` does not remove a function that the caller exported, whether its
 # name is one of `cronic`'s own functions or merely starts like them.  The
@@ -474,7 +505,7 @@ CRONIC="$REAL_CRONIC"
 bash_x_status=0
 bash -x "$CRONIC" "$work/trace-only" 0 > "$work/output" 2> "$work/stderr" \
   || bash_x_status=$?
-if [ "$bash_x_status" = 0 ] && grep -q "CRONIC_DEBUG=false" "$work/stderr"; then
+if [ "$bash_x_status" = 0 ] && grep -q "cronic_debug=false" "$work/stderr"; then
   echo "PASS: bash -x traces cronic"
 else
   echo "FAIL: bash -x traces cronic: exit status $bash_x_status, stderr:"
