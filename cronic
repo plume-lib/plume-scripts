@@ -6,15 +6,14 @@
 # In brief:
 #   Cronic is a small shim shell script for wrapping cron jobs so that cron
 #   only sends email when an error has occurred. Cronic defines an error as
-#   any non-trace error output or a non-zero result code. Cronic filters
-#   Bash execution traces (or anything matching PS4) from the error output,
-#   so jobs can be run with execution tracing to aid forensic
-#   debugging. Apart from its options, Cronic simply executes its
-#   arguments.
+#   any non-trace error output or a non-zero result code. Cronic separates
+#   execution traces from the error output, so jobs can be run with execution
+#   tracing to aid forensic debugging. Apart from its options, Cronic simply
+#   executes its arguments.
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
-# The options are documented in function `cronic_help`; run `cronic --help`.
-# Trace lines are filtered only if PS4 contains no `$`, backquote, or backslash.
+# The options and the treatment of execution traces are documented in function
+# `cronic_help`; run `cronic --help`.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -45,6 +44,12 @@ cronic_help() {
   echo "                       is less likely to be overlooked"
   echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
+  echo "Execution traces (from \"set -x\") are not treated as error output."
+  echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
+  echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
+  echo "stderr, from which lines that start with PS4 are removed.  That removal"
+  echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
+  echo "because such a PS4 can expand differently on each line."
   exit 0
 }
 
@@ -118,6 +123,7 @@ cronic_out=$cronic_tmpdir/out
 cronic_err=$cronic_tmpdir/err
 cronic_reduced_err=$cronic_tmpdir/err.reduced
 cronic_trace=$cronic_tmpdir/trace
+cronic_xtrace=$cronic_tmpdir/xtrace
 
 # Remove the temporary files however this script terminates, including when it
 # is interrupted before it reaches the end.  When cronic_debug is true, the
@@ -141,6 +147,17 @@ trap 'cronic_cleanup; trap - HUP EXIT; kill -s HUP $$' HUP
 trap 'cronic_cleanup; trap - INT EXIT; kill -s INT $$' INT
 trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 
+# A bash command writes its execution trace to the file descriptor named by
+# BASH_XTRACEFD, rather than to stderr, so the trace is separated from the
+# error output exactly, whatever PS4 is.  The descriptor is allocated by bash
+# (as 10 or higher), so that it does not collide with a descriptor, such as 3,
+# that the wrapped command uses for its own purposes.  Bash before 4.1 supports
+# neither BASH_XTRACEFD nor descriptor allocation.
+if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1))); then
+  exec {cronic_xtrace_fd}> "$cronic_xtrace"
+  export BASH_XTRACEFD=$cronic_xtrace_fd
+fi
+
 set +e
 # `command` because the wrapped command runs in this shell, where a function of
 # this script, such as `cronic_usage`, would otherwise run in place of a
@@ -149,20 +166,37 @@ command -- "$@" > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
-# A trace line starts with PS4 after expansion, with PS4's first character
-# repeated once per level of nesting.  If PS4 contains a `$`, backquote, or
-# backslash, then its expansion can differ from line to line, so no line is
-# treated as a trace line:  any pattern for such a PS4 could also match, and
-# hide, a real error.
-# The `sed` command escapes PS4's basic-regular-expression metacharacters, then
-# makes the first (possibly escaped) character repeatable.
-cronic_pattern=
-case ${PS4-} in
-  '' | *[\$\`\\]*) ;;
-  *)
-    cronic_pattern=^$(printf '%s\n' "$PS4" | sed 's/[*.[^$]/\\&/g; s/^\\\{0,1\}./&\\+/')
-    ;;
-esac
+# Unsetting BASH_XTRACEFD also closes its file descriptor.
+unset BASH_XTRACEFD
+
+# Prints a basic regular expression that matches its argument literally.
+# The argument must not contain a backslash.
+cronic_bre_quote() {
+  printf '%s\n' "$1" | LC_ALL=C sed 's/[*.[^]/\\&/g'
+}
+
+# Prints a basic regular expression that matches the trace lines, for PS4, that
+# a shell other than bash 4.1 or later writes to stderr.  Such a line starts
+# with PS4 after expansion, with PS4's first character repeated once per level
+# of nesting.  If PS4 contains a `$`, backquote, or backslash, then its
+# expansion can differ from line to line, so nothing is printed:  any pattern
+# for such a PS4 could also match, and hide, a real error.  Nothing is printed
+# if PS4 contains a newline, either, because `grep` would treat each line of
+# the pattern as a separate pattern.
+cronic_trace_pattern() {
+  case ${PS4-} in
+    '' | *[\$\`\\]* | *$'\n'*) return ;;
+  esac
+  # In the C locale, a character is a byte.  The first character is a UTF-8
+  # lead byte and its continuation bytes, or else a single byte, so that a
+  # multibyte character is repeated as a whole, whatever the locale.
+  local LC_ALL=C
+  [[ $PS4 =~ ^([$'\xc0'-$'\xff'][$'\x80'-$'\xbf']*|.) ]]
+  local first=${BASH_REMATCH[0]}
+  printf '^\\(%s\\)\\+%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "${PS4#"$first"}")"
+}
+
+cronic_pattern=$(cronic_trace_pattern)
 if [ -n "$cronic_pattern" ] && grep -q "$cronic_pattern" "$cronic_trace"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
@@ -213,6 +247,11 @@ if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ]
     echo
     echo "TRACE-ERROR OUTPUT:"
     cat "$cronic_trace"
+  fi
+  if [ -s "$cronic_xtrace" ]; then
+    echo
+    echo "TRACE OUTPUT:"
+    cat "$cronic_xtrace"
   fi
   if [ $cronic_duplicate_stderr -eq 1 ]; then
     echo
