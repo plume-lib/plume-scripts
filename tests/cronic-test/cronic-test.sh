@@ -479,10 +479,13 @@ check "exported function does not see unexported variable from BASH_ENV" 0 \
 unset BASH_ENV
 CRONIC="$REAL_CRONIC"
 
-# `cronic` does not change a variable that the caller exported.  For each
-# variable that `cronic` assigns, the caller exports that name in uppercase,
-# both with and without any "cronic_" prefix (for example, `CRONIC_OUT` and
-# `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
+# The wrapped command sees the caller's exported variables unchanged.  For
+# each variable that `cronic` assigns, the caller exports that name in
+# uppercase, both with and without any "cronic_" prefix (for example,
+# `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
+# The lowercase names that `cronic` assigns, such as `cronic_out`, are not
+# exported here, because environment variables conventionally have uppercase
+# names; the next test checks a few of them.
 variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
 if [ -z "$variable_names" ]; then
   echo "FAIL: found no variables in $CRONIC"
