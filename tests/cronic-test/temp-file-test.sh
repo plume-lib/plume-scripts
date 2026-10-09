@@ -43,13 +43,12 @@ temp_files() {
 
 ### The temporary file names are not derived from the process id.
 
-# The old names were built from `cronic`'s process id.  `cronic` runs the
-# wrapped command in a subshell, so `cronic` is an ancestor of the wrapped
-# command but not necessarily its parent; check the process id of every
-# ancestor.  Check both the hard-coded /tmp that the old names used and the
-# $TMPDIR that this test sets, so that reintroducing the predictable names under
-# either directory is caught.  The test fails if no ancestor is checked, so
-# that a broken `ps` cannot make it pass vacuously.
+# A temporary file name built from `cronic`'s process id would be predictable.
+# `cronic` runs the wrapped command in a subshell, so `cronic` is an ancestor of
+# the wrapped command but not necessarily its parent; check the process id of
+# every ancestor.  Check both /tmp and the $TMPDIR that this test sets, so that
+# predictable names under either directory are caught.  The test fails if no
+# ancestor is checked, so that a broken `ps` cannot make it pass vacuously.
 cat > "$work/report-ppid" << 'EOF'
 #!/bin/sh
 pid=$PPID
@@ -72,7 +71,7 @@ chmod +x "$work/report-ppid"
   > "$work/output" 2>&1 \
   || fail "nonzero exit status: $(cat "$work/output")"
 # At least `cronic` and this test are ancestors of the wrapped command.
-if [ "$(wc -l < "$work/ancestors" 2> /dev/null || echo 0)" -lt 2 ]; then
+if [ "$(wc -l 2> /dev/null < "$work/ancestors" || echo 0)" -lt 2 ]; then
   fail "the ancestors of the wrapped command were not checked"
 elif [ -e "$work/predictable" ]; then
   fail "temporary file names are predictable from the process id:"

@@ -16,6 +16,8 @@
 # The options are documented in function `cronic_help`; run `cronic --help`.
 # COMMAND runs in a subshell, with the caller's variables and shell options
 # rather than this script's.
+# This script runs under bash 3.2, which is /bin/bash on macOS, so it does not
+# use later features such as `${name@a}`.
 
 # The caller's state, as commands that restore it, before this script changes
 # any of it for itself.  The wrapped command runs with the caller's state
@@ -33,14 +35,15 @@
 # `bash -x cronic` traces this script only if SHELLOPTS is not exported.
 # The redirection discards the trace of these commands.
 {
-  # The command substitution keeps the loop variable out of this script.
+  # `compgen -e` lists exported variables, and fails if there are none, in which
+  # case `declare -p` with no names would print every variable.  The `if` makes
+  # the status 0, as `errexit` requires.  The command substitution keeps `names`
+  # out of this script.
   CRONIC_CALLER_VARIABLES=$(
-    # shellcheck disable=SC2034 # `name` is used indirectly, as `${!name@a}`.
-    for name in "${!CRONIC_@}"; do
-      case ${!name@a} in
-        *x*) echo "${!name@A}" ;;
-      esac
-    done
+    if names=$(compgen -e CRONIC_); then
+      # shellcheck disable=SC2086 # Each name is one word.
+      declare -p $names
+    fi
   )
   # verbose and xtrace come last, in one command, so that restoring them neither
   # echoes nor traces the restoring of any option.
@@ -59,7 +62,7 @@
     *x*) CRONIC_CALLER_OPTIONS+='-o xtrace' ;;
     *) CRONIC_CALLER_OPTIONS+='+o xtrace' ;;
   esac
-  if [[ ${SHELLOPTS@a} == *x* ]]; then set +vx; fi
+  if [[ $(declare -p SHELLOPTS) =~ ^declare\ -[a-zA-Z]*x ]]; then set +vx; fi
 } 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
@@ -169,6 +172,19 @@ CRONIC_ERR=$CRONIC_TMPDIR/err
 CRONIC_REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
 CRONIC_TRACE=$CRONIC_TMPDIR/trace
 
+# Appends its argument to CRONIC_PATTERN, as a basic regular expression that
+# matches the argument literally.
+cronic_append_literal() {
+  local text=$1
+  while [ -n "$text" ]; do
+    case $text in
+      [.[*^\$\\]*) CRONIC_PATTERN+=\\ ;;
+    esac
+    CRONIC_PATTERN+=${text:0:1}
+    text=${text:1}
+  done
+}
+
 # Remove the temporary files however this script terminates, including when it
 # is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
 # files are retained; don't "echo" their location, because that would be
@@ -203,18 +219,19 @@ trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 # shell function that it runs.  The redirections are on the subshell, so that
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
-# The subshell unsets every variable whose name starts with `CRONIC_`, and this
-# script's functions, so that a builtin or shell function that is the command
-# does not see this script's variables and functions, and so that a function
-# does not take precedence over a program of the same name.  Then the subshell
-# restores the caller's variables and options.  The subshell first turns off
-# this script's xtrace and verbose, so that the restoring is not traced or
-# echoed; any error in the restoring goes to the command's error output.
+# The subshell unsets every variable whose name starts with `CRONIC_` and every
+# function whose name starts with `cronic_`, so that a builtin or shell function
+# that is the command does not see this script's variables and functions, and
+# so that a function does not take precedence over a program of the same name.
+# Then the subshell restores the caller's variables and options.  The subshell
+# first turns off this script's xtrace and verbose, so that the restoring is not
+# traced or echoed; any error in the restoring goes to the command's error
+# output.
 set +e
 (
   { set +vx; } 2> /dev/null
   eval "unset -v \"\${!CRONIC_@}\"
-    unset -f cronic_cleanup cronic_usage_line cronic_usage cronic_help cronic_set_expected
+    unset -f \$(compgen -A function cronic_)
     $CRONIC_CALLER_VARIABLES
     $CRONIC_CALLER_OPTIONS"
   "$@"
@@ -222,90 +239,32 @@ set +e
 CRONIC_RESULT=$?
 set -e
 
-# A trace line starts with PS4 after expansion, with its first character
-# repeated once per level of nesting.  Expansion changes from line to line, so
-# the pattern matches PS4's literal text exactly, with its regular-expression
-# metacharacters escaped, and matches anything where PS4 has a `$` expansion, a
-# backquoted command, or a backslash escape.  Quote characters are removed, as
-# bash removes them when it expands PS4.  If PS4 does not start with literal
-# text, then no line is treated as a trace line.
+# A trace line starts with PS4 after expansion, with PS4's first character
+# repeated once per level of nesting.  If PS4 contains no `$`, backquote,
+# backslash, or quote character, then the pattern matches PS4 exactly.
+# Otherwise, expansion changes from line to line, so the pattern matches only
+# PS4's literal text before the first such character, followed (if PS4 ends
+# with literal text) by anything and then PS4's literal ending.  The literal
+# ending excludes letters, digits, and the other characters that can end an
+# expansion or escape.  If PS4 does not start with literal text, then no line is
+# treated as a trace line.
 CRONIC_PATTERN=
 case ${PS4-} in
   '' | [\$\`\\\'\"]*) ;;
   *)
-    CRONIC_REST=${PS4:1}
     CRONIC_PATTERN=^
-    case $PS4 in
-      [.*[^]*) CRONIC_PATTERN+=\\ ;;
-    esac
-    CRONIC_PATTERN+="${PS4:0:1}\\+"
-    # shellcheck disable=SC2016 # These are regular expressions, not expansions.
-    CRONIC_RE_NAME='^\$[A-Za-z_][A-Za-z0-9_]*(.*)$'
-    # shellcheck disable=SC2016 # These are regular expressions, not expansions.
-    CRONIC_RE_COMMAND='^`[^`]*`?(.*)$'
-    CRONIC_RE_SINGLE_QUOTED="^'([^']*)'?(.*)\$"
-    while [ -n "$CRONIC_REST" ]; do
-      CRONIC_LITERAL=
-      # shellcheck disable=SC1003,SC2016 # The patterns are literal text.
-      case $CRONIC_REST in
-        '${'* | '$('*)
-          # Skip to the matching close brace or parenthesis.
-          CRONIC_OPEN=${CRONIC_REST:1:1}
-          if [ "$CRONIC_OPEN" = "{" ]; then CRONIC_CLOSE="}"; else CRONIC_CLOSE=")"; fi
-          CRONIC_DEPTH=0
-          CRONIC_I=1
-          while [ "$CRONIC_I" -lt ${#CRONIC_REST} ]; do
-            case ${CRONIC_REST:CRONIC_I:1} in
-              "$CRONIC_OPEN") CRONIC_DEPTH=$((CRONIC_DEPTH + 1)) ;;
-              "$CRONIC_CLOSE") CRONIC_DEPTH=$((CRONIC_DEPTH - 1)) ;;
-            esac
-            CRONIC_I=$((CRONIC_I + 1))
-            if [ "$CRONIC_DEPTH" -eq 0 ]; then break; fi
-          done
-          CRONIC_REST=${CRONIC_REST:CRONIC_I}
-          ;;
-        '$'?*)
-          if [[ $CRONIC_REST =~ $CRONIC_RE_NAME ]]; then
-            CRONIC_REST=${BASH_REMATCH[1]}
-          else
-            CRONIC_REST=${CRONIC_REST:2}
-          fi
-          ;;
-        '`'*)
-          [[ $CRONIC_REST =~ $CRONIC_RE_COMMAND ]]
-          CRONIC_REST=${BASH_REMATCH[1]}
-          ;;
-        '\'*)
-          CRONIC_REST=${CRONIC_REST:2}
-          ;;
-        \'*)
-          [[ $CRONIC_REST =~ $CRONIC_RE_SINGLE_QUOTED ]]
-          CRONIC_LITERAL=${BASH_REMATCH[1]}
-          CRONIC_REST=${BASH_REMATCH[2]}
-          ;;
-        \"*)
-          CRONIC_REST=${CRONIC_REST:1}
-          continue
-          ;;
-        *)
-          CRONIC_LITERAL=${CRONIC_REST:0:1}
-          CRONIC_REST=${CRONIC_REST:1}
-          ;;
-      esac
-      if [ -n "$CRONIC_LITERAL" ]; then
-        while [ -n "$CRONIC_LITERAL" ]; do
-          case $CRONIC_LITERAL in
-            [.*[^\$\\]*) CRONIC_PATTERN+=\\ ;;
-          esac
-          CRONIC_PATTERN+=${CRONIC_LITERAL:0:1}
-          CRONIC_LITERAL=${CRONIC_LITERAL:1}
-        done
-      elif [ "${CRONIC_PATTERN: -2}" != ".*" ]; then
-        CRONIC_PATTERN+=".*"
+    cronic_append_literal "${PS4:0:1}"
+    CRONIC_PATTERN+='\+'
+    CRONIC_PREFIX=${PS4:1}
+    CRONIC_PREFIX=${CRONIC_PREFIX%%[\$\`\\\'\"]*}
+    cronic_append_literal "$CRONIC_PREFIX"
+    if [ "$CRONIC_PREFIX" != "${PS4:1}" ]; then
+      CRONIC_SUFFIX=${PS4##*[][\$\`\\\'\"\!\{\}\(\)_[:alnum:]]}
+      if [ -n "$CRONIC_SUFFIX" ]; then
+        CRONIC_PATTERN+='.*'
+        cronic_append_literal "$CRONIC_SUFFIX"
       fi
-    done
-    # A trailing `.*` matches nothing more than the empty string does.
-    CRONIC_PATTERN=${CRONIC_PATTERN%.\*}
+    fi
     ;;
 esac
 if [ -n "$CRONIC_PATTERN" ] && grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then

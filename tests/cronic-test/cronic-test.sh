@@ -342,6 +342,15 @@ check "PS4 with several expansions, trace-only stderr" 0 silent \
   "$work/trace-only" 0
 check "PS4 with several expansions, error line that starts with +" 0 \
   "report:^+++ b/file$" "$work/plus-stderr"
+# A backslash escape can be longer than two characters.
+PS4='+\D{%H}: '
+check "PS4 with a long escape, trace-only stderr" 0 silent "$work/trace-only" 0
+check "PS4 with a long escape, error line that starts with +" 0 \
+  "report:^+++ b/file$" "$work/plus-stderr"
+# A single quote within double quotes is literal.
+PS4="+\"it's\" "
+check "PS4 with a quote within quotes, trace-only stderr" 0 silent \
+  "$work/trace-only" 0
 unset PS4
 
 # The command may be a shell builtin.
