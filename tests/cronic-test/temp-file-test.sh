@@ -2,11 +2,12 @@
 
 # Tests how `cronic` creates and removes its temporary files.
 #
-# `cronic` used to write to `/tmp/cronic.out.$$` and three sibling paths.
-# Process ids are guessable and reused, so on a multi-user machine another user
-# could pre-create those paths as symlinks and have the wrapped command's
-# output written through them.  `cronic` also had no signal handler, so a run
-# that was interrupted before its final `rm` left all four files behind.
+# Temporary file names built from the process id, such as `/tmp/cronic.out.$$`,
+# would be unsafe:  process ids are guessable and reused, so on a multi-user
+# machine another user could pre-create those paths as symlinks and have the
+# wrapped command's output written through them.  Without a signal handler, a
+# run that was interrupted before its final cleanup would leave its temporary
+# files behind.
 
 set -eu
 
@@ -41,66 +42,114 @@ temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
 }
 
-### The temporary file names are not derived from the process id.
-
-# The wrapped command's parent is `cronic` itself, so $PPID is the process id
-# that the old names were built from.  Check both the hard-coded /tmp that the
-# old names used and the $TMPDIR that this test sets, so that reintroducing the
-# predictable names under either directory is caught.
-cat > "$work/report-ppid" << 'EOF'
-#!/bin/sh
-for dir in "/tmp" "${TMPDIR:-/tmp}"; do
-  for file in "$dir/cronic.out.$PPID" "$dir/cronic.err.$PPID" \
-    "$dir/cronic.err.reduced.$PPID" "$dir/cronic.trace.$PPID"; do
-    if [ -e "$file" ]; then
-      echo "$file" >> "$1"
-    fi
-  done
-done
-EOF
-chmod +x "$work/report-ppid"
-
-"$CRONIC" "$work/report-ppid" "$work/predictable" > "$work/output" 2>&1 \
-  || fail "nonzero exit status: $(cat "$work/output")"
-if [ -e "$work/predictable" ]; then
-  fail "temporary file names are predictable from the process id:"
-  cat "$work/predictable"
-else
-  pass "temporary file names are not predictable from the process id"
-fi
-
-### An interrupted run leaves no temporary files behind.
-
-# Waits for the test to create the "release" file, so that the signal arrives
-# while `cronic` is running the command rather than before or after.
+# Waits for the test to create the "release" file, so that the test can act
+# while `cronic` is running the command rather than before or after.  If a third
+# argument is given, writes it to stdout and stderr first, so that the test can
+# find the files that `cronic` redirected them to.  Gives up if the release
+# file's directory disappears, as it does when the test exits early; otherwise
+# this script and `cronic` would never terminate.
 cat > "$work/wait-for-release" << 'EOF'
 #!/bin/sh
+if [ $# -ge 3 ]; then
+  echo "$3"
+  echo "$3" >&2
+fi
 touch "$1"
-while [ ! -e "$2" ]; do
+while [ ! -e "$2" ] && [ -d "$(dirname -- "$2")" ]; do
   sleep 0.1
 done
 EOF
 chmod +x "$work/wait-for-release"
 
+# wait_for_start FILE: waits until the wrapped command has created FILE.
+wait_for_start() {
+  waited=0
+  while [ ! -e "$1" ]; do
+    if [ "$waited" -ge 100 ]; then
+      echo "the wrapped command did not start"
+      exit 1
+    fi
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+}
+
+### The temporary files are in a private directory with an unpredictable name.
+
+# A temporary file name built from `$$`, `$RANDOM`, the time, or the like would
+# be predictable.  Rather than guess how a name might be predictable, check
+# where the wrapped command's output actually goes:  the command writes a
+# string that is unique to this test run, and the test looks for the files that
+# contain it.  Each such file must be directly within a directory that `mktemp
+# -d` created in $TMPDIR:  named `cronic.XXXXXX` and accessible only by its
+# owner.  Searching /tmp as well catches a `cronic` that ignores $TMPDIR.  The
+# test also fails if it finds no such files, so that it cannot pass vacuously.
+marker="cronic temp-file-test marker $work"
+
+# marker_files: prints the files that contain the marker.  Files directly
+# within /tmp, or within a subdirectory of it, are searched, except for this
+# test's own files.  Errors, such as unreadable files, are ignored.
+marker_files() {
+  {
+    find "$TMPDIR" -type f -exec grep -lF -- "$marker" {} + 2> /dev/null || true
+    find /tmp -maxdepth 2 -path "$work" -prune \
+      -o -type f -user "$(id -u)" -exec grep -lF -- "$marker" {} + \
+      2> /dev/null || true
+  } | sort -u
+}
+
+# in_private_dir FILE: succeeds if FILE is directly within a directory in
+# $TMPDIR that is named like `mktemp`'s `cronic.XXXXXX` template and that is
+# accessible only by its owner.
+in_private_dir() {
+  dir="$(dirname -- "$1")"
+  [ "$(dirname -- "$dir")" = "$TMPDIR" ] || return 1
+  case "$(basename -- "$dir")" in
+    cronic.??????) ;;
+    *) return 1 ;;
+  esac
+  [ -n "$(find "$dir" -prune -perm 700)" ]
+}
+
+"$CRONIC" "$work/wait-for-release" "$work/started-1" "$work/release-1" \
+  "$marker" > "$work/output" 2>&1 &
+cronic_pid=$!
+wait_for_start "$work/started-1"
+found="$(marker_files)"
+unsafe=""
+while IFS= read -r file; do
+  if [ -n "$file" ] && ! in_private_dir "$file"; then
+    unsafe="$unsafe$file
+"
+  fi
+done << EOF
+$found
+EOF
+touch "$work/release-1"
+wait "$cronic_pid" || fail "nonzero exit status: $(cat "$work/output")"
+if [ -n "$unsafe" ]; then
+  fail "temporary files are not in a private directory created by mktemp:"
+  printf '%s' "$unsafe"
+fi
+if [ -z "$found" ]; then
+  fail "found no temporary files of cronic while the wrapped command ran"
+fi
+if [ -n "$found" ] && [ -z "$unsafe" ]; then
+  pass "temporary files are in a private directory created by mktemp"
+fi
+
+### An interrupted run leaves no temporary files behind.
+
 before="$(temp_files)"
-"$CRONIC" "$work/wait-for-release" "$work/started" "$work/release" \
+"$CRONIC" "$work/wait-for-release" "$work/started-2" "$work/release-2" \
   > "$work/output" 2>&1 &
 cronic_pid=$!
-
-waited=0
-while [ ! -e "$work/started" ]; do
-  if [ "$waited" -ge 100 ]; then
-    echo "the wrapped command did not start"
-    exit 1
-  fi
-  sleep 0.1
-  waited=$((waited + 1))
-done
+wait_for_start "$work/started-2"
 
 # `cronic` is waiting for the wrapped command, so it handles the signal only
 # once that command has finished; release the command after signaling.
 kill -TERM "$cronic_pid"
-touch "$work/release"
+touch "$work/release-2"
 cronic_status=0
 # Redirect stderr to discard the shell's "Terminated" job message, which would
 # otherwise look like a failure in the test output.
