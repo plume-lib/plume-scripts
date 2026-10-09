@@ -116,22 +116,13 @@ exit "$1"
 EOF
 chmod +x "$work/ignore-failure"
 
-# Runs `cronic` with SHELLOPTS set to its first argument and exported.
-cat > "$work/cronic-with-shellopts" << 'EOF'
-#!/bin/sh
-shellopts="$1"
-shift
-exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
-EOF
-chmod +x "$work/cronic-with-shellopts"
-
 # Runs `cronic` with SHELLOPTS set to its first argument and exported, and
 # with these exported shell functions:
 #  * `fail_then_continue` runs `false` and then prints a line.
 #  * `fail_in_pipeline` runs a pipeline whose first command fails.
 #  * `report_cronic_variables` writes to stderr any variable or function of
 #    `cronic`'s that it can see.
-cat > "$work/cronic-with-function" << 'EOF2'
+cat > "$work/cronic-with-shellopts" << 'EOF2'
 #!/bin/bash
 fail_then_continue() {
   false
@@ -150,11 +141,60 @@ shellopts="$1"
 shift
 exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
 EOF2
-chmod +x "$work/cronic-with-function"
+chmod +x "$work/cronic-with-shellopts"
+
+# Runs `cronic` with exported shell functions named like the builtins that
+# `cronic` uses to restore the caller's options.  Each function writes to
+# stderr and then runs the builtin.
+cat > "$work/cronic-with-builtin-functions" << 'EOF'
+#!/bin/bash
+for name in compgen eval export printf set unset; do
+  builtin eval "$name() {
+    echo \"the function $name ran\" >&2
+    builtin $name \"\$@\"
+  }"
+  builtin export -f "$name"
+done
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-builtin-functions"
 
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
+}
+
+# check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
+# runs `cronic`, and checks that it exits with status 0, leaves no temporary
+# files, and produces a report whose "TRACE OUTPUT" section, through the
+# following empty line, is the contents of GOAL-FILE.  COMMAND's stderr is left
+# in "$work/stderr".
+check_trace_section() {
+  description="$1"
+  goal="$2"
+  shift 2
+
+  before="$(temp_files)"
+  actual_status=0
+  "$@" > "$work/output" 2> "$work/stderr" || actual_status=$?
+  after="$(temp_files)"
+  if [ "$actual_status" != 0 ]; then
+    echo "FAIL: $description: exit status $actual_status, expected 0"
+    status=1
+  fi
+  if [ "$before" != "$after" ]; then
+    echo "FAIL: $description: temporary files were left behind:"
+    echo "$after"
+    status=1
+  fi
+  sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+  if cmp -s "$goal" "$work/trace-section"; then
+    echo "PASS: $description"
+  else
+    echo "FAIL: $description: got:"
+    cat "$work/output"
+    status=1
+  fi
 }
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
@@ -370,26 +410,6 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
 # command, followed by the command's own trace, with nothing that `cronic` did
 # to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
 # it appears under "TRACE OUTPUT".
-before="$(temp_files)"
-xtrace_status=0
-"$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0 \
-  > "$work/output" 2> "$work/stderr" || xtrace_status=$?
-after="$(temp_files)"
-if [ "$xtrace_status" != 0 ]; then
-  echo "FAIL: exported SHELLOPTS with xtrace: exit status $xtrace_status, expected 0"
-  status=1
-fi
-if [ -s "$work/stderr" ]; then
-  echo "FAIL: exported SHELLOPTS with xtrace: cronic wrote to stderr:"
-  cat "$work/stderr"
-  status=1
-fi
-if [ "$before" != "$after" ]; then
-  echo "FAIL: exported SHELLOPTS with xtrace: temporary files were left behind:"
-  echo "$after"
-  status=1
-fi
-sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
 cat > "$work/trace-section.goal" << EOF
 TRACE OUTPUT:
 + $work/trace-and-stderr 0
@@ -398,11 +418,12 @@ TRACE OUTPUT:
 + exit 0
 
 EOF
-if cmp -s "$work/trace-section.goal" "$work/trace-section"; then
-  echo "PASS: exported SHELLOPTS with xtrace, trace output"
-else
-  echo "FAIL: exported SHELLOPTS with xtrace, trace output: got:"
-  cat "$work/output"
+check_trace_section "exported SHELLOPTS with xtrace, trace output" \
+  "$work/trace-section.goal" \
+  "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+if [ -s "$work/stderr" ]; then
+  echo "FAIL: exported SHELLOPTS with xtrace: cronic wrote to stderr:"
+  cat "$work/stderr"
   status=1
 fi
 
@@ -422,7 +443,6 @@ fi
 
 # The caller's `-e` applies within an exported shell function that is the
 # command, and the caller's lack of `-e` does too.
-CRONIC="$work/cronic-with-function"
 check "exported SHELLOPTS with errexit, exported function ignores a failure" 1 \
   report "$default_shellopts:errexit" fail_then_continue
 check "exported SHELLOPTS, exported function ignores a failure" 0 silent \
@@ -482,43 +502,25 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
-# The command sees a variable that the caller exported even if its name is that
-# of one of `cronic`'s own variables, though that is unconventional.
-cat > "$work/check-cronic-variables" << 'EOF'
-#!/bin/sh
-[ "$cronic_debug" = "caller's cronic_debug" ] \
-  && [ "$cronic_tmpdir" = "caller's cronic_tmpdir" ] || exit 3
-EOF
-chmod +x "$work/check-cronic-variables"
-cronic_debug="caller's cronic_debug"
-cronic_tmpdir="caller's cronic_tmpdir"
-export cronic_debug cronic_tmpdir
-check "caller's exported variables named like cronic's" 0 silent \
-  "$work/check-cronic-variables"
-unset cronic_debug cronic_tmpdir
-
-# `cronic` does not remove a function that the caller exported, whether its
-# name is one of `cronic`'s own functions or merely starts like them.  The
-# function is visible both to the command and to the command's children.
-cat > "$work/cronic-with-cronic-functions" << 'EOF'
+# Names that start with `cronic_` are reserved:  the command does not see a
+# variable or function with such a name that the caller exported.
+cat > "$work/cronic-with-cronic-names" << 'EOF'
 #!/bin/bash
 cronic_mine() {
   exit 3
 }
-cronic_usage() {
-  exit 4
-}
-export -f cronic_mine cronic_usage
-exec "$1" "${@:2}"
+cronic_debug="caller's cronic_debug"
+export -f cronic_mine
+export cronic_debug
+exec "$REAL_CRONIC" "$@"
 EOF
-chmod +x "$work/cronic-with-cronic-functions"
-CRONIC="$work/cronic-with-cronic-functions"
-check "caller's exported function named cronic_mine" 3 silent \
-  "$REAL_CRONIC" --expected-status 3 cronic_mine
-check "caller's exported function named cronic_mine, in a child" 3 silent \
-  "$REAL_CRONIC" --expected-status 3 bash -c cronic_mine
-check "caller's exported function named cronic_usage" 4 silent \
-  "$REAL_CRONIC" --expected-status 4 cronic_usage
+chmod +x "$work/cronic-with-cronic-names"
+CRONIC="$work/cronic-with-cronic-names"
+# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+check "caller's exported cronic_ variable is not seen" 0 silent \
+  sh -c '[ -z "${cronic_debug+set}" ]'
+check "caller's exported cronic_ function is not seen" 0 silent \
+  bash -c '! declare -F cronic_mine'
 CRONIC="$REAL_CRONIC"
 
 # `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
@@ -536,9 +538,6 @@ fi
 # Under `bash -x cronic`, the report's trace section contains nothing that
 # `cronic` did to set up the command.  The command does not inherit xtrace, so
 # its own `set -x` is not traced.
-bash -x "$CRONIC" "$work/trace-and-stderr" 0 > "$work/output" 2> /dev/null \
-  || true
-sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
 cat > "$work/bash-x-trace-section.goal" << EOF
 TRACE OUTPUT:
 + $work/trace-and-stderr 0
@@ -546,13 +545,15 @@ TRACE OUTPUT:
 + exit 0
 
 EOF
-if cmp -s "$work/bash-x-trace-section.goal" "$work/trace-section"; then
-  echo "PASS: bash -x cronic, trace output"
-else
-  echo "FAIL: bash -x cronic, trace output: got:"
-  cat "$work/output"
-  status=1
-fi
+check_trace_section "bash -x cronic, trace output" \
+  "$work/bash-x-trace-section.goal" \
+  bash -x "$CRONIC" "$work/trace-and-stderr" 0
+
+# A function that the caller exported with the name of a builtin does not run
+# in place of the builtin when `cronic` restores the caller's options.
+CRONIC="$work/cronic-with-builtin-functions"
+check "caller's exported functions named like builtins" 0 silent true
+CRONIC="$REAL_CRONIC"
 
 # Bash writes its trace lines to a separate file, so they are not error
 # output, whatever PS4 is.

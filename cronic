@@ -14,21 +14,22 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
-# COMMAND runs in a subshell, with the caller's variables and shell options
-# rather than this script's.
-# This script runs under bash 3.2, which is /bin/bash on macOS, so it does not
-# use later features such as `${name@a}`.
+# COMMAND runs in a subshell, with the caller's shell options rather than this
+# script's.  Names that start with `cronic_` are reserved for this script:
+# COMMAND does not see a variable or function with such a name, even one that
+# the caller exported.
+# This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
+# feature of a later bash only after checking the version.
 
-# The caller's state, as commands that restore it, before this script changes
-# any of it for itself.  The wrapped command runs with the caller's state
-# rather than this script's; see where it is run, below.
-#  * The caller's exported variables and functions whose names start with
-#    `cronic_`, which this script's own variables and functions would otherwise
-#    hide.
-#  * The caller's `set -o` shell options.  `set +o` reports `-e` and verbose as
-#    off, because bash turns them off in a command substitution, so `$-`
-#    supplies them.  This script changes no `shopt` option, so the command
-#    inherits the caller's `shopt` options without any restoring.
+# The caller's shell options, as a command that restores them, before this
+# script changes them for itself.  This script changes only errexit, nounset,
+# verbose, and xtrace, so the command inherits the caller's other `set -o`
+# options, and its `shopt` options, without any restoring; an option that this
+# script changes must be added here.  `$-` reports the options without the
+# cost of a command substitution, such as `$(set +o)`, in which bash would also
+# report errexit as off.  The options are
+# restored in one command, so that restoring verbose and xtrace neither echoes
+# nor traces the restoring of the others.
 # If the caller exported SHELLOPTS, then this script does not trace itself or
 # echo its input:  that output would go to this script's stderr, and cron would
 # send email for every run.  An exported `verbose` nonetheless echoes the lines
@@ -36,45 +37,27 @@
 # tell whether xtrace came from SHELLOPTS or from the command line, so
 # `bash -x cronic` traces this script only if SHELLOPTS is not exported.
 # The redirection discards the trace of these commands.
+# Builtins are called via `builtin`, here and where the caller's options are
+# restored, so that a function that the caller exported with the name of a
+# builtin, such as `set` or `unset`, does not run in its place.
 {
-  # `compgen -e` lists exported variables, and fails if there are none, in which
-  # case `declare -p` with no names would print every variable.  The `if` makes
-  # the status 0, as `errexit` requires.  `declare -F` marks an exported
-  # function with `x`.  The command substitution keeps `names`, `flags`, and
-  # `name` out of this script.
-  cronic_caller_variables=$(
-    if names=$(compgen -e cronic_); then
-      # shellcheck disable=SC2086 # Each name is one word.
-      declare -p $names
-    fi
-    declare -F | while read -r _ flags name; do
-      case "$flags $name" in
-        -*x*' 'cronic_*)
-          declare -f "$name"
-          echo "export -f $name"
-          ;;
-      esac
-    done
-  )
-  # `$-` supplies errexit, verbose, and xtrace.  They come last, in one
-  # command, so that restoring verbose and xtrace neither echoes nor traces the
-  # restoring of any other option.
-  cronic_caller_options=$(set +o)
-  cronic_caller_set='set'
-  for cronic_option in e:errexit v:verbose x:xtrace; do
-    cronic_caller_options=${cronic_caller_options/$'\n'set [-+]o ${cronic_option#*:}/}
+  cronic_caller_options='builtin set'
+  for cronic_option in e:errexit u:nounset v:verbose x:xtrace; do
     case $- in
-      *"${cronic_option%%:*}"*) cronic_caller_set+=" -o ${cronic_option#*:}" ;;
-      *) cronic_caller_set+=" +o ${cronic_option#*:}" ;;
+      *"${cronic_option%%:*}"*) cronic_caller_options+=" -o ${cronic_option#*:}" ;;
+      *) cronic_caller_options+=" +o ${cronic_option#*:}" ;;
     esac
   done
-  cronic_caller_options+=$'\n'$cronic_caller_set
-  if [[ $(declare -p SHELLOPTS) =~ ^declare\ -[a-zA-Z]*x ]]; then set +vx; fi
+  # The filter makes `compgen` match SHELLOPTS exactly, not every exported
+  # variable whose name starts with SHELLOPTS.
+  if builtin compgen -e -X '!SHELLOPTS' SHELLOPTS > /dev/null; then
+    builtin set +vx
+  fi
 } 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
-set -eu
+builtin set -eu
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -101,6 +84,8 @@ cronic_help() {
   echo "                       is less likely to be overlooked"
   echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
+  echo "Names that start with \"cronic_\" are reserved:  COMMAND does not see a"
+  echo "variable or function with such a name, even one that the caller exported."
   echo "Execution traces (from \"set -x\") are not treated as error output."
   echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
   echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
@@ -231,27 +216,35 @@ fi
 # when `-x` is set, the trace of running the command goes into the command's
 # trace output rather than to this script's stderr.
 # The subshell unsets every variable whose name starts with `cronic_` and every
-# function whose name starts with `cronic_`, so that a builtin or shell function
-# that is the command does not see this script's variables and functions, and
-# so that a function does not take precedence over a program of the same name.
-# Then the subshell restores the caller's variables and options.  The subshell
-# first turns off this script's xtrace and verbose, so that the restoring is not
-# traced or echoed; any error in the restoring goes to the command's error
-# output.
-set +e
+# function that this script defined, so that a builtin or shell function that
+# is the command does not see this script's variables and functions, and so
+# that a function does not take precedence over a program of the same name.
+# This script's functions are listed, rather than found by
+# `compgen -A function cronic_`, to avoid the cost of a command substitution;
+# the test suite checks that the list is complete.  A command substitution
+# finds any other such function, such as one that the caller exported, but
+# only when the status of `compgen` shows that there is one.
+# Then the subshell restores the caller's options.  The subshell first turns
+# off this script's xtrace and verbose, so that the restoring is not traced or
+# echoed; any error in the restoring goes to the command's error output.
+builtin set +e
 (
-  { set +vx; } 2> /dev/null
-  if [ -n "$cronic_xtrace_fd" ]; then
-    export BASH_XTRACEFD=$cronic_xtrace_fd
+  { builtin set +vx; } 2> /dev/null
+  if [[ -n $cronic_xtrace_fd ]]; then
+    builtin export BASH_XTRACEFD=$cronic_xtrace_fd
   fi
-  eval "unset -v \"\${!cronic_@}\"
-    unset -f \$(compgen -A function cronic_)
-    $cronic_caller_variables
+  builtin unset -f cronic_usage_line cronic_usage cronic_help \
+    cronic_set_expected cronic_cleanup
+  if builtin compgen -A function cronic_ > /dev/null; then
+    # shellcheck disable=SC2046 # Each name is one word.
+    builtin unset -f $(builtin compgen -A function cronic_)
+  fi
+  builtin eval "builtin unset -v \"\${!cronic_@}\"
     $cronic_caller_options"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
-set -e
+builtin set -e
 
 if [ -n "$cronic_xtrace_fd" ]; then
   exec {cronic_xtrace_fd}>&-
@@ -260,7 +253,7 @@ fi
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.
 cronic_bre_quote() {
-  printf '%s\n' "$1" | LC_ALL=C sed 's/[*.[^]/\\&/g'
+  builtin printf '%s\n' "$1" | LC_ALL=C sed 's/[*.[^]/\\&/g'
 }
 
 # Prints a basic regular expression that matches the trace lines, for PS4, that
@@ -281,7 +274,7 @@ cronic_trace_pattern() {
   local LC_ALL=C
   [[ $PS4 =~ ^([$'\xc0'-$'\xff'][$'\x80'-$'\xbf']*|.) ]]
   local first=${BASH_REMATCH[0]}
-  printf '^\\(%s\\)\\+%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "${PS4#"$first"}")"
+  builtin printf '^\\(%s\\)\\+%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "${PS4#"$first"}")"
 }
 
 cronic_pattern=$(cronic_trace_pattern)
