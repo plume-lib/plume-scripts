@@ -245,18 +245,38 @@ for name in $function_names; do
 done
 PATH="$saved_path"
 
-# `cronic` does not change a variable that the caller exported, even one whose
-# name is a plain word such as `DEBUG` or `OUT`.
+# `cronic` does not change a variable that the caller exported.  For each
+# variable that `cronic` assigns, the caller exports that name in uppercase,
+# both with and without any "cronic_" prefix (for example, `CRONIC_OUT` and
+# `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
+variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
+if [ -z "$variable_names" ]; then
+  echo "FAIL: found no variables in $CRONIC"
+  status=1
+fi
+exported_names=
+for name in $variable_names; do
+  upper=$(echo "$name" | tr '[:lower:]' '[:upper:]')
+  for exported in "$upper" "${upper#CRONIC_}"; do
+    [ "$exported" = TMPDIR ] && continue
+    exported_names="$exported_names $exported"
+  done
+done
 cat > "$work/check-variables" << 'EOF'
 #!/bin/sh
-[ "$DEBUG" = "caller's DEBUG" ] && [ "$OUT" = "caller's OUT" ] \
-  && [ "$RESULT" = "caller's RESULT" ] || exit 3
+for name; do
+  eval "value=\${$name-}"
+  [ "$value" = "caller's $name" ] || exit 3
+done
 EOF
 chmod +x "$work/check-variables"
-DEBUG="caller's DEBUG"
-OUT="caller's OUT"
-RESULT="caller's RESULT"
-export DEBUG OUT RESULT
-check "caller's exported variables" 0 silent "$work/check-variables"
+for name in $exported_names; do
+  eval "$name=\"caller's \$name\""
+  export "${name?}"
+done
+# shellcheck disable=SC2086  # each name is a separate argument.
+check "caller's exported variables" 0 silent "$work/check-variables" $exported_names
+# shellcheck disable=SC2086  # each name is a separate argument.
+unset $exported_names
 
 exit "$status"
