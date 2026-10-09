@@ -19,6 +19,11 @@
 # as an error.
 set -eu
 
+# The names of this script's functions start with "cronic_", and the names of
+# its variables start with "CRONIC_", so that they are unlikely to be the names
+# of the caller's exported variables.  An assignment to a variable that the
+# caller exported would change the value that the wrapped command sees.
+
 # Prints the usage line.
 cronic_usage_line() {
   echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]"
@@ -47,23 +52,23 @@ cronic_help() {
   exit 0
 }
 
-# Sets EXPECTED to its argument, or reports a usage error if the argument is
-# not a valid exit status.
+# Sets CRONIC_EXPECTED to its argument, or reports a usage error if the
+# argument is not a valid exit status.
 cronic_set_expected() {
-  EXPECTED=$1
+  CRONIC_EXPECTED=$1
   # No leading zeros, because `[[ ... -eq ... ]]` would read the value as
   # octal.  At most 255, because no exit status is larger.
-  if ! [[ $EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$EXPECTED" -gt 255 ]; then
-    echo "$0: --expected-status requires an integer from 0 to 255, got \"$EXPECTED\"" >&2
+  if ! [[ $CRONIC_EXPECTED =~ ^(0|[1-9][0-9]{0,2})$ ]] || [ "$CRONIC_EXPECTED" -gt 255 ]; then
+    echo "$0: --expected-status requires an integer from 0 to 255, got \"$CRONIC_EXPECTED\"" >&2
     cronic_usage
   fi
 }
 
 # The options are parsed before the temporary directory is created, so that
 # `--help` and a usage error neither create nor depend on it.
-EXPECTED=0
-PERMITSTDERR=0
-DUPLICATE_STDERR=0
+CRONIC_EXPECTED=0
+CRONIC_PERMITSTDERR=0
+CRONIC_DUPLICATE_STDERR=0
 while [ $# -gt 0 ]; do
   case $1 in
     --expected-status)
@@ -81,11 +86,11 @@ while [ $# -gt 0 ]; do
       ;;
     --permit-stderr)
       shift
-      PERMITSTDERR=1
+      CRONIC_PERMITSTDERR=1
       ;;
     --duplicate-stderr)
       shift
-      DUPLICATE_STDERR=1
+      CRONIC_DUPLICATE_STDERR=1
       ;;
     -h | --help)
       cronic_help
@@ -105,26 +110,26 @@ while [ $# -gt 0 ]; do
 done
 [ $# -gt 0 ] || cronic_usage
 
-DEBUG=false
-# DEBUG=true
+CRONIC_DEBUG=false
+# CRONIC_DEBUG=true
 
 # A private directory, rather than predictable `/tmp/cronic.*.$$` names: on a
 # shared machine, process ids are guessable and reused, so another user could
 # pre-create those paths as symlinks and have the wrapped command's output
 # written through them.
 CRONIC_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
-OUT=$CRONIC_TMPDIR/out
-ERR=$CRONIC_TMPDIR/err
-REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
-TRACE=$CRONIC_TMPDIR/trace
+CRONIC_OUT=$CRONIC_TMPDIR/out
+CRONIC_ERR=$CRONIC_TMPDIR/err
+CRONIC_REDUCED_ERR=$CRONIC_TMPDIR/err.reduced
+CRONIC_TRACE=$CRONIC_TMPDIR/trace
 
 # Remove the temporary files however this script terminates, including when it
-# is interrupted before it reaches the end.  When DEBUG is true, the files are
-# retained; don't "echo" their location, because that would be appended to
-# stderr.
+# is interrupted before it reaches the end.  When CRONIC_DEBUG is true, the
+# files are retained; don't "echo" their location, because that would be
+# appended to stderr.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
 cronic_cleanup() {
-  [ "$DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
+  [ "$CRONIC_DEBUG" = "true" ] || rm -rf "$CRONIC_TMPDIR"
 }
 trap cronic_cleanup EXIT
 
@@ -144,65 +149,66 @@ set +e
 # `command` because the wrapped command runs in this shell, where a function of
 # this script, such as `cronic_usage`, would otherwise run in place of a
 # program of the same name.
-command -- "$@" > "$OUT" 2> "$TRACE"
-RESULT=$?
+command -- "$@" > "$CRONIC_OUT" 2> "$CRONIC_TRACE"
+CRONIC_RESULT=$?
 set -e
 
-PATTERN="^${PS4:0:1}\\+${PS4:1}"
-if grep -q "$PATTERN" "$TRACE"; then
+CRONIC_PATTERN="^${PS4:0:1}\\+${PS4:1}"
+if grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
   # `set -e` would abort the script here, before it produces its report,
   # exits with the wrapped command's status, and removes its temporary files.
-  grep -v "$PATTERN" "$TRACE" > "$ERR" || true
+  grep -v "$CRONIC_PATTERN" "$CRONIC_TRACE" > "$CRONIC_ERR" || true
 else
-  ERR=$TRACE
+  CRONIC_ERR=$CRONIC_TRACE
 fi
 
 # Certain Unix programs send output to stderr even when a command is successful!
 # For example, git does this, and the POSIX standard requires it for make.
-# The full stderr output is shown, but file REDUCED_ERR is checked for emptiness below.
+# The full stderr output is shown, but file CRONIC_REDUCED_ERR is checked for
+# emptiness below.
 # TODO: Expand this.
-cat "$ERR" \
+cat "$CRONIC_ERR" \
   | grep -v "^Everything up-to-date$" \
   | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
-    > "$REDUCED_ERR" || true
+    > "$CRONIC_REDUCED_ERR" || true
 
-if [ $RESULT -ne "$EXPECTED" ] || { [ $PERMITSTDERR -eq 0 ] && [ -s "$REDUCED_ERR" ]; }; then
+if [ $CRONIC_RESULT -ne "$CRONIC_EXPECTED" ] || { [ $CRONIC_PERMITSTDERR -eq 0 ] && [ -s "$CRONIC_REDUCED_ERR" ]; }; then
   echo "Cronic detected failure or error output for the command:"
   echo "$@"
   echo
-  if [[ $EXPECTED -eq 0 ]]; then
-    if [[ $RESULT -eq 0 ]]; then
-      echo "RESULT CODE: $RESULT  (success)"
+  if [[ $CRONIC_EXPECTED -eq 0 ]]; then
+    if [[ $CRONIC_RESULT -eq 0 ]]; then
+      echo "RESULT CODE: $CRONIC_RESULT  (success)"
     else
-      echo "RESULT CODE: $RESULT  (failure)"
+      echo "RESULT CODE: $CRONIC_RESULT  (failure)"
     fi
   else
-    echo "RESULT CODE: $RESULT  (expected: $EXPECTED)"
+    echo "RESULT CODE: $CRONIC_RESULT  (expected: $CRONIC_EXPECTED)"
   fi
   echo
   echo "ERROR OUTPUT:"
-  cat "$ERR"
+  cat "$CRONIC_ERR"
   echo
-  if [ "$DEBUG" != "true" ]; then
-    if ! cmp --silent "$ERR" "$REDUCED_ERR"; then
+  if [ "$CRONIC_DEBUG" != "true" ]; then
+    if ! cmp --silent "$CRONIC_ERR" "$CRONIC_REDUCED_ERR"; then
       echo "REDUCED ERROR OUTPUT:"
-      cat "$REDUCED_ERR"
+      cat "$CRONIC_REDUCED_ERR"
       echo
     fi
   fi
   echo "STANDARD OUTPUT:"
-  cat "$OUT"
-  if [ "$TRACE" != "$ERR" ]; then
+  cat "$CRONIC_OUT"
+  if [ "$CRONIC_TRACE" != "$CRONIC_ERR" ]; then
     echo
     echo "TRACE-ERROR OUTPUT:"
-    cat "$TRACE"
+    cat "$CRONIC_TRACE"
   fi
-  if [ $DUPLICATE_STDERR -eq 1 ]; then
+  if [ $CRONIC_DUPLICATE_STDERR -eq 1 ]; then
     echo
     echo "ERROR OUTPUT:"
-    cat "$ERR"
+    cat "$CRONIC_ERR"
   fi
   echo
   echo "END OF CRONIC OUTPUT."
@@ -210,4 +216,4 @@ fi
 
 # The temporary files are removed by the EXIT trap.
 
-exit $RESULT
+exit $CRONIC_RESULT

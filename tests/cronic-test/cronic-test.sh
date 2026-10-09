@@ -245,4 +245,18 @@ for name in $function_names; do
 done
 PATH="$saved_path"
 
+# `cronic` does not change a variable that the caller exported, even one whose
+# name is a plain word such as `DEBUG` or `OUT`.
+cat > "$work/check-variables" << 'EOF'
+#!/bin/sh
+[ "$DEBUG" = "caller's DEBUG" ] && [ "$OUT" = "caller's OUT" ] \
+  && [ "$RESULT" = "caller's RESULT" ] || exit 3
+EOF
+chmod +x "$work/check-variables"
+DEBUG="caller's DEBUG"
+OUT="caller's OUT"
+RESULT="caller's RESULT"
+export DEBUG OUT RESULT
+check "caller's exported variables" 0 silent "$work/check-variables"
+
 exit "$status"
