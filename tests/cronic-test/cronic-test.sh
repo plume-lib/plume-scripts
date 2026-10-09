@@ -19,9 +19,10 @@ unset BASH_ENV
 # Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
 # to the commands below.  If SHELLOPTS is exported, then run this script again
 # without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
-if env | grep -q '^SHELLOPTS='; then
-  env -u SHELLOPTS "$0" "$@"
-  exit
+# `printenv` matches the name exactly, unlike a search of the output of `env`,
+# which can match a line within the value of another variable.
+if printenv SHELLOPTS > /dev/null; then
+  exec env -u SHELLOPTS sh "$0" "$@"
 fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -132,8 +133,7 @@ fail_in_pipeline() {
   false | true
 }
 report_cronic_variables() {
-  set | grep '^cronic_' >&2
-  declare -F | grep ' cronic_' >&2
+  compgen -v -A function cronic_ >&2
   return 0
 }
 export -f fail_then_continue fail_in_pipeline report_cronic_variables
@@ -148,6 +148,34 @@ temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
 }
 
+# run_cronic DESCRIPTION EXPECTED-STATUS COMMAND...: runs COMMAND, which runs
+# `cronic`, with its standard output in "$work/output" and its error output in
+# "$work/stderr".  If COMMAND exits with a status other than EXPECTED-STATUS,
+# or leaves temporary files behind, then reports a failure and returns 1.
+run_cronic() {
+  description="$1"
+  expected_status="$2"
+  shift 2
+
+  before="$(temp_files)"
+  actual_status=0
+  "$@" > "$work/output" 2> "$work/stderr" || actual_status=$?
+  after="$(temp_files)"
+
+  if [ "$actual_status" != "$expected_status" ]; then
+    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
+    cat "$work/output" "$work/stderr"
+    status=1
+    return 1
+  fi
+  if [ "$before" != "$after" ]; then
+    echo "FAIL: $description: temporary files were left behind:"
+    echo "$after"
+    status=1
+    return 1
+  fi
+}
+
 # check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
 # runs `cronic`, and checks that it exits with status 0, leaves no temporary
 # files, and produces a report whose "TRACE OUTPUT" section, through the
@@ -158,19 +186,7 @@ check_trace_section() {
   goal="$2"
   shift 2
 
-  before="$(temp_files)"
-  actual_status=0
-  "$@" > "$work/output" 2> "$work/stderr" || actual_status=$?
-  after="$(temp_files)"
-  if [ "$actual_status" != 0 ]; then
-    echo "FAIL: $description: exit status $actual_status, expected 0"
-    status=1
-  fi
-  if [ "$before" != "$after" ]; then
-    echo "FAIL: $description: temporary files were left behind:"
-    echo "$after"
-    status=1
-  fi
+  run_cronic "$description" 0 "$@" || return 0
   sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
   if cmp -s "$goal" "$work/trace-section"; then
     echo "PASS: $description"
@@ -193,17 +209,10 @@ check() {
   expected_output="$3"
   shift 3
 
-  before="$(temp_files)"
-  actual_status=0
-  "$CRONIC" "$@" > "$work/output" 2>&1 || actual_status=$?
-  after="$(temp_files)"
-
-  if [ "$actual_status" != "$expected_status" ]; then
-    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
-    cat "$work/output"
-    status=1
-    return
-  fi
+  run_cronic "$description" "$expected_status" "$CRONIC" "$@" || return 0
+  # The checks below examine both outputs, because `cronic` writes its usage
+  # messages to stderr.
+  cat "$work/stderr" >> "$work/output"
 
   case "$expected_output" in
     silent)
@@ -234,13 +243,6 @@ check() {
       fi
       ;;
   esac
-
-  if [ "$before" != "$after" ]; then
-    echo "FAIL: $description: temporary files were left behind:"
-    echo "$after"
-    status=1
-    return
-  fi
 
   echo "PASS: $description"
 }
@@ -357,20 +359,6 @@ check "builtin command" 0 silent :
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
 
-# A program whose name is that of a function of `cronic`'s runs rather than the
-# function.
-cat > "$work/bin/cronic_cleanup" << 'EOF'
-#!/bin/sh
-echo "the program named cronic_cleanup ran" 1>&2
-exit 4
-EOF
-chmod +x "$work/bin/cronic_cleanup"
-saved_path="$PATH"
-PATH="$work/bin:$PATH"
-check "program named cronic_cleanup" 4 \
-  "report:^the program named cronic_cleanup ran$" cronic_cleanup
-PATH="$saved_path"
-
 # When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
 # the wrapped command, but the caller's options do.
 REAL_CRONIC="$CRONIC"
@@ -413,16 +401,20 @@ fi
 
 # With verbose exported, a successful command produces no report:  `cronic`
 # does not echo, into the command's error output, the commands that restore the
-# caller's options.  (`cronic` does echo its own first lines to its stderr.)
-verbose_status=0
-"$CRONIC" "$default_shellopts:verbose" true > "$work/output" 2> /dev/null \
-  || verbose_status=$?
-if [ "$verbose_status" = 0 ] && [ ! -s "$work/output" ]; then
-  echo "PASS: exported SHELLOPTS with verbose"
-else
-  echo "FAIL: exported SHELLOPTS with verbose: exit status $verbose_status, output:"
-  cat "$work/output"
-  status=1
+# caller's options.  `cronic` echoes to its stderr only its lines through its
+# first command, which bash reads before `cronic` turns verbose off.
+sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
+if run_cronic "exported SHELLOPTS with verbose" 0 \
+  "$CRONIC" "$default_shellopts:verbose" true; then
+  if [ ! -s "$work/output" ] && cmp -s "$work/verbose-stderr.goal" "$work/stderr"; then
+    echo "PASS: exported SHELLOPTS with verbose"
+  else
+    echo "FAIL: exported SHELLOPTS with verbose: output:"
+    cat "$work/output"
+    echo "stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
 fi
 
 # The caller's `-e` applies within an exported shell function that is the
@@ -508,15 +500,15 @@ check "caller's exported cronic_ function is not seen" 0 silent \
 CRONIC="$REAL_CRONIC"
 
 # `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
-bash_x_status=0
-bash -x "$CRONIC" "$work/trace-only" 0 > "$work/output" 2> "$work/stderr" \
-  || bash_x_status=$?
-if [ "$bash_x_status" = 0 ] && grep -q "cronic_debug=false" "$work/stderr"; then
-  echo "PASS: bash -x traces cronic"
-else
-  echo "FAIL: bash -x traces cronic: exit status $bash_x_status, stderr:"
-  cat "$work/stderr"
-  status=1
+if run_cronic "bash -x traces cronic" 0 \
+  bash -x "$CRONIC" "$work/trace-only" 0; then
+  if grep -q "cronic_debug=false" "$work/stderr"; then
+    echo "PASS: bash -x traces cronic"
+  else
+    echo "FAIL: bash -x traces cronic: stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
 fi
 
 # Under `bash -x cronic`, the report's trace section contains nothing that

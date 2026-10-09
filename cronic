@@ -1,4 +1,8 @@
 #!/bin/bash
+{
+  cronic_caller_flags=${-//[^euvx]/}
+  if compgen -e -X '!SHELLOPTS' SHELLOPTS > /dev/null; then set +vx; fi
+} 2> /dev/null
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -21,49 +25,47 @@
 # This script assumes that the caller has not exported a function with the name
 # of a builtin or program that this script uses, such as `set` or `cat`; such a
 # function would run in place of the builtin or program.
+# This script assumes that bash has the `compgen` builtin, which is absent only
+# if bash was built with `--disable-progcomp`.  Without it, an exported
+# SHELLOPTS could make this script trace itself to stderr, and the command could
+# see a `cronic_` function that the caller exported.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
-# The caller's shell options, as a command that restores them, before this
-# script changes them for itself.  This script changes only errexit, nounset,
-# verbose, and xtrace, so the command inherits the caller's other `set -o`
-# options, and its `shopt` options, without any restoring; an option that this
-# script changes must be added here.  `$-` reports the options without the
-# cost of a command substitution, such as `$(set +o)`, in which bash would also
-# report errexit as off.  The options are restored in one command, so that
-# restoring verbose and xtrace neither echoes nor traces the restoring of the
-# others.
-# If the caller exported SHELLOPTS, then this script does not trace itself or
-# echo its input:  that output would go to this script's stderr, and cron would
-# send email for every run.  An exported `verbose` nonetheless echoes the lines
-# of this script that bash reads before it reaches the `set +vx`.  Bash cannot
-# tell whether xtrace came from SHELLOPTS or from the command line, so
-# `bash -x cronic` traces this script only if SHELLOPTS is not exported.
-# The redirection discards the trace of these commands.
+# The first command sets cronic_caller_flags to the caller's shell options, as
+# the letters that `$-` uses for them, before this script changes them for
+# itself.  This script changes only errexit, nounset, verbose, and xtrace, so
+# the command inherits the caller's other `set -o` options, and its `shopt`
+# options, without any restoring; an option that this script changes must be
+# added to the pattern.  `$-` reports the options without the cost of a command
+# substitution, such as `$(set +o)`, in which bash would also report errexit as
+# off.
+# If the caller exported SHELLOPTS, then the first command also stops this
+# script from tracing itself or echoing its input:  that output would go to
+# this script's stderr, and cron would send email for every run.  An exported
+# `verbose` nonetheless echoes every line that bash reads before it reaches the
+# `set +vx`, which is why that command comes first, before any comment.  Bash
+# cannot tell whether xtrace came from SHELLOPTS or from the command line, so
+# `bash -x cronic` traces this script only if SHELLOPTS is not exported.  The
+# filter makes `compgen` match SHELLOPTS exactly, not every exported variable
+# whose name starts with SHELLOPTS.  The redirection discards the trace of the
+# first command.
+
+# Unset every function whose name starts with `cronic_`, all of which the caller
+# exported, because this script has not yet defined any.  Then the only such
+# functions are this script's, which the subshell that runs the command unsets
+# by name.  Testing the status of `compgen` first avoids the cost of a command
+# substitution when there is no such function.  Each name is read whole, rather
+# than split from an unquoted expansion, so that a name that contains a glob
+# character is not expanded to file names.  The names are read from a
+# here-string rather than from a process substitution, which bash before 5.1
+# rejects in posix mode, as an exported SHELLOPTS can set.  The redirection
+# discards the trace of these commands.
 {
-  cronic_caller_options='set'
-  for cronic_option in e:errexit u:nounset v:verbose x:xtrace; do
-    case $- in
-      *"${cronic_option%%:*}"*) cronic_caller_options+=" -o ${cronic_option#*:}" ;;
-      *) cronic_caller_options+=" +o ${cronic_option#*:}" ;;
-    esac
-  done
-  # The filter makes `compgen` match SHELLOPTS exactly, not every exported
-  # variable whose name starts with SHELLOPTS.
-  if compgen -e -X '!SHELLOPTS' SHELLOPTS > /dev/null; then
-    set +vx
-  fi
-  # Unset every function whose name starts with `cronic_`, all of which the
-  # caller exported, because this script has not yet defined any.  Then the
-  # only such functions are this script's, which the subshell that runs the
-  # command unsets by name.  Testing the status of `compgen` first avoids the
-  # cost of a process substitution when there is no such function.  Each name
-  # is read whole, rather than split from an unquoted expansion, so that a name
-  # that contains a glob character is not expanded to file names.
   if compgen -A function cronic_ > /dev/null; then
     while read -r cronic_name; do
       unset -f "$cronic_name"
-    done < <(compgen -A function cronic_)
+    done <<< "$(compgen -A function cronic_)"
   fi
 } 2> /dev/null
 
@@ -237,17 +239,22 @@ fi
 # point; the test suite fails if the command can see one that it omits.
 # Then the subshell restores the caller's options.  The subshell first turns
 # off this script's xtrace and verbose, so that the restoring is not traced or
-# echoed; any error in the restoring goes to the command's error output.
+# echoed; any error in the restoring goes to the command's error output.  The
+# subshell then needs to turn off only this script's nounset (errexit is off
+# already), in the same command that turns on the caller's options, so that
+# restoring verbose and xtrace neither echoes nor traces the restoring of the
+# others.  The `:+` avoids a bare `set -`, which would turn off verbose and
+# xtrace.
 set +e
 (
   { set +vx; } 2> /dev/null
-  if [[ -n $cronic_xtrace_fd ]]; then
+  if [ -n "$cronic_xtrace_fd" ]; then
     export BASH_XTRACEFD=$cronic_xtrace_fd
   fi
   unset -f cronic_usage_line cronic_usage cronic_help \
     cronic_set_expected cronic_cleanup
   eval "unset -v \"\${!cronic_@}\"
-    $cronic_caller_options"
+    set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
