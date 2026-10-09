@@ -91,17 +91,13 @@ echo "++ conflict" 1>&2
 EOF
 chmod +x "$work/plus-stderr"
 
-# Commands whose error output resembles trace lines for a PS4 with expansions.
-cat > "$work/plus-colon-stderr" << 'EOF'
+# A command that writes each of its arguments, as a line, to stderr.  It stands
+# for a shell other than bash, which writes its trace lines to stderr.
+cat > "$work/stderr-lines" << 'EOF'
 #!/bin/sh
-echo "+++ conflict: in file.c" 1>&2
+printf '%s\n' "$@" 1>&2
 EOF
-chmod +x "$work/plus-colon-stderr"
-cat > "$work/plus-space-stderr" << 'EOF'
-#!/bin/sh
-echo "+ error happened" 1>&2
-EOF
-chmod +x "$work/plus-space-stderr"
+chmod +x "$work/stderr-lines"
 
 # A bash command that reads an unset variable.
 cat > "$work/read-unset" << 'EOF'
@@ -331,36 +327,6 @@ for name in $function_names; do
 done
 PATH="$saved_path"
 
-# Trace lines are recognized when PS4 contains regular-expression
-# metacharacters or quotes.
-PS4='[trace] '
-export PS4
-check "PS4 with metacharacters, trace-only stderr" 0 silent "$work/trace-only" 0
-check "PS4 with metacharacters, trace lines and real stderr" 0 \
-  "report:^a real error$" "$work/trace-and-stderr" 0
-# Quotes in PS4 are literal.
-PS4="+\"it's\" "
-check "PS4 with quotes, trace-only stderr" 0 silent "$work/trace-only" 0
-# When PS4 contains an expansion or escape, no line is treated as a trace line,
-# so trace lines are reported, and so is an error line that resembles one.
-# shellcheck disable=SC2016 # The expansion is for the traced command to do.
-PS4='+${LINENO}: '
-check "PS4 with expansions, trace-only stderr" 0 \
-  "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
-check "PS4 with expansions, error line that starts with +" 0 \
-  "report:^+++ b/file$" "$work/plus-stderr"
-# shellcheck disable=SC2016 # The expansion is for the traced command to do.
-PS4='+${BASH_SOURCE}:${LINENO}: '
-check "PS4 with several expansions, error line that resembles a trace line" 0 \
-  "report:^+++ conflict: in file.c$" "$work/plus-colon-stderr"
-PS4='+\D{%H}: '
-check "PS4 with an escape, trace-only stderr" 0 report "$work/trace-only" 0
-# shellcheck disable=SC2016 # The expansion is for the traced command to do.
-PS4='+$LINENO'
-check "PS4 ending with an expansion, error line that starts with +" 0 \
-  "report:^+ error happened$" "$work/plus-space-stderr"
-unset PS4
-
 # The command may be a shell builtin.
 check "builtin command" 0 silent :
 # A builtin that would end the shell does not prevent the report.
@@ -402,7 +368,8 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
   "$default_shellopts:xtrace" "$work/trace-only" 0
 # With xtrace exported, the report's trace section is the trace of running the
 # command, followed by the command's own trace, with nothing that `cronic` did
-# to set up the command's options.
+# to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
+# it appears under "TRACE OUTPUT".
 before="$(temp_files)"
 xtrace_status=0
 "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0 \
@@ -422,13 +389,12 @@ if [ "$before" != "$after" ]; then
   echo "$after"
   status=1
 fi
-sed -n '/^TRACE-ERROR OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
 cat > "$work/trace-section.goal" << EOF
-TRACE-ERROR OUTPUT:
+TRACE OUTPUT:
 + $work/trace-and-stderr 0
 + set -x
 + echo 'a real error'
-a real error
 + exit 0
 
 EOF
@@ -572,12 +538,11 @@ fi
 # its own `set -x` is not traced.
 bash -x "$CRONIC" "$work/trace-and-stderr" 0 > "$work/output" 2> /dev/null \
   || true
-sed -n '/^TRACE-ERROR OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
 cat > "$work/bash-x-trace-section.goal" << EOF
-TRACE-ERROR OUTPUT:
+TRACE OUTPUT:
 + $work/trace-and-stderr 0
 + echo 'a real error'
-a real error
 + exit 0
 
 EOF
@@ -588,5 +553,80 @@ else
   cat "$work/output"
   status=1
 fi
+
+# Bash writes its trace lines to a separate file, so they are not error
+# output, whatever PS4 is.
+export PS4
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${LINENO}: '
+check "bash, PS4 with expansions, trace-only stderr" 0 silent \
+  "$work/trace-only" 0
+check "bash, PS4 with expansions, trace in the report" 3 \
+  "report:echo 'the standard output'$" "$work/trace-only" 3
+check "bash, PS4 with expansions, trace lines and real stderr" 0 \
+  "report:^a real error$" "$work/trace-and-stderr" 0
+PS4='+\D{%H}: '
+check "bash, PS4 with an escape, trace-only stderr" 0 silent \
+  "$work/trace-only" 0
+PS4='[trace] '
+check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
+  "$work/trace-only" 0
+
+# The tests below concern trace lines that a shell other than bash writes to
+# stderr; they are recognized by PS4.  Bash running as root does not import
+# PS4 from the environment, so `cronic` would see the default PS4, and these
+# tests are skipped.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "SKIP: tests of PS4 in stderr, because bash ignores PS4 when run as root"
+  unset PS4
+  exit "$status"
+fi
+
+# Trace lines are recognized when PS4 contains regular-expression
+# metacharacters or quotes, and the metacharacters do not match other lines.
+PS4='[trace] '
+check "PS4 with metacharacters, trace-only stderr" 0 silent \
+  "$work/stderr-lines" "[trace] echo hi" "[[trace] echo nested"
+check "PS4 with metacharacters, trace lines and real stderr" 0 \
+  "report:^a real error$" \
+  "$work/stderr-lines" "[trace] echo hi" "a real error"
+PS4='+.* '
+check "PS4 with metacharacters, error line that they would match" 0 \
+  "report:^+++ b/file$" "$work/stderr-lines" "+++ b/file"
+PS4="+\"it's\" "
+check "PS4 with quotes, trace-only stderr" 0 silent \
+  "$work/stderr-lines" "+\"it's\" echo hi" "++\"it's\" echo nested"
+# A multibyte first character is repeated as a whole, even in the C locale.
+PS4='→ '
+LC_ALL=C
+export LC_ALL
+check "PS4 with a multibyte first character, trace-only stderr" 0 silent \
+  "$work/stderr-lines" "→ echo hi" "→→ echo nested"
+unset LC_ALL
+# When PS4 contains an expansion, an escape, or a newline, no line is treated
+# as a trace line, so trace lines are reported, and so is an error line that
+# resembles one.
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${LINENO}: '
+check "PS4 with expansions, trace-only stderr" 0 \
+  "report:^+3: echo hi$" "$work/stderr-lines" "+3: echo hi"
+check "PS4 with expansions, error line that starts with +" 0 \
+  "report:^+++ b/file$" "$work/stderr-lines" "+++ b/file"
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${BASH_SOURCE}:${LINENO}: '
+check "PS4 with several expansions, error line that resembles a trace line" 0 \
+  "report:^+++ conflict: in file.c$" "$work/stderr-lines" "+++ conflict: in file.c"
+PS4='+\D{%H}: '
+check "PS4 with an escape, trace-only stderr" 0 \
+  "report:^+12: echo hi$" "$work/stderr-lines" "+12: echo hi"
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+$LINENO'
+check "PS4 ending with an expansion, error line that starts with +" 0 \
+  "report:^+ error happened$" "$work/stderr-lines" "+ error happened"
+PS4='a
+b '
+check "PS4 with a newline, error line that contains its second line" 0 \
+  "report:^error: bad b input$" "$work/stderr-lines" "error: bad b input"
+unset PS4
 
 exit "$status"
