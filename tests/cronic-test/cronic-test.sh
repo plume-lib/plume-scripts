@@ -91,6 +91,18 @@ echo "++ conflict" 1>&2
 EOF
 chmod +x "$work/plus-stderr"
 
+# Commands whose error output resembles trace lines for a PS4 with expansions.
+cat > "$work/plus-colon-stderr" << 'EOF'
+#!/bin/sh
+echo "+++ conflict: in file.c" 1>&2
+EOF
+chmod +x "$work/plus-colon-stderr"
+cat > "$work/plus-space-stderr" << 'EOF'
+#!/bin/sh
+echo "+ error happened" 1>&2
+EOF
+chmod +x "$work/plus-space-stderr"
+
 # A bash command that reads an unset variable.
 cat > "$work/read-unset" << 'EOF'
 #!/bin/bash
@@ -321,36 +333,33 @@ PATH="$saved_path"
 
 
 # Trace lines are recognized when PS4 contains regular-expression
-# metacharacters, and when PS4 contains expansions.
+# metacharacters or quotes.
 PS4='[trace] '
 export PS4
 check "PS4 with metacharacters, trace-only stderr" 0 silent "$work/trace-only" 0
 check "PS4 with metacharacters, trace lines and real stderr" 0 \
   "report:^a real error$" "$work/trace-and-stderr" 0
+# Quotes in PS4 are literal.
+PS4="+\"it's\" "
+check "PS4 with quotes, trace-only stderr" 0 silent "$work/trace-only" 0
+# When PS4 contains an expansion or escape, no line is treated as a trace line,
+# so trace lines are reported, and so is an error line that resembles one.
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${LINENO}: '
-check "PS4 with expansions, trace-only stderr" 0 silent "$work/trace-only" 0
-check "PS4 with expansions, trace lines and real stderr" 0 \
-  "report:^a real error$" "$work/trace-and-stderr" 0
-# An error line that starts with PS4's first character, but does not otherwise
-# look like a trace line, is reported.
+check "PS4 with expansions, trace-only stderr" 0 \
+  "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
 check "PS4 with expansions, error line that starts with +" 0 \
   "report:^+++ b/file$" "$work/plus-stderr"
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${BASH_SOURCE}:${LINENO}: '
-check "PS4 with several expansions, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
-check "PS4 with several expansions, error line that starts with +" 0 \
-  "report:^+++ b/file$" "$work/plus-stderr"
-# A backslash escape can be longer than two characters.
+check "PS4 with several expansions, error line that resembles a trace line" 0 \
+  "report:^+++ conflict: in file.c$" "$work/plus-colon-stderr"
 PS4='+\D{%H}: '
-check "PS4 with a long escape, trace-only stderr" 0 silent "$work/trace-only" 0
-check "PS4 with a long escape, error line that starts with +" 0 \
-  "report:^+++ b/file$" "$work/plus-stderr"
-# A single quote within double quotes is literal.
-PS4="+\"it's\" "
-check "PS4 with a quote within quotes, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
+check "PS4 with an escape, trace-only stderr" 0 report "$work/trace-only" 0
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+$LINENO'
+check "PS4 ending with an expansion, error line that starts with +" 0 \
+  "report:^+ error happened$" "$work/plus-space-stderr"
 unset PS4
 
 # The command may be a shell builtin.

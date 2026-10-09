@@ -14,6 +14,7 @@
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
 # The options are documented in function `cronic_help`; run `cronic --help`.
+# Trace lines are filtered only if PS4 contains no `$`, backquote, or backslash.
 # COMMAND runs in a subshell, with the caller's variables and shell options
 # rather than this script's.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it does not
@@ -240,31 +241,18 @@ CRONIC_RESULT=$?
 set -e
 
 # A trace line starts with PS4 after expansion, with PS4's first character
-# repeated once per level of nesting.  If PS4 contains no `$`, backquote,
-# backslash, or quote character, then the pattern matches PS4 exactly.
-# Otherwise, expansion changes from line to line, so the pattern matches only
-# PS4's literal text before the first such character, followed (if PS4 ends
-# with literal text) by anything and then PS4's literal ending.  The literal
-# ending excludes letters, digits, and the other characters that can end an
-# expansion or escape.  If PS4 does not start with literal text, then no line is
-# treated as a trace line.
+# repeated once per level of nesting.  If PS4 contains a `$`, backquote, or
+# backslash, then its expansion can differ from line to line, so no line is
+# treated as a trace line:  any pattern for such a PS4 could also match, and
+# hide, a real error.
 CRONIC_PATTERN=
 case ${PS4-} in
-  '' | [\$\`\\\'\"]*) ;;
+  '' | *[\$\`\\]*) ;;
   *)
     CRONIC_PATTERN=^
     cronic_append_literal "${PS4:0:1}"
     CRONIC_PATTERN+='\+'
-    CRONIC_PREFIX=${PS4:1}
-    CRONIC_PREFIX=${CRONIC_PREFIX%%[\$\`\\\'\"]*}
-    cronic_append_literal "$CRONIC_PREFIX"
-    if [ "$CRONIC_PREFIX" != "${PS4:1}" ]; then
-      CRONIC_SUFFIX=${PS4##*[][\$\`\\\'\"\!\{\}\(\)_[:alnum:]]}
-      if [ -n "$CRONIC_SUFFIX" ]; then
-        CRONIC_PATTERN+='.*'
-        cronic_append_literal "$CRONIC_SUFFIX"
-      fi
-    fi
+    cronic_append_literal "${PS4:1}"
     ;;
 esac
 if [ -n "$CRONIC_PATTERN" ] && grep -q "$CRONIC_PATTERN" "$CRONIC_TRACE"; then
