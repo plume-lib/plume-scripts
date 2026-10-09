@@ -38,7 +38,7 @@ but some of the scripts use `perl` or `python`.
 
 A wrapper for cron jobs so that cron only sends
 email when an error has occurred.
-Documentation [at top of file](cronic) and at <http://habilis.net/cronic/>.
+Run `cronic --help` for its options; also see <http://habilis.net/cronic/>.
 
 ### lint-diff.py
 
