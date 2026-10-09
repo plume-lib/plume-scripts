@@ -19,12 +19,6 @@
 # as an error.
 set -eu
 
-# The names of this script's variables are lowercase, because an assignment to
-# a variable that the caller exported would change the value that the wrapped
-# command sees, and by convention exported (environment) variables are
-# uppercase.  The names of this script's functions and variables also start
-# with "cronic_", to further reduce the chance of a clash.
-
 # Prints the usage line.
 cronic_usage_line() {
   echo "Usage: $0 [--expected-status N] [--permit-stderr] [--duplicate-stderr] [--] COMMAND [ARG...]"
