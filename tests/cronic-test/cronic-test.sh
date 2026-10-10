@@ -35,7 +35,7 @@ status=0
 
 # A command whose stderr is nothing but trace lines.
 cat > "$work/trace-only" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 set -x
 echo "the standard output"
 exit "$1"
@@ -44,7 +44,7 @@ chmod +x "$work/trace-only"
 
 # A command that writes real error output in addition to trace lines.
 cat > "$work/trace-and-stderr" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 set -x
 echo "a real error" 1>&2
 exit "$1"
@@ -84,7 +84,7 @@ chmod +x "$work/make-noise-and-stderr"
 # A bash command whose trace lines go to stderr, as under a bash earlier than
 # 4.1, whatever the bash version.  Its trace lines are nested 3 deep.
 cat > "$work/nested-trace" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 unset BASH_XTRACEFD
 set -x
 outer=$(inner=$(echo deepest); echo "$inner")
@@ -329,7 +329,9 @@ unset $exported_names
 # PS4 contains an expansion or an escape, so it reports them as error output.
 # This tests for the features themselves, rather than for the bash version
 # that `cronic` tests for, so that it detects a wrong version test in `cronic`.
-if [ -z "$(/bin/bash -c 'exec {fd}> /dev/null && BASH_XTRACEFD=$fd && set -x && :' 2>&1)" ]; then
+# `cronic` and the bash scripts above all run under the first `bash` in PATH,
+# so that is the bash tested here.
+if [ -z "$(bash -c 'exec {fd}> /dev/null && BASH_XTRACEFD=$fd && set -x && :' 2>&1)" ]; then
   bash_has_xtracefd=true
 else
   bash_has_xtracefd=false
@@ -337,27 +339,17 @@ fi
 export PS4
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${LINENO}: '
+# The real error is reported, whether or not the trace lines are too.
+check "bash, PS4 with expansions, trace lines and real stderr" 0 \
+  "report:^a real error$" "$work/trace-and-stderr" 0
+check "bash, PS4 with expansions, trace in the report" 3 \
+  "report:echo 'the standard output'$" "$work/trace-only" 3
 if [ "$bash_has_xtracefd" = true ]; then
   check "bash, PS4 with expansions, trace-only stderr" 0 silent \
     "$work/trace-only" 0
-  # The trace lines are not error output, so the real error is what is reported.
-  check "bash, PS4 with expansions, trace lines and real stderr" 0 \
-    "report:^a real error$" "$work/trace-and-stderr" 0
-else
-  check "bash before 4.1, PS4 with expansions, trace-only stderr" 0 \
-    "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
-  echo "SKIP: bash, PS4 with expansions, trace lines and real stderr," \
-    "because /bin/bash is earlier than 4.1, so the trace lines are error output"
-fi
-check "bash, PS4 with expansions, trace in the report" 3 \
-  "report:echo 'the standard output'$" "$work/trace-only" 3
-PS4='+\D{%H}: '
-if [ "$bash_has_xtracefd" = true ]; then
+  PS4='+\D{%H}: '
   check "bash, PS4 with an escape, trace-only stderr" 0 silent \
     "$work/trace-only" 0
-else
-  check "bash before 4.1, PS4 with an escape, trace-only stderr" 0 \
-    "report:^+[0-9][0-9]: echo 'the standard output'$" "$work/trace-only" 0
 fi
 PS4='[trace] '
 check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
@@ -371,6 +363,18 @@ if [ "$(id -u)" -eq 0 ]; then
   echo "SKIP: tests of PS4 in stderr, because bash ignores PS4 when run as root"
   unset PS4
   exit "$status"
+fi
+
+# An earlier bash writes its trace lines to stderr, and when PS4 contains an
+# expansion or an escape, they are reported.
+if [ "$bash_has_xtracefd" = false ]; then
+  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
+  PS4='+${LINENO}: '
+  check "bash before 4.1, PS4 with expansions, trace-only stderr" 0 \
+    "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
+  PS4='+\D{%H}: '
+  check "bash before 4.1, PS4 with an escape, trace-only stderr" 0 \
+    "report:^+[0-9][0-9]: echo 'the standard output'$" "$work/trace-only" 0
 fi
 
 # Trace lines are recognized when PS4 contains regular-expression

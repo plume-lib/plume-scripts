@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -14,11 +14,12 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
-# This script runs on macOS, whose /bin/bash is bash 3.2.  So it uses a feature
-# of a later bash, such as BASH_XTRACEFD (bash 4.1), only after checking the
-# version; see the BASH_VERSINFO check below.  Its uses of `grep`, `sed`, and
-# `cmp` are POSIX.  `mktemp -d` with a template is not POSIX, but macOS, the
-# BSDs, and GNU support it.  CI runs its tests on macOS.
+# This script runs under the first `bash` in PATH, which on macOS may be
+# /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
+# BASH_XTRACEFD (bash 4.1), only after checking the version; see the
+# BASH_VERSINFO check below.  Its uses of `grep`, `sed`, and `cmp` are POSIX.
+# `mktemp -d` with a template is not POSIX, but macOS, the BSDs, and GNU
+# support it.  CI runs its tests on macOS, under /bin/bash.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -199,9 +200,9 @@ cronic_trace_pattern() {
   [[ $PS4 =~ ^([$'\xc0'-$'\xff'][$'\x80'-$'\xbf']*|.) ]]
   local first
   first=$(cronic_bre_quote "${BASH_REMATCH[0]}")
-  # `\(...\)*` rather than GNU's `\+`, which is not a POSIX basic regular
+  # `\{1,\}` rather than GNU's `\+`, which is not a POSIX basic regular
   # expression.
-  printf '^%s\\(%s\\)*%s\n' "$first" "$first" "$(cronic_bre_quote "${PS4#"${BASH_REMATCH[0]}"}")"
+  printf '^\\(%s\\)\\{1,\\}%s\n' "$first" "$(cronic_bre_quote "${PS4#"${BASH_REMATCH[0]}"}")"
 }
 
 cronic_pattern=$(cronic_trace_pattern)
@@ -223,10 +224,11 @@ fi
 # directory as 'dir' from version 4.0, and as `dir' before then; macOS's
 # /usr/bin/make is GNU make 3.81.
 # TODO: Expand this.
-cat "$cronic_err" \
-  | grep -v "^Everything up-to-date$" \
-  | grep -E -v '^g?make(\[[0-9]+\])?: (Entering|Leaving) directory '"[\`']"'.*'"'"'$' \
-    > "$cronic_reduced_err" || true
+# `|| true` because `grep -v` exits with status 1 when it selects no lines.
+grep -E -v \
+  -e '^Everything up-to-date$' \
+  -e '^g?make(\[[0-9]+\])?: (Entering|Leaving) directory '"[\`']"'.*'"'"'$' \
+  "$cronic_err" > "$cronic_reduced_err" || true
 
 if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
   echo "Cronic detected failure or error output for the command:"
