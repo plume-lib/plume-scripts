@@ -374,4 +374,36 @@ check "PS4 with a newline, error line that contains its second line" 0 \
   "report:^error: bad b input$" "$work/stderr-lines" "error: bad b input"
 unset PS4
 
+# A command that expands an unset variable.
+cat > "$work/unset-variable" << 'EOF'
+#!/bin/bash
+echo "${cronic_test_unset_variable}"
+EOF
+chmod +x "$work/unset-variable"
+
+# Callers that export SHELLOPTS, without and with `set -u`.  When the caller
+# exports SHELLOPTS, the wrapped command gets the caller's `set -u` setting,
+# not `cronic`'s.
+cat > "$work/caller" << EOF
+#!/bin/bash
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+chmod +x "$work/caller"
+cat > "$work/caller-nounset" << EOF
+#!/bin/bash
+set -u
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+chmod +x "$work/caller-nounset"
+saved_cronic="$CRONIC"
+CRONIC="$work/caller"
+check "exported SHELLOPTS without nounset, unset variable" 0 silent \
+  "$work/unset-variable"
+CRONIC="$work/caller-nounset"
+check "exported SHELLOPTS with nounset, unset variable" 1 \
+  "report:unbound variable" "$work/unset-variable"
+CRONIC="$saved_cronic"
+
 exit "$status"

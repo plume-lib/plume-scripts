@@ -15,6 +15,17 @@
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
 
+# Whether the caller treats unset variables as an error.  When the caller
+# exports SHELLOPTS, this script starts with the caller's options, and the
+# wrapped command inherits this script's options, so the wrapped command is run
+# with the caller's setting rather than with this script's `set -u`.
+# Otherwise, a script that the wrapped command runs, such as a `#!/bin/sh`
+# script where `/bin/sh` is bash, would fail on its first unset variable.
+case $- in
+  *u*) cronic_caller_nounset=true ;;
+  *) cronic_caller_nounset=false ;;
+esac
+
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
@@ -159,12 +170,13 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
 fi
 
 set +e
+[ "$cronic_caller_nounset" = true ] || set +u
 # `command` because the wrapped command runs in this shell, where a function of
 # this script, such as `cronic_usage`, would otherwise run in place of a
 # program of the same name.
 command -- "$@" > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
-set -e
+set -eu
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
