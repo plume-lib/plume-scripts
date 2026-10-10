@@ -160,24 +160,30 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
-# The command runs in a subshell rather than in this shell, so that a builtin
-# such as `exit` or `exec` cannot end this script before it reports.  The
-# redirections apply to the whole subshell, so that they also capture what the
-# subshell writes after the command finishes, such as the output of an EXIT
-# trap that the command sets.  Within the subshell, the command sees neither
-# this script's functions nor its variables, and runs with `set +u`, as it
-# would in an ordinary shell.  Removing the functions also means that a
-# function such as `cronic_usage` cannot run in place of a program of the same
-# name.
+# The command runs in a fresh bash process rather than in this shell, so that
+# a builtin such as `exit` or `exec` cannot end this script before it reports,
+# and so that the command sees none of this script's state:  not its functions,
+# its unexported variables, its positional parameters, or its `set -eu`.  The
+# redirections apply to the whole process, so that they also capture what it
+# writes after the command finishes, such as the output of an EXIT trap that
+# the command sets.  The command is passed as a string of quoted words rather
+# than as positional parameters, so that a builtin such as `eval` sees no
+# positional parameters.  The leading `''` quotes the first word, so that it is
+# never read as a reserved word such as `time` or `if`, nor as an assignment.
+cronic_command="''$(printf '%q ' "$@")"
+# A non-interactive bash runs the file named by BASH_ENV when it starts.  This
+# script already ran that file, so BASH_ENV is empty while the fresh bash
+# starts, and the command string then restores it.  Otherwise the file would
+# run twice, and its output would be reported as the command's.  This script
+# has BASH_ENV only if the caller exported it, so the restored value is still
+# exported.
+if [ -n "${BASH_ENV+set}" ]; then
+  cronic_command="BASH_ENV=$(printf '%q' "$BASH_ENV"); $cronic_command"
+else
+  cronic_command="unset BASH_ENV; $cronic_command"
+fi
 set +e
-(
-  # shellcheck disable=SC2046  # each name is a separate argument.
-  unset -f $(compgen -A function cronic_)
-  # shellcheck disable=SC2046  # each name is a separate argument.
-  unset -v $(compgen -v cronic_)
-  set +u
-  "$@"
-) > "$cronic_out" 2> "$cronic_trace"
+BASH_ENV='' "$BASH" -c "$cronic_command" > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 

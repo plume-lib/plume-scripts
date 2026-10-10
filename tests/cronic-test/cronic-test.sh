@@ -283,6 +283,48 @@ check "builtin cannot see cronic's variables" 0 silent \
   eval '[ -z "${cronic_tmpdir+set}" ]'
 check "builtin cannot see cronic's functions" 1 report \
   eval 'declare -F cronic_cleanup'
+# A builtin sees neither `cronic`'s positional parameters nor its regular
+# expression matches, which `--expected-status` produces.
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin cannot see cronic's positional parameters" 0 silent \
+  eval '[ $# -eq 0 ]'
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin cannot see cronic's regular expression matches" 3 silent \
+  --expected-status 3 eval '[ -z "${BASH_REMATCH[0]-}" ] && exit 3'
+# The file named by BASH_ENV does not run again for the command, but the
+# command sees the caller's BASH_ENV, or none if the caller set none.
+# `cronic` itself runs the file, so the file writes nothing when `cronic` does.
+cat > "$work/bash-env" << 'EOF'
+case $0 in
+  */cronic) ;;
+  *) echo "from BASH_ENV" >&2 ;;
+esac
+EOF
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "BASH_ENV file does not run for the command" 0 silent true
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "command sees the caller's BASH_ENV" 0 silent \
+  sh -c '[ "$BASH_ENV" = "$1" ]' sh "$BASH_ENV"
+unset BASH_ENV
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "command sees no BASH_ENV if the caller set none" 0 silent \
+  sh -c '[ -z "${BASH_ENV+set}" ]'
+# A first word that is a reserved word or an assignment is a command name.
+mkdir "$work/reserved"
+for name in time if FOO=bar; do
+  cat > "$work/reserved/$name" << 'EOF'
+#!/bin/sh
+exit 3
+EOF
+  chmod +x "$work/reserved/$name"
+done
+saved_path="$PATH"
+PATH="$work/reserved:$PATH"
+for name in time if FOO=bar; do
+  check "command named $name" 3 silent --expected-status 3 "$name"
+done
+PATH="$saved_path"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
