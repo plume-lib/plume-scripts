@@ -109,14 +109,6 @@ exit "$1"
 EOF
 chmod +x "$work/read-unset"
 
-# A bash command in which a command fails before the script exits.
-cat > "$work/ignore-failure" << 'EOF'
-#!/bin/bash
-false
-exit "$1"
-EOF
-chmod +x "$work/ignore-failure"
-
 # Runs `cronic` with SHELLOPTS set to its first argument and exported.
 cat > "$work/cronic-with-shellopts" << 'EOF2'
 #!/bin/bash
@@ -316,12 +308,12 @@ default_shellopts=braceexpand:hashall:interactive-comments
 check "exported SHELLOPTS, command reads an unset variable" 0 silent \
   "$default_shellopts" "$work/read-unset" 0
 check "exported SHELLOPTS, command ignores a failure" 0 silent \
-  "$default_shellopts" "$work/ignore-failure" 0
+  "$default_shellopts" bash -c 'false; :'
 check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "report:unbound variable" \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
-  "$default_shellopts:errexit" "$work/ignore-failure" 0
+  "$default_shellopts:errexit" bash -c 'false; :'
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
