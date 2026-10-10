@@ -14,6 +14,17 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
+# COMMAND runs in a subshell, with the caller's shell options rather than this
+# script's.
+# This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
+# feature of a later bash only after checking the version.
+
+# Save the caller's shell options, as the letters that `$-` uses for them,
+# before this script changes them for itself.  This script changes only errexit,
+# nounset, verbose, and xtrace, so the command inherits the caller's other
+# `set -o` options, and its `shopt` options, without any restoring; an option
+# that this script changes must be added to the pattern.
+cronic_caller_flags=${-//[^euvx]/}
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -158,11 +169,22 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
+# Run the command with the caller's `set -o` shell options rather than this
+# script's.  If the caller exported SHELLOPTS, then the command would otherwise
+# inherit this script's options, and a bash script that reads an unset variable
+# (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
+# The command runs in a subshell rather than in this shell, so that a builtin
+# such as `exit` or `exec` cannot end this script before it reports.
+# `command` because a function of this script, such as `cronic_usage`, would
+# otherwise run in place of a program of the same name.  The subshell turns off
+# this script's nounset (errexit is off already) in the same command that turns
+# on the caller's options.  The `:+` avoids a bare `set -`, which would turn off
+# verbose and xtrace.
 set +e
-# `command` because the wrapped command runs in this shell, where a function of
-# this script, such as `cronic_usage`, would otherwise run in place of a
-# program of the same name.
-command -- "$@" > "$cronic_out" 2> "$cronic_trace"
+(
+  set +u${cronic_caller_flags:+ -$cronic_caller_flags}
+  command -- "$@"
+) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
