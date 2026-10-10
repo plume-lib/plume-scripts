@@ -15,7 +15,8 @@
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
-# feature of a later bash only after checking the version.
+# feature of a later bash only after checking the version.  For example,
+# BASH_XTRACEFD requires bash 4.1; see the BASH_VERSINFO check below.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
