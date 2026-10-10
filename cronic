@@ -182,6 +182,13 @@ fi
 # the caller's verbose and xtrace.  The redirections are on the command rather
 # than on the subshell, so that the execution traces of the subshell's own
 # commands go to this script's standard error rather than to the command's.
+# The subshell is not the operand of `||` or the like, because then bash would
+# ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
+# command inherits.
+# Limitation:  if the command is a builtin that runs code in the subshell, such
+# as `source` or `eval`, that code runs with the caller's options even if the
+# caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
+# that code silently expands an unset variable to the empty string.
 set +e
 (
   set +u${cronic_caller_flags:+ -$cronic_caller_flags}
