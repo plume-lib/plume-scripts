@@ -131,6 +131,55 @@ temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
 }
 
+# run_cronic DESCRIPTION EXPECTED-STATUS COMMAND...: runs COMMAND, which runs
+# `cronic`, with its standard output in "$work/output" and its error output in
+# "$work/stderr".  If COMMAND exits with a status other than EXPECTED-STATUS,
+# or leaves temporary files behind, then reports a failure and returns 1.
+run_cronic() {
+  description="$1"
+  expected_status="$2"
+  shift 2
+
+  before="$(temp_files)"
+  actual_status=0
+  "$@" > "$work/output" 2> "$work/stderr" || actual_status=$?
+  after="$(temp_files)"
+
+  if [ "$actual_status" != "$expected_status" ]; then
+    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
+    cat "$work/output" "$work/stderr"
+    status=1
+    return 1
+  fi
+  if [ "$before" != "$after" ]; then
+    echo "FAIL: $description: temporary files were left behind:"
+    echo "$after"
+    status=1
+    return 1
+  fi
+}
+
+# check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
+# runs `cronic`, and checks that it exits with status 0, leaves no temporary
+# files, and produces a report whose "TRACE OUTPUT" section, through the
+# following empty line, is the contents of GOAL-FILE.  COMMAND's stderr is left
+# in "$work/stderr".
+check_trace_section() {
+  description="$1"
+  goal="$2"
+  shift 2
+
+  run_cronic "$description" 0 "$@" || return 0
+  sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+  if cmp -s "$goal" "$work/trace-section"; then
+    echo "PASS: $description"
+  else
+    echo "FAIL: $description: got:"
+    cat "$work/output"
+    status=1
+  fi
+}
+
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
@@ -143,17 +192,10 @@ check() {
   expected_output="$3"
   shift 3
 
-  before="$(temp_files)"
-  actual_status=0
-  "$CRONIC" "$@" > "$work/output" 2>&1 || actual_status=$?
-  after="$(temp_files)"
-
-  if [ "$actual_status" != "$expected_status" ]; then
-    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
-    cat "$work/output"
-    status=1
-    return
-  fi
+  run_cronic "$description" "$expected_status" "$CRONIC" "$@" || return 0
+  # The checks below examine both outputs, because `cronic` writes its usage
+  # messages to stderr.
+  cat "$work/stderr" >> "$work/output"
 
   case "$expected_output" in
     silent)
@@ -184,13 +226,6 @@ check() {
       fi
       ;;
   esac
-
-  if [ "$before" != "$after" ]; then
-    echo "FAIL: $description: temporary files were left behind:"
-    echo "$after"
-    status=1
-    return
-  fi
 
   echo "PASS: $description"
 }
@@ -322,6 +357,49 @@ check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
   "$default_shellopts:errexit" "$work/ignore-failure" 0
+# With xtrace exported, a successful command with only trace output on stderr
+# produces no output at all:  `cronic` does not trace itself.
+check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
+  "$default_shellopts:xtrace" "$work/trace-only" 0
+# With xtrace exported, the report's trace section is the trace of running the
+# command, followed by the command's own trace, with nothing that `cronic` did
+# to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
+# it appears under "TRACE OUTPUT".
+cat > "$work/trace-section.goal" << EOF
+TRACE OUTPUT:
++ command -- $work/trace-and-stderr 0
++ set -x
++ echo 'a real error'
++ exit 0
+
+EOF
+check_trace_section "exported SHELLOPTS with xtrace, trace output" \
+  "$work/trace-section.goal" \
+  "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+if [ -s "$work/stderr" ]; then
+  echo "FAIL: exported SHELLOPTS with xtrace: cronic wrote to stderr:"
+  cat "$work/stderr"
+  status=1
+fi
+
+# With verbose exported, a successful command produces no report:  `cronic`
+# does not echo, into the command's error output, the commands that restore the
+# caller's options.  `cronic` echoes to its stderr only its lines through its
+# first command, which bash reads before `cronic` turns verbose off.
+sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
+if run_cronic "exported SHELLOPTS with verbose" 0 \
+  "$CRONIC" "$default_shellopts:verbose" true; then
+  if [ ! -s "$work/output" ] && cmp -s "$work/verbose-stderr.goal" "$work/stderr"; then
+    echo "PASS: exported SHELLOPTS with verbose"
+  else
+    echo "FAIL: exported SHELLOPTS with verbose: output:"
+    cat "$work/output"
+    echo "stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
+fi
+
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -360,6 +438,32 @@ done
 check "caller's exported variables" 0 silent "$work/check-variables" $exported_names
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
+
+# `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
+if run_cronic "bash -x traces cronic" 0 \
+  bash -x "$CRONIC" "$work/trace-only" 0; then
+  if grep -q "cronic_debug=false" "$work/stderr"; then
+    echo "PASS: bash -x traces cronic"
+  else
+    echo "FAIL: bash -x traces cronic: stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
+fi
+
+# Under `bash -x cronic`, the report's trace section contains nothing that
+# `cronic` did to set up the command.  The command does not inherit xtrace, so
+# its own `set -x` is not traced.
+cat > "$work/bash-x-trace-section.goal" << EOF
+TRACE OUTPUT:
++ command -- $work/trace-and-stderr 0
++ echo 'a real error'
++ exit 0
+
+EOF
+check_trace_section "bash -x cronic, trace output" \
+  "$work/bash-x-trace-section.goal" \
+  bash -x "$CRONIC" "$work/trace-and-stderr" 0
 
 # Bash writes its trace lines to a separate file, so they are not error
 # output, whatever PS4 is.

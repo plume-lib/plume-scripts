@@ -1,4 +1,8 @@
 #!/bin/bash
+{
+  cronic_caller_flags=${-//[^euvx]/}
+  if compgen -e -X '!SHELLOPTS' SHELLOPTS > /dev/null; then set +vx; fi
+} 2> /dev/null
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -16,15 +20,33 @@
 # `cronic_help`; run `cronic --help`.
 # COMMAND runs in a subshell, with the caller's shell options rather than this
 # script's.
+# This script assumes that the caller has not exported a function with the name
+# of a builtin or program that this script uses, such as `set` or `cat`; such a
+# function would run in place of the builtin or program.
+# This script assumes that bash has the `compgen` builtin, which is absent only
+# if bash was built with `--disable-progcomp`.  Without it, an exported
+# SHELLOPTS could make this script trace itself to stderr.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
-# Save the caller's shell options, as the letters that `$-` uses for them,
-# before this script changes them for itself.  This script changes only errexit,
-# nounset, verbose, and xtrace, so the command inherits the caller's other
-# `set -o` options, and its `shopt` options, without any restoring; an option
-# that this script changes must be added to the pattern.
-cronic_caller_flags=${-//[^euvx]/}
+# The first command sets cronic_caller_flags to the caller's shell options, as
+# the letters that `$-` uses for them, before this script changes them for
+# itself.  This script changes only errexit, nounset, verbose, and xtrace, so
+# the command inherits the caller's other `set -o` options, and its `shopt`
+# options, without any restoring; an option that this script changes must be
+# added to the pattern.  `$-` reports the options without the cost of a command
+# substitution, such as `$(set +o)`, in which bash would also report errexit as
+# off.
+# If the caller exported SHELLOPTS, then the first command also stops this
+# script from tracing itself or echoing its input:  that output would go to
+# this script's stderr, and cron would send email for every run.  An exported
+# `verbose` nonetheless echoes every line that bash reads before it reaches the
+# `set +vx`, which is why that command comes first, before any comment.  Bash
+# cannot tell whether xtrace came from SHELLOPTS or from the command line, so
+# `bash -x cronic` traces this script only if SHELLOPTS is not exported.  The
+# filter makes `compgen` match SHELLOPTS exactly, not every exported variable
+# whose name starts with SHELLOPTS.  The redirection discards the trace of the
+# first command.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -163,10 +185,12 @@ trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 # error output exactly, whatever PS4 is.  The descriptor is allocated by bash
 # (as 10 or higher), so that it does not collide with a descriptor, such as 3,
 # that the wrapped command uses for its own purposes.  Bash before 4.1 supports
-# neither BASH_XTRACEFD nor descriptor allocation.
+# neither BASH_XTRACEFD nor descriptor allocation.  Only the subshell that runs
+# the command sets BASH_XTRACEFD, so that this script's own trace, under
+# `bash -x cronic`, goes to this script's stderr rather than into the report.
+cronic_xtrace_fd=
 if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1))); then
   exec {cronic_xtrace_fd}> "$cronic_xtrace"
-  export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
 # Run the command with the caller's `set -o` shell options rather than this
@@ -176,20 +200,32 @@ fi
 # The command runs in a subshell rather than in this shell, so that a builtin
 # such as `exit` or `exec` cannot end this script before it reports.
 # `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.  The subshell turns off
-# this script's nounset (errexit is off already) in the same command that turns
-# on the caller's options.  The `:+` avoids a bare `set -`, which would turn off
-# verbose and xtrace.
+# otherwise run in place of a program of the same name.  The redirections are
+# on the subshell, and the subshell sets BASH_XTRACEFD before it restores the
+# caller's xtrace, so that when `-x` is set, the trace of running the command
+# goes into the command's trace output rather than to this script's stderr.
+# The subshell first turns off this script's xtrace and verbose, so that the
+# restoring is not traced or echoed; any error in the restoring goes to the
+# command's error output.  The subshell then needs to turn off only this
+# script's nounset (errexit is off already), in the same command that turns on
+# the caller's options, so that restoring verbose and xtrace neither echoes nor
+# traces the restoring of the others.  The `:+` avoids a bare `set -`, which
+# would turn off verbose and xtrace.
 set +e
 (
+  { set +vx; } 2> /dev/null
+  if [ -n "$cronic_xtrace_fd" ]; then
+    export BASH_XTRACEFD=$cronic_xtrace_fd
+  fi
   set +u${cronic_caller_flags:+ -$cronic_caller_flags}
   command -- "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
-# Unsetting BASH_XTRACEFD also closes its file descriptor.
-unset BASH_XTRACEFD
+if [ -n "$cronic_xtrace_fd" ]; then
+  exec {cronic_xtrace_fd}>&-
+fi
 
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.
