@@ -6,9 +6,9 @@
 #
 # `cronic` filters trace lines out of stderr with `grep -v`, which exits with
 # status 1 when it selects no lines.  `cronic` runs under `set -e`, so an
-# unguarded `grep -v` aborted the script at that point:  no report was printed,
-# the exit status was grep's 1 rather than the wrapped command's, and all of
-# the temporary files under /tmp were left behind.
+# unguarded `grep -v` would abort the script at that point:  no report would be
+# printed, the exit status would be grep's 1 rather than the wrapped command's,
+# and the temporary files would be left behind.
 
 set -eu
 
