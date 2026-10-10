@@ -381,29 +381,23 @@ echo "${cronic_test_unset_variable}"
 EOF
 chmod +x "$work/unset-variable"
 
-# Callers that export SHELLOPTS, without and with `set -u`.  When the caller
-# exports SHELLOPTS, the wrapped command gets the caller's `set -u` setting,
-# not `cronic`'s.
+# A caller that sets the option given as its first argument, such as `-u` or
+# `+u`, and exports SHELLOPTS.  When the caller exports SHELLOPTS, the wrapped
+# command gets the caller's `set -u` setting, not `cronic`'s.
 cat > "$work/caller" << EOF
 #!/bin/bash
+set "\$1"
+shift
 export SHELLOPTS
 exec "$CRONIC" "\$@"
 EOF
 chmod +x "$work/caller"
-cat > "$work/caller-nounset" << EOF
-#!/bin/bash
-set -u
-export SHELLOPTS
-exec "$CRONIC" "\$@"
-EOF
-chmod +x "$work/caller-nounset"
 saved_cronic="$CRONIC"
 CRONIC="$work/caller"
 check "exported SHELLOPTS without nounset, unset variable" 0 silent \
-  "$work/unset-variable"
-CRONIC="$work/caller-nounset"
+  +u "$work/unset-variable"
 check "exported SHELLOPTS with nounset, unset variable" 1 \
-  "report:unbound variable" "$work/unset-variable"
+  "report:unbound variable" -u "$work/unset-variable"
 CRONIC="$saved_cronic"
 
 exit "$status"

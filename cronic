@@ -15,16 +15,22 @@
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
 
-# Whether the caller treats unset variables as an error.  When the caller
-# exports SHELLOPTS, this script starts with the caller's options, and the
-# wrapped command inherits this script's options, so the wrapped command is run
-# with the caller's setting rather than with this script's `set -u`.
-# Otherwise, a script that the wrapped command runs, such as a `#!/bin/sh`
-# script where `/bin/sh` is bash, would fail on its first unset variable.
-case $- in
-  *u*) cronic_caller_nounset=true ;;
-  *) cronic_caller_nounset=false ;;
-esac
+# The caller's options, as commands that restore them.  When the caller exports
+# SHELLOPTS, this script starts with the caller's options, and the wrapped
+# command inherits this script's options, so this script restores the caller's
+# options while it runs the wrapped command.  Otherwise, any bash script that
+# the wrapped command runs, such as a `#!/bin/bash` script, would get this
+# script's `set -eu` rather than the caller's options and, for example, fail on
+# its first unset variable.
+# Limitation:  if the wrapped command is a builtin that runs code in this
+# script's shell, such as `source` or `eval`, that code also runs with the
+# caller's options, even if the caller does not export SHELLOPTS.  So if the
+# caller does not use `set -u`, that code silently expands an unset variable
+# to the empty string.
+# Not `$(set +o)`, because a command substitution, unlike a process
+# substitution, does not inherit `set -e`.  `read` exits with status 1 at the
+# end of its input.
+read -r -d '' cronic_caller_opts < <(set +o) || true
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -169,14 +175,19 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
+# The wrapped command runs in a subshell with the caller's options.  It is not
+# the operand of `||` or the like, because then bash would ignore `set -e` and
+# would remove "errexit" from the SHELLOPTS that the wrapped command inherits.
 set +e
-[ "$cronic_caller_nounset" = true ] || set +u
-# `command` because the wrapped command runs in this shell, where a function of
-# this script, such as `cronic_usage`, would otherwise run in place of a
-# program of the same name.
-command -- "$@" > "$cronic_out" 2> "$cronic_trace"
+(
+  eval "$cronic_caller_opts"
+  # `command` because the wrapped command runs in a subshell of this shell,
+  # where a function of this script, such as `cronic_usage`, would otherwise
+  # run in place of a program of the same name.
+  command -- "$@"
+) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
-set -eu
+set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
