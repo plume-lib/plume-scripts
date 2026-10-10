@@ -300,20 +300,33 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
-# Bash writes its trace lines to a separate file, so they are not error
-# output, whatever PS4 is.
+# Bash 4.1 or later writes its trace lines to a separate file, so they are not
+# error output, whatever PS4 is.  An earlier bash, such as macOS's /bin/bash,
+# writes them to stderr, where `cronic` cannot recognize them when PS4 contains
+# an expansion or an escape, so the "silent" checks for such a PS4 are skipped.
+if /bin/bash -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'; then
+  bash_has_xtracefd=true
+else
+  bash_has_xtracefd=false
+  echo "SKIP: bash, trace-only stderr with a PS4 that contains an expansion or" \
+    "an escape, because /bin/bash is earlier than 4.1"
+fi
 export PS4
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${LINENO}: '
-check "bash, PS4 with expansions, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
+if [ "$bash_has_xtracefd" = true ]; then
+  check "bash, PS4 with expansions, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+fi
 check "bash, PS4 with expansions, trace in the report" 3 \
   "report:echo 'the standard output'$" "$work/trace-only" 3
 check "bash, PS4 with expansions, trace lines and real stderr" 0 \
   "report:^a real error$" "$work/trace-and-stderr" 0
 PS4='+\D{%H}: '
-check "bash, PS4 with an escape, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
+if [ "$bash_has_xtracefd" = true ]; then
+  check "bash, PS4 with an escape, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+fi
 PS4='[trace] '
 check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
   "$work/trace-only" 0

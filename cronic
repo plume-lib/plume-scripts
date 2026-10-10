@@ -14,8 +14,9 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
-# This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
-# feature of a later bash only after checking the version.
+# This script runs on macOS, whose /bin/bash is bash 3.2, so it uses a feature
+# of a later bash only after checking the version, and it uses only the POSIX
+# features of utilities such as `grep` and `cmp`.  CI runs its tests on macOS.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -194,8 +195,11 @@ cronic_trace_pattern() {
   # multibyte character is repeated as a whole, whatever the locale.
   local LC_ALL=C
   [[ $PS4 =~ ^([$'\xc0'-$'\xff'][$'\x80'-$'\xbf']*|.) ]]
-  local first=${BASH_REMATCH[0]}
-  printf '^\\(%s\\)\\+%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "${PS4#"$first"}")"
+  local first
+  first=$(cronic_bre_quote "${BASH_REMATCH[0]}")
+  # `\(...\)*` rather than GNU's `\+`, which is not a POSIX basic regular
+  # expression.
+  printf '^%s\\(%s\\)*%s\n' "$first" "$first" "$(cronic_bre_quote "${PS4#"${BASH_REMATCH[0]}"}")"
 }
 
 cronic_pattern=$(cronic_trace_pattern)
@@ -216,7 +220,7 @@ fi
 # TODO: Expand this.
 cat "$cronic_err" \
   | grep -v "^Everything up-to-date$" \
-  | grep -v '^make\(\[[0-9]\+\]\)\?: \(Entering\|Leaving\) directory '"'"'.*'"'"'$' \
+  | grep -E -v '^make(\[[0-9]+\])?: (Entering|Leaving) directory '"'"'.*'"'"'$' \
     > "$cronic_reduced_err" || true
 
 if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
@@ -237,7 +241,7 @@ if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ]
   cat "$cronic_err"
   echo
   if [ "$cronic_debug" != "true" ]; then
-    if ! cmp --silent "$cronic_err" "$cronic_reduced_err"; then
+    if ! cmp -s "$cronic_err" "$cronic_reduced_err"; then
       echo "REDUCED ERROR OUTPUT:"
       cat "$cronic_reduced_err"
       echo
