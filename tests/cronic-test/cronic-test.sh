@@ -109,14 +109,6 @@ exit "$1"
 EOF
 chmod +x "$work/read-unset"
 
-# A bash command in which a command fails before the script exits.
-cat > "$work/ignore-failure" << 'EOF'
-#!/bin/bash
-false
-exit "$1"
-EOF
-chmod +x "$work/ignore-failure"
-
 # Runs `cronic` with SHELLOPTS set to its first argument and exported.
 cat > "$work/cronic-with-shellopts" << 'EOF2'
 #!/bin/bash
@@ -161,9 +153,8 @@ run_cronic() {
 
 # check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
 # runs `cronic`, and checks that it exits with status 0, leaves no temporary
-# files, and produces a report whose "TRACE OUTPUT" section, through the
-# following empty line, is the contents of GOAL-FILE.  COMMAND's stderr is left
-# in "$work/stderr".
+# files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
+# section, through the following empty line, is the contents of GOAL-FILE.
 check_trace_section() {
   description="$1"
   goal="$2"
@@ -171,11 +162,13 @@ check_trace_section() {
 
   run_cronic "$description" 0 "$@" || return 0
   sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
-  if cmp -s "$goal" "$work/trace-section"; then
+  if [ ! -s "$work/stderr" ] && cmp -s "$goal" "$work/trace-section"; then
     echo "PASS: $description"
   else
-    echo "FAIL: $description: got:"
+    echo "FAIL: $description: output:"
     cat "$work/output"
+    echo "stderr:"
+    cat "$work/stderr"
     status=1
   fi
 }
@@ -351,12 +344,12 @@ default_shellopts=braceexpand:hashall:interactive-comments
 check "exported SHELLOPTS, command reads an unset variable" 0 silent \
   "$default_shellopts" "$work/read-unset" 0
 check "exported SHELLOPTS, command ignores a failure" 0 silent \
-  "$default_shellopts" "$work/ignore-failure" 0
+  "$default_shellopts" bash -c 'false; :'
 check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "report:unbound variable" \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
-  "$default_shellopts:errexit" "$work/ignore-failure" 0
+  "$default_shellopts:errexit" bash -c 'false; :'
 # With xtrace exported, a successful command with only trace output on stderr
 # produces no output at all:  `cronic` does not trace itself.
 check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
@@ -376,11 +369,6 @@ EOF
 check_trace_section "exported SHELLOPTS with xtrace, trace output" \
   "$work/trace-section.goal" \
   "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
-if [ -s "$work/stderr" ]; then
-  echo "FAIL: exported SHELLOPTS with xtrace: cronic wrote to stderr:"
-  cat "$work/stderr"
-  status=1
-fi
 
 # With verbose exported, a successful command produces no report:  `cronic`
 # does not echo, into the command's error output, the commands that restore the
@@ -439,21 +427,9 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
-# `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
-if run_cronic "bash -x traces cronic" 0 \
-  bash -x "$CRONIC" "$work/trace-only" 0; then
-  if grep -q "cronic_debug=false" "$work/stderr"; then
-    echo "PASS: bash -x traces cronic"
-  else
-    echo "FAIL: bash -x traces cronic: stderr:"
-    cat "$work/stderr"
-    status=1
-  fi
-fi
-
-# Under `bash -x cronic`, the report's trace section contains nothing that
-# `cronic` did to set up the command.  The command does not inherit xtrace, so
-# its own `set -x` is not traced.
+# `bash -x cronic` does not trace `cronic` itself, but does trace running the
+# command.  The command does not inherit xtrace, because SHELLOPTS is not
+# exported, so its own `set -x` is not traced.
 cat > "$work/bash-x-trace-section.goal" << EOF
 TRACE OUTPUT:
 + command -- $work/trace-and-stderr 0
