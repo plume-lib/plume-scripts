@@ -277,6 +277,20 @@ check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
   eval ': "$cronic_test_unset_variable"'
+# The same holds when the caller exports SHELLOPTS, which would otherwise pass
+# `cronic`'s own `set -u` to the command.
+cat > "$work/cronic-with-shellopts" << EOF
+#!/bin/bash
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+chmod +x "$work/cronic-with-shellopts"
+saved_cronic="$CRONIC"
+CRONIC="$work/cronic-with-shellopts"
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin with an unset variable, SHELLOPTS exported" 0 silent \
+  eval ': "$cronic_test_unset_variable"'
+CRONIC="$saved_cronic"
 # A builtin cannot see or change `cronic`'s variables or functions.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin cannot see cronic's variables" 0 silent \

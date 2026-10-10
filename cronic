@@ -164,6 +164,8 @@ fi
 # a builtin such as `exit` or `exec` cannot end this script before it reports,
 # and so that the command sees none of this script's state:  not its functions,
 # its unexported variables, its positional parameters, or its `set -eu`.  The
+command does see the caller's environment, including any functions that the
+caller exported, just as it would if the caller ran it directly.  The
 # redirections apply to the whole process, so that they also capture what it
 # writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.  The command is passed as a string of quoted words rather
@@ -182,10 +184,12 @@ if [ -n "${BASH_ENV+set}" ]; then
 else
   cronic_command="unset BASH_ENV; $cronic_command"
 fi
-set +e
+# `set +u` matters even though the command runs in a fresh bash:  if the
+# caller exported SHELLOPTS, then the fresh bash inherits this script's options.
+set +eu
 BASH_ENV='' "$BASH" -c "$cronic_command" > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
-set -e
+set -eu
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
