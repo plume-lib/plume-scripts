@@ -117,9 +117,26 @@ exit "$1"
 EOF
 chmod +x "$work/ignore-failure"
 
-# Runs `cronic` with SHELLOPTS set to its first argument and exported.
+# Runs `cronic` with SHELLOPTS set to its first argument and exported, and
+# with these exported shell functions:
+#  * `fail_then_continue` runs `false` and then prints a line.
+#  * `fail_in_pipeline` runs a pipeline whose first command fails.
+#  * `report_cronic_variables` writes to stderr any variable or function of
+#    `cronic`'s that it can see.
 cat > "$work/cronic-with-shellopts" << 'EOF2'
 #!/bin/bash
+fail_then_continue() {
+  false
+  echo "after the failure"
+}
+fail_in_pipeline() {
+  false | true
+}
+report_cronic_variables() {
+  compgen -v -A function cronic_ >&2
+  return 0
+}
+export -f fail_then_continue fail_in_pipeline report_cronic_variables
 shellopts="$1"
 shift
 exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
@@ -367,7 +384,7 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
 # it appears under "TRACE OUTPUT".
 cat > "$work/trace-section.goal" << EOF
 TRACE OUTPUT:
-+ command -- $work/trace-and-stderr 0
++ $work/trace-and-stderr 0
 + set -x
 + echo 'a real error'
 + exit 0
@@ -400,6 +417,28 @@ if run_cronic "exported SHELLOPTS with verbose" 0 \
   fi
 fi
 
+# The caller's `-e` applies within an exported shell function that is the
+# command, and the caller's lack of `-e` does too.
+check "exported SHELLOPTS with errexit, exported function ignores a failure" 1 \
+  report "$default_shellopts:errexit" fail_then_continue
+check "exported SHELLOPTS, exported function ignores a failure" 0 silent \
+  "$default_shellopts" fail_then_continue
+# Every one of the caller's options applies, not only `-e`, `-u`, and `-x`.
+check "exported SHELLOPTS with pipefail, exported function" 1 report \
+  "$default_shellopts:pipefail" fail_in_pipeline
+check "exported SHELLOPTS without pipefail, exported function" 0 silent \
+  "$default_shellopts" fail_in_pipeline
+# A shell function that is the command does not see `cronic`'s variables or
+# function.
+check "exported function sees none of cronic's variables or function" 0 silent \
+  "$default_shellopts" report_cronic_variables
+# ... nor a variable that is not exported, which BASH_ENV set within `cronic`.
+echo "cronic_from_bash_env=unexported" > "$work/bash-env"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "exported function does not see unexported variable from BASH_ENV" 0 \
+  silent "$default_shellopts" report_cronic_variables
+unset BASH_ENV
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -407,8 +446,8 @@ CRONIC="$REAL_CRONIC"
 # uppercase, both with and without any "cronic_" prefix (for example,
 # `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
 # The lowercase names that `cronic` assigns, such as `cronic_out`, are not
-# exported:  `cronic` does overwrite them, but environment variables
-# conventionally have uppercase names.
+# exported here, because environment variables conventionally have uppercase
+# names; the next test checks a few of them.
 variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
 if [ -z "$variable_names" ]; then
   echo "FAIL: found no variables in $CRONIC"
@@ -439,6 +478,27 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
+# Names that start with `cronic_` are reserved:  the command does not see a
+# variable or function with such a name that the caller exported.
+cat > "$work/cronic-with-cronic-names" << 'EOF'
+#!/bin/bash
+cronic_mine() {
+  exit 3
+}
+cronic_debug="caller's cronic_debug"
+export -f cronic_mine
+export cronic_debug
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-cronic-names"
+CRONIC="$work/cronic-with-cronic-names"
+# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+check "caller's exported cronic_ variable is not seen" 0 silent \
+  sh -c '[ -z "${cronic_debug+set}" ]'
+check "caller's exported cronic_ function is not seen" 0 silent \
+  bash -c '! declare -F cronic_mine'
+CRONIC="$REAL_CRONIC"
+
 # `bash -x cronic`, which does not export SHELLOPTS, traces `cronic` itself.
 if run_cronic "bash -x traces cronic" 0 \
   bash -x "$CRONIC" "$work/trace-only" 0; then
@@ -456,7 +516,7 @@ fi
 # its own `set -x` is not traced.
 cat > "$work/bash-x-trace-section.goal" << EOF
 TRACE OUTPUT:
-+ command -- $work/trace-and-stderr 0
++ $work/trace-and-stderr 0
 + echo 'a real error'
 + exit 0
 
