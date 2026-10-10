@@ -18,15 +18,17 @@
 # feature of a later bash only after checking the version.
 
 # Save the caller's shell options, as the letters that `$-` uses for them,
-# before this script changes them for itself.  This script changes only errexit,
-# nounset, verbose, and xtrace, so the command inherits the caller's other
+# before this script changes them for itself.  This script changes only
+# allexport, errexit, and nounset, so the command inherits the caller's other
 # `set -o` options, and its `shopt` options, without any restoring; an option
 # that this script changes must be added to the pattern.
-cronic_caller_flags=${-//[^euvx]/}
+cronic_caller_flags=${-//[^aeu]/}
 
 # Exit if a command exits with a non-zero status, and treat unset variables
-# as an error.
-set -eu
+# as an error.  Do not export this script's variables to the command, even if
+# the caller's exported SHELLOPTS contains allexport.
+set -eu +a
+export -n cronic_caller_flags
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -176,13 +178,15 @@ fi
 # `command` because a function of this script, such as `cronic_usage`, would
 # otherwise run in place of a program of the same name.  The subshell turns off
 # this script's nounset (errexit is off already) in the same command that turns
-# on the caller's options.  The `:+` avoids a bare `set -`, which would turn off
-# verbose and xtrace.
+# on the caller's options.  The `:+` avoids a trailing `-`, which would turn off
+# the caller's verbose and xtrace.  The redirections are on the command rather
+# than on the subshell, so that the execution traces of the subshell's own
+# commands go to this script's standard error rather than to the command's.
 set +e
 (
   set +u${cronic_caller_flags:+ -$cronic_caller_flags}
-  command -- "$@"
-) > "$cronic_out" 2> "$cronic_trace"
+  command -- "$@" > "$cronic_out" 2> "$cronic_trace"
+)
 cronic_result=$?
 set -e
 
