@@ -16,8 +16,9 @@
 # `cronic_help`; run `cronic --help`.
 # This script runs on macOS, whose /bin/bash is bash 3.2.  So it uses a feature
 # of a later bash, such as BASH_XTRACEFD (bash 4.1), only after checking the
-# version; see the BASH_VERSINFO check below.  And it uses only the POSIX
-# features of utilities such as `grep` and `cmp`.  CI runs its tests on macOS.
+# version; see the BASH_VERSINFO check below.  Its uses of `grep`, `sed`, and
+# `cmp` are POSIX.  `mktemp -d` with a template is not POSIX, but macOS, the
+# BSDs, and GNU support it.  CI runs its tests on macOS.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -218,10 +219,13 @@ fi
 # For example, git does this, and the POSIX standard requires it for make.
 # The full stderr output is shown, but file cronic_reduced_err is checked for
 # emptiness below.
+# GNU make names itself as invoked, such as `make` or `gmake`.  It quotes the
+# directory as 'dir' from version 4.0, and as `dir' before then; macOS's
+# /usr/bin/make is GNU make 3.81.
 # TODO: Expand this.
 cat "$cronic_err" \
   | grep -v "^Everything up-to-date$" \
-  | grep -E -v '^make(\[[0-9]+\])?: (Entering|Leaving) directory '"'"'.*'"'"'$' \
+  | grep -E -v '^g?make(\[[0-9]+\])?: (Entering|Leaving) directory '"[\`']"'.*'"'"'$' \
     > "$cronic_reduced_err" || true
 
 if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
