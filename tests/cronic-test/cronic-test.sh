@@ -11,10 +11,12 @@
 # command's.  (The temporary files would still be removed, by `cronic`'s EXIT
 # trap, so the left-behind-files check in `check` does not detect that bug.)
 # The checks that catch that bug are the "trace-only stderr" checks that use
-# `stderr-lines` with a literal PS4, which run only when the test is not run as
-# root.  The checks that use `trace-only`, a bash script, catch it only under a
-# bash earlier than 4.1:  a later bash writes its trace lines to BASH_XTRACEFD,
-# so `cronic` sees no trace lines in stderr and does not run `grep -v`.
+# `stderr-lines` with a literal PS4, and the "nested trace in stderr" check,
+# whose bash script writes its trace lines to stderr whatever the bash version.
+# All of them run only when the test is not run as root.  The checks that use
+# `trace-only`, a bash script, catch it only under a bash earlier than 4.1:  a
+# later bash writes its trace lines to BASH_XTRACEFD, so `cronic` sees no trace
+# lines in stderr and does not run `grep -v`.
 
 set -eu
 
@@ -53,8 +55,9 @@ chmod +x "$work/trace-and-stderr"
 
 # A command whose stderr is nothing but `make` directory-change notices.  Both
 # the top-level form (`make:`) and the recursive form (`make[1]:`) appear, as do
-# the quoting of GNU make 3.81 (macOS's /usr/bin/make) and the name `gmake`;
-# all must be filtered out of the reduced error output.
+# the quoting of GNU make 3.81 (macOS's /usr/bin/make) and the other names
+# that GNU make runs under; all must be filtered out of the reduced error
+# output.
 cat > "$work/make-noise" << 'EOF'
 #!/bin/sh
 echo "make: Entering directory '/tmp/x'" 1>&2
@@ -63,6 +66,10 @@ echo 'make[2]: Entering directory `/tmp/x/sub/old'"'" 1>&2
 echo 'make[2]: Leaving directory `/tmp/x/sub/old'"'" 1>&2
 echo "gmake[2]: Entering directory '/tmp/x/sub/g'" 1>&2
 echo "gmake[2]: Leaving directory '/tmp/x/sub/g'" 1>&2
+echo "gnumake[2]: Entering directory '/tmp/x/sub/gnu'" 1>&2
+echo "gnumake[2]: Leaving directory '/tmp/x/sub/gnu'" 1>&2
+echo "mingw32-make[2]: Entering directory '/tmp/x/sub/mingw'" 1>&2
+echo "mingw32-make[2]: Leaving directory '/tmp/x/sub/mingw'" 1>&2
 echo "make[1]: Leaving directory '/tmp/x/sub'" 1>&2
 echo "make: Leaving directory '/tmp/x'" 1>&2
 exit "$1"
@@ -80,6 +87,16 @@ echo "make: Leaving directory '/tmp/x'" 1>&2
 exit "$1"
 EOF
 chmod +x "$work/make-noise-and-stderr"
+
+# A command that writes a trace line and then an error line that contains a
+# NUL byte and a byte that is invalid in UTF-8, so that `grep` would treat the
+# output as binary.
+cat > "$work/binary-stderr" << 'EOF'
+#!/bin/sh
+printf '[trace] echo hi\n' 1>&2
+printf 'bad \377\000 error\n' 1>&2
+EOF
+chmod +x "$work/binary-stderr"
 
 # A bash command whose trace lines go to stderr, as under a bash earlier than
 # 4.1, whatever the bash version.  Its trace lines are nested 3 deep.
@@ -204,6 +221,9 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 # ... but a real error among them is still reported.
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
+
+# Error output that `grep` would treat as binary is still reported.
+check "binary stderr" 0 "report:error$" "$work/binary-stderr"
 
 # Without a command, `cronic` reports a usage error rather than aborting on an
 # unset variable.
@@ -330,8 +350,11 @@ unset $exported_names
 # This tests for the features themselves, rather than for the bash version
 # that `cronic` tests for, so that it detects a wrong version test in `cronic`.
 # `cronic` and the bash scripts above all run under the first `bash` in PATH,
-# so that is the bash tested here.
-if [ -z "$(bash -c 'exec {fd}> /dev/null && BASH_XTRACEFD=$fd && set -x && :' 2>&1)" ]; then
+# so that is the bash tested here.  The probe checks whether a trace line
+# reaches the file, rather than whether bash writes to stderr, because bash can
+# write an unrelated warning to stderr, such as for an uninstalled locale.
+if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
+  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
   bash_has_xtracefd=true
 else
   bash_has_xtracefd=false
@@ -355,10 +378,10 @@ PS4='[trace] '
 check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
   "$work/trace-only" 0
 
-# The tests below concern trace lines that a shell other than bash writes to
-# stderr; they are recognized by PS4.  Bash running as root does not import
-# PS4 from the environment, so `cronic` would see the default PS4, and these
-# tests are skipped.
+# The tests below concern trace lines in stderr, as written by a shell other
+# than bash or by a bash that does not use BASH_XTRACEFD; they are recognized
+# by PS4.  Bash running as root does not import PS4 from the environment, so
+# `cronic` would see the default PS4, and these tests are skipped.
 if [ "$(id -u)" -eq 0 ]; then
   echo "SKIP: tests of PS4 in stderr, because bash ignores PS4 when run as root"
   unset PS4
@@ -391,6 +414,8 @@ check "bash, PS4 with metacharacters, nested trace in the report" 3 \
 check "PS4 with metacharacters, trace lines and real stderr" 0 \
   "report:^a real error$" \
   "$work/stderr-lines" "[trace] echo hi" "a real error"
+check "PS4 with metacharacters, trace lines and binary stderr" 0 \
+  "report:error$" "$work/binary-stderr"
 PS4='+.* '
 check "PS4 with metacharacters, error line that they would match" 0 \
   "report:^+++ b/file$" "$work/stderr-lines" "+++ b/file"
