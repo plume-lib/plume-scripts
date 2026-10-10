@@ -14,11 +14,10 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
-# This script runs on macOS, whose /bin/bash is bash 3.2, so it uses a feature
-# of a later bash only after checking the version, and it uses only the POSIX
-# features of utilities such as `grep` and `cmp`.  For example, BASH_XTRACEFD
-# requires bash 4.1; see the BASH_VERSINFO check below.  CI runs its tests on
-# macOS.
+# This script runs on macOS, whose /bin/bash is bash 3.2.  So it uses a feature
+# of a later bash, such as BASH_XTRACEFD (bash 4.1), only after checking the
+# version; see the BASH_VERSINFO check below.  And it uses only the POSIX
+# features of utilities such as `grep` and `cmp`.  CI runs its tests on macOS.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
