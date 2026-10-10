@@ -15,13 +15,11 @@
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
 
-# The caller's options, as commands that restore them.  When the caller exports
-# SHELLOPTS, this script starts with the caller's options, and the wrapped
-# command inherits this script's options, so this script restores the caller's
-# options while it runs the wrapped command.  Otherwise, any bash script that
-# the wrapped command runs, such as a `#!/bin/bash` script, would get this
-# script's `set -eu` rather than the caller's options and, for example, fail on
-# its first unset variable.
+# The caller's options, as commands that restore them.  This script restores
+# the caller's options while it runs the wrapped command.  Otherwise, any bash
+# script that the wrapped command runs, such as a `#!/bin/bash` script, would
+# get this script's `set -eu` rather than the caller's options and, for example,
+# fail on its first unset variable.
 # Limitation:  if the wrapped command is a builtin that runs code in this
 # script's shell, such as `source` or `eval`, that code also runs with the
 # caller's options, even if the caller does not export SHELLOPTS.  So if the
