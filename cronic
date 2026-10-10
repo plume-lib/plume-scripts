@@ -159,13 +159,23 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
 fi
 
 # The command runs in a subshell rather than in this shell, so that a builtin
-# such as `exit` or `exec` cannot end this script before it reports.
-# `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.
+# such as `exit` or `exec` cannot end this script before it reports.  The
+# redirections apply to the whole subshell, so that they also capture what the
+# subshell writes after the command finishes, such as the output of an EXIT
+# trap that the command sets.  Within the subshell, the command sees neither
+# this script's functions nor its variables, and runs with `set +u`, as it
+# would in an ordinary shell.  Removing the functions also means that a
+# function such as `cronic_usage` cannot run in place of a program of the same
+# name.
 set +e
 (
-  command -- "$@" > "$cronic_out" 2> "$cronic_trace"
-)
+  # shellcheck disable=SC2046  # each name is a separate argument.
+  unset -f $(compgen -A function cronic_)
+  # shellcheck disable=SC2046  # each name is a separate argument.
+  unset -v $(compgen -v cronic_)
+  set +u
+  "$@"
+) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 

@@ -267,6 +267,21 @@ check "builtin command" 0 silent :
 # A builtin that would end the shell does not prevent the report.
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
+# Output that the subshell writes after the command finishes, such as from an
+# EXIT trap that the command sets, is captured rather than leaked.
+check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
+  trap 'echo "from the trap" >&2' EXIT
+check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
+# A builtin runs with `set +u`, as it would in an ordinary shell.
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin with an unset variable" 0 silent \
+  eval ': "$cronic_test_unset_variable"'
+# A builtin cannot see or change `cronic`'s variables or functions.
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin cannot see cronic's variables" 0 silent \
+  eval '[ -z "${cronic_tmpdir+set}" ]'
+check "builtin cannot see cronic's functions" 1 report \
+  eval 'declare -F cronic_cleanup'
 
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
