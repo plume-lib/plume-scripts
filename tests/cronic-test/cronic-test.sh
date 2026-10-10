@@ -10,6 +10,11 @@
 # printed, and the exit status would be grep's 1 rather than the wrapped
 # command's.  (The temporary files would still be removed, by `cronic`'s EXIT
 # trap, so the left-behind-files check in `check` does not detect that bug.)
+# The checks that catch that bug are the "trace-only stderr" checks that use
+# `stderr-lines` with a literal PS4, which run only when the test is not run as
+# root.  The checks that use `trace-only`, a bash script, catch it only under a
+# bash earlier than 4.1:  a later bash writes its trace lines to BASH_XTRACEFD,
+# so `cronic` sees no trace lines in stderr and does not run `grep -v`.
 
 set -eu
 
