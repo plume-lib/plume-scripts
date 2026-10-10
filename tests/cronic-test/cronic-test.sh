@@ -262,6 +262,12 @@ for name in $function_names; do
 done
 PATH="$saved_path"
 
+# The command may be a shell builtin.
+check "builtin command" 0 silent :
+# A builtin that would end the shell does not prevent the report.
+check "exit builtin" 3 report exit 3
+check "exec builtin" 3 report exec "$work/trace-only" 3
+
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
 # uppercase, both with and without any "cronic_" prefix (for example,

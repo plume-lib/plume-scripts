@@ -158,11 +158,14 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
+# The command runs in a subshell rather than in this shell, so that a builtin
+# such as `exit` or `exec` cannot end this script before it reports.
+# `command` because a function of this script, such as `cronic_usage`, would
+# otherwise run in place of a program of the same name.
 set +e
-# `command` because the wrapped command runs in this shell, where a function of
-# this script, such as `cronic_usage`, would otherwise run in place of a
-# program of the same name.
-command -- "$@" > "$cronic_out" 2> "$cronic_trace"
+(
+  command -- "$@" > "$cronic_out" 2> "$cronic_trace"
+)
 cronic_result=$?
 set -e
 
