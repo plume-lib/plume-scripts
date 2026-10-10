@@ -14,6 +14,8 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
+# This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
+# feature of a later bash only after checking the version.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -203,8 +205,8 @@ cronic_pattern=$(cronic_trace_pattern)
 if [ -n "$cronic_pattern" ] && grep -q "$cronic_pattern" "$cronic_trace"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
-  # `set -e` would abort the script here, before it produces its report,
-  # exits with the wrapped command's status, and removes its temporary files.
+  # `set -e` would abort the script here, before it produces its report, and
+  # it would exit with status 1 rather than with the wrapped command's status.
   grep -v "$cronic_pattern" "$cronic_trace" > "$cronic_err" || true
 else
   cronic_err=$cronic_trace
