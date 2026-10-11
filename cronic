@@ -69,10 +69,13 @@
 # `export`, `set`, or `unset`, runs in place of a function of the same name; in
 # posix mode, `export -pf` lists the names of the exported functions.  Once
 # `builtin` is saved (via `command`, in a subshell that removes any function
-# named `command`) and removed, it runs the other builtins.  `declare -f` runs
-# with posix mode off, because posix mode rejects a function name, such as
-# `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT turns posix
-# mode off again, unless the caller's shell was already in posix mode.
+# named `command`) and removed, it runs the other builtins.  `builtin` needs
+# that separate path because `command` cannot be removed first:  `builtin`
+# saves the definition of `command` along with the caller's other functions.
+# `declare -f` runs with posix mode off, because posix mode rejects a function
+# name, such as `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT
+# turns posix mode off again, unless the caller's shell was already in posix
+# mode.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.

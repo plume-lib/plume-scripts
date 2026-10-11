@@ -516,6 +516,23 @@ check "caller's exported functions are seen" 0 silent \
   bash -c 'command declare -F builtin set unset > /dev/null'
 CRONIC="$REAL_CRONIC"
 
+# The caller may export functions named `builtin` and `command`, which `cronic`
+# uses to save the caller's functions; the command sees both of them.
+cat > "$work/cronic-with-builtin-and-command" << 'EOF'
+#!/bin/bash
+builtin() { echo "function builtin ran"; }
+command() { echo "function command ran"; }
+export -f builtin command
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-builtin-and-command"
+CRONIC="$work/cronic-with-builtin-and-command"
+# shellcheck disable=SC2016 # The expansion is for `bash` to do.
+check "caller's exported functions named builtin and command are seen" 1 \
+  "report:function builtin ran, function command ran" \
+  bash -c 'echo "$(builtin), $(command)"; false'
+CRONIC="$REAL_CRONIC"
+
 # A function whose name is not an identifier reaches the command, even when
 # the caller exported errexit.  A function that BASH_ENV defined, rather than
 # one that the caller exported, is not exported to the command.
