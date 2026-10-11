@@ -1,4 +1,36 @@
 #!/bin/bash
+{
+  cronic_caller_opts=$SHELLOPTS
+  if [[ :$SHELLOPTS: == *:posix:* ]]; then
+    cronic_posix_off=
+  else
+    cronic_posix_off="+o posix"
+    POSIXLY_CORRECT=y
+  fi
+  set +vx
+} 2> /dev/null
+\unalias -a
+cronic_exported=$(export -pf)
+cronic_caller_functions=
+if [[ $'\n'$cronic_exported$'\n' == *$'\n'"export -f builtin"$'\n'* ]]; then
+  cronic_caller_functions=$(unset -f command; unset POSIXLY_CORRECT; command declare -f builtin)
+fi
+unset -f builtin
+cronic_caller_function_names=
+while builtin read -r cronic_name; do
+  cronic_name=${cronic_name#export -f }
+  if [[ -n $cronic_name && $cronic_name != cronic_* ]]; then
+    builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
+    cronic_caller_function_names+=$cronic_name_quoted
+  fi
+done <<< "$cronic_exported"
+if [[ -n $cronic_caller_function_names ]]; then
+  cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
+fi
+while builtin read -r cronic_name; do
+  [[ -z $cronic_name ]] || unset -f -- "$cronic_name" || exit 1
+done <<< "$(builtin compgen -A function)"
+[ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -14,8 +46,55 @@
 # --duplicate-stderr options, which may be given in any order.
 # The options and the treatment of execution traces are documented in function
 # `cronic_help`; run `cronic --help`.
+# Names that start with `cronic_` are reserved for this script:  COMMAND does
+# not see a variable or function with such a name, even one that the caller
+# exported.  This script assumes that bash has the `compgen` builtin, which is
+# absent only if bash was built with `--disable-progcomp`.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
+
+# The first command saves the caller's `set -o` shell options, as the
+# colon-separated list of those that are on, before this script changes any of
+# them for itself.  They include any option that BASH_ENV set, because bash runs
+# BASH_ENV before this script's first line and does not record the options that
+# it started with.  This script changes no `shopt` option, so the command
+# inherits those without any restoring.
+# The first command then stops this script from tracing itself or echoing its
+# input, which would go to this script's stderr, so that cron would send email
+# for every run.  It comes before any comment, because bash echoes every line
+# that it reads while verbose is on.  The redirection discards its own trace.
+# Verbose is handled only partly:  bash echoes this script's lines through the
+# end of the first command to stderr before that command can turn verbose off.
+# So if the caller exports SHELLOPTS with verbose, or runs `bash -v cronic`,
+# then cron sends email for every run.
+# Likewise, bash runs the file named by BASH_ENV, if any, before this script's
+# first command, so an exported xtrace, verbose, or nounset applies to that file
+# and can make it write to stderr; such a cron job should unset BASH_ENV.
+# The next command removes every alias, such as one that BASH_ENV defined, so
+# that no alias changes this script's commands or the caller's functions, which
+# the command gets back by re-parsing their definitions; the backslash stops an
+# alias named `unalias` from applying.  Bash imports the caller's exported
+# functions before it runs BASH_ENV, so their bodies never contain an alias.
+# The commands after it save the definitions of the caller's exported
+# functions, which bash has imported, and remove every function, including any
+# that BASH_ENV defined, so that none runs in place of a builtin or program that
+# this script uses.  The command gets the exported functions back.  Assigning
+# POSIXLY_CORRECT turns on posix mode, in which a special builtin, such as
+# `export`, `set`, or `unset`, runs in place of a function of the same name; in
+# posix mode, `export -pf` lists the names of the exported functions.  Once
+# `builtin` is saved (via `command`, in a subshell that removes any function
+# named `command`) and removed, it runs the other builtins.  `builtin` needs
+# that separate path because `command` cannot be removed first:  `builtin`
+# saves the definition of `command` along with the caller's other functions.
+# `declare -f` runs with posix mode off, because posix mode rejects a function
+# name, such as `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT
+# turns posix mode off again, unless the caller's shell was already in posix
+# mode.  Their error output is not discarded:  if `unset` cannot remove a
+# function, such as one that BASH_ENV made readonly, then bash reports the
+# error and this script exits, so cron sends email rather than failing
+# silently.  The exit is explicit because only bash 5.3 or later exits when, in
+# posix mode, `unset` fails on a readonly function.  `exit` is a special
+# builtin, so in posix mode no function runs in its place.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -46,12 +125,24 @@ cronic_help() {
   echo "                       is less likely to be overlooked"
   echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
+  echo "COMMAND may be a program, a shell builtin, or a shell function that the"
+  echo "caller exported; a function runs in place of a program of the same name."
+  echo "Names that start with \"cronic_\" are reserved:  COMMAND does not see a"
+  echo "variable or function with such a name, even one that the caller exported."
+  echo "COMMAND runs with the caller's shell options, such as errexit, nounset,"
+  echo "and xtrace (including any that BASH_ENV sets), rather than with this"
+  echo "script's.  This script never traces itself, so \"bash -x cronic COMMAND\""
+  echo "traces only the running of COMMAND."
   echo "Execution traces (from \"set -x\") are not treated as error output."
   echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
   echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "Under \"set -v\" exported via SHELLOPTS, or \"bash -v cronic\", bash echoes the"
+  echo "first lines of cronic to stderr before cronic can turn verbose off."
+  echo "Likewise, bash runs the BASH_ENV file, if any, before cronic starts, so"
+  echo "exported shell options can make that file write to stderr."
   exit 0
 }
 
@@ -160,14 +251,54 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
-# The command runs in a subshell rather than in this shell, so that a builtin
-# such as `exit` or `exec` cannot end this script before it reports.
-# `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.
+# Run the command with the caller's `set -o` shell options rather than this
+# script's.  If the caller exported SHELLOPTS, then the command would otherwise
+# inherit this script's options, and a bash script that reads an unset variable
+# (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
+# The command runs in a subshell rather than via `exec`, so that it can be a
+# shell builtin or an exported shell function, and rather than in this shell,
+# so that a builtin such as `exit` or `exec` cannot end this script before it
+# reports.  The subshell is not the operand of `||` or the like, because then
+# bash would ignore `set -e` throughout the subshell, including in a shell
+# function that it runs, and would remove "errexit" from the SHELLOPTS that the
+# command inherits.
+# The subshell unsets this script's functions, which are the only ones that
+# remain, and every variable whose name starts with `cronic_`, so that the
+# command does not see them, and so that a function does not run in place of a
+# program of the same name.  The names of this script's functions are
+# identifiers, so they need no quoting.  The `eval` expands the
+# cronic_caller_* variables before `unset` removes them.  It then defines the
+# caller's functions, which can replace a builtin, so the remaining commands run
+# in posix mode, as special builtins.  The last command turns posix mode off
+# (unless the caller's shell was in posix mode), turns off every other option
+# that is on, which includes nounset, and turns on the caller's other options,
+# so that the restoring is neither traced nor echoed.  That command never turns
+# posix mode off and on again, because doing so would replace the caller's
+# value of POSIXLY_CORRECT by "y"; turning posix mode off unsets
+# POSIXLY_CORRECT.  The options to turn off are those of this script, which the
+# subshell inherits, apart from posix mode.
+# Limitation:  if the command is a builtin that runs code in the subshell, such
+# as `source` or `eval`, that code runs with the caller's options even if the
+# caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
+# that code silently expands an unset variable to the empty string.
+cronic_set_args=$cronic_posix_off
+for cronic_opt in ${SHELLOPTS//:/ }; do
+  [ "$cronic_opt" = posix ] || cronic_set_args+=" +o $cronic_opt"
+done
+for cronic_opt in ${cronic_caller_opts//:/ }; do
+  [ "$cronic_opt" = posix ] || cronic_set_args+=" -o $cronic_opt"
+done
 set +e
 (
-  command -- "$@" > "$cronic_out" 2> "$cronic_trace"
-)
+  # shellcheck disable=SC2046  # each name is a separate argument.
+  unset -f $(compgen -A function)
+  eval "unset -v \"\${!cronic_@}\"
+    $cronic_caller_functions
+    ${cronic_posix_off:+POSIXLY_CORRECT=y}
+    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}
+    set $cronic_set_args"
+  "$@"
+) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 

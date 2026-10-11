@@ -13,6 +13,21 @@
 
 set -eu
 
+# Do not let the user's environment file run in `cronic` or in the bash commands
+# below.  It could write to stderr, especially when an exported SHELLOPTS turns
+# on `-u` for it.
+unset BASH_ENV
+# Use the default PS4, which the goal files and the trace lines below assume.
+unset PS4
+# Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
+# to the commands below.  If SHELLOPTS is exported, then run this script again
+# without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
+# `printenv` matches the name exactly, unlike a search of the output of `env`,
+# which can match a line within the value of another variable.
+if printenv SHELLOPTS > /dev/null; then
+  exec env -u SHELLOPTS sh "$0" "$@"
+fi
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
 
@@ -27,6 +42,22 @@ export TMPDIR
 mkdir "$TMPDIR"
 
 status=0
+
+# has_xtracefd BASH: succeeds if `cronic`, run under the bash program BASH,
+# writes the execution trace to a separate file, via BASH_XTRACEFD, which bash
+# 4.1 or later supports.  If not, then bash writes its trace to stderr, like any
+# other shell, and the tests that depend on the separate file are skipped.
+has_xtracefd() {
+  # shellcheck disable=SC2016  # the expansions are for bash, not this shell.
+  "$1" -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'
+}
+# Whether `cronic`, which runs under /bin/bash, writes the trace to a separate
+# file.
+if has_xtracefd /bin/bash; then
+  bash_xtracefd=true
+else
+  bash_xtracefd=false
+fi
 
 # A command whose stderr is nothing but trace lines.
 cat > "$work/trace-only" << 'EOF'
@@ -88,9 +119,94 @@ printf '%s\n' "$@" 1>&2
 EOF
 chmod +x "$work/stderr-lines"
 
+# A bash command that reads an unset variable.
+cat > "$work/read-unset" << 'EOF'
+#!/bin/bash
+unset CRONIC_TEST_UNSET_VARIABLE
+echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
+exit "$1"
+EOF
+chmod +x "$work/read-unset"
+
+# Runs `cronic` with SHELLOPTS set to its first argument and exported, and
+# with these exported shell functions:
+#  * `fail_then_continue` runs `false` and then prints a line.
+#  * `fail_in_pipeline` runs a pipeline whose first command fails.
+#  * `report_cronic_variables` writes to stderr any variable or function of
+#    `cronic`'s that it can see.
+cat > "$work/cronic-with-shellopts" << 'EOF2'
+#!/bin/bash
+fail_then_continue() {
+  false
+  echo "after the failure"
+}
+fail_in_pipeline() {
+  false | true
+}
+report_cronic_variables() {
+  compgen -v -A function cronic_ >&2
+  return 0
+}
+export -f fail_then_continue fail_in_pipeline report_cronic_variables
+shellopts="$1"
+shift
+exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
+EOF2
+chmod +x "$work/cronic-with-shellopts"
+
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
+}
+
+# run_cronic DESCRIPTION EXPECTED-STATUS COMMAND...: runs COMMAND, which runs
+# `cronic`, with its standard output in "$work/output" and its error output in
+# "$work/stderr".  If COMMAND exits with a status other than EXPECTED-STATUS,
+# or leaves temporary files behind, then reports a failure and returns 1.
+run_cronic() {
+  description="$1"
+  expected_status="$2"
+  shift 2
+
+  before="$(temp_files)"
+  actual_status=0
+  "$@" > "$work/output" 2> "$work/stderr" || actual_status=$?
+  after="$(temp_files)"
+
+  if [ "$actual_status" != "$expected_status" ]; then
+    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
+    cat "$work/output" "$work/stderr"
+    status=1
+    return 1
+  fi
+  if [ "$before" != "$after" ]; then
+    echo "FAIL: $description: temporary files were left behind:"
+    echo "$after"
+    status=1
+    return 1
+  fi
+}
+
+# check_goals DESCRIPTION OUTPUT-GOAL STDERR-GOAL COMMAND...: runs COMMAND,
+# which runs `cronic`, and checks that it exits with status 0, leaves no
+# temporary files, and writes the contents of OUTPUT-GOAL to standard output
+# and the contents of STDERR-GOAL to stderr.
+check_goals() {
+  description="$1"
+  output_goal="$2"
+  stderr_goal="$3"
+  shift 3
+
+  run_cronic "$description" 0 "$@" || return 0
+  if cmp -s "$output_goal" "$work/output" && cmp -s "$stderr_goal" "$work/stderr"; then
+    echo "PASS: $description"
+  else
+    echo "FAIL: $description: output:"
+    cat "$work/output"
+    echo "stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
 }
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
@@ -105,17 +221,10 @@ check() {
   expected_output="$3"
   shift 3
 
-  before="$(temp_files)"
-  actual_status=0
-  "$CRONIC" "$@" > "$work/output" 2>&1 || actual_status=$?
-  after="$(temp_files)"
-
-  if [ "$actual_status" != "$expected_status" ]; then
-    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
-    cat "$work/output"
-    status=1
-    return
-  fi
+  run_cronic "$description" "$expected_status" "$CRONIC" "$@" || return 0
+  # The checks below examine both outputs, because `cronic` writes its usage
+  # messages to stderr.
+  cat "$work/stderr" >> "$work/output"
 
   case "$expected_output" in
     silent)
@@ -146,13 +255,6 @@ check() {
       fi
       ;;
   esac
-
-  if [ "$before" != "$after" ]; then
-    echo "FAIL: $description: temporary files were left behind:"
-    echo "$after"
-    status=1
-    return
-  fi
 
   echo "PASS: $description"
 }
@@ -269,13 +371,102 @@ check "builtin command" 0 silent :
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
 
+# When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
+# the wrapped command, but the caller's options do.
+REAL_CRONIC="$CRONIC"
+export REAL_CRONIC
+CRONIC="$work/cronic-with-shellopts"
+default_shellopts=braceexpand:hashall:interactive-comments
+check "exported SHELLOPTS, command reads an unset variable" 0 silent \
+  "$default_shellopts" "$work/read-unset" 0
+check "exported SHELLOPTS, command ignores a failure" 0 silent \
+  "$default_shellopts" bash -c 'false; :'
+check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
+  "report:unbound variable" \
+  "$default_shellopts:nounset" "$work/read-unset" 0
+check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
+  "$default_shellopts:errexit" bash -c 'false; :'
+# With xtrace exported, a successful command with only trace output on stderr
+# produces no output at all:  `cronic` does not trace itself.
+check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
+  "$default_shellopts:xtrace" "$work/trace-only" 0
+# With xtrace exported, the report's trace section is the trace of running the
+# command, followed by the command's own trace, with nothing that `cronic` did
+# to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
+# it appears under "TRACE OUTPUT".
+cat > "$work/trace-report.goal" << EOF
+Cronic detected failure or error output for the command:
+$work/trace-and-stderr 0
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+a real error
+
+STANDARD OUTPUT:
+
+TRACE OUTPUT:
++ $work/trace-and-stderr 0
++ set -x
++ echo 'a real error'
++ exit 0
+
+END OF CRONIC OUTPUT.
+EOF
+if $bash_xtracefd; then
+  check_goals "exported SHELLOPTS with xtrace, trace output" \
+    "$work/trace-report.goal" /dev/null \
+    "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+else
+  echo "SKIP: exported SHELLOPTS with xtrace, trace output, because bash is older than 4.1"
+fi
+
+# With verbose exported, a successful command produces no report:  `cronic`
+# does not echo, into the command's error output, the commands that restore the
+# caller's options.  `cronic` echoes to its stderr only its lines through its
+# first command, which bash reads before `cronic` turns verbose off.
+sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
+check_goals "exported SHELLOPTS with verbose" \
+  /dev/null "$work/verbose-stderr.goal" \
+  "$CRONIC" "$default_shellopts:verbose" true
+
+# The caller's `-e` applies within an exported shell function that is the
+# command, and the caller's lack of `-e` does too.
+check "exported SHELLOPTS with errexit, exported function ignores a failure" 1 \
+  report "$default_shellopts:errexit" fail_then_continue
+check "exported SHELLOPTS, exported function ignores a failure" 0 silent \
+  "$default_shellopts" fail_then_continue
+# Every one of the caller's options applies, not only `-e`, `-u`, and `-x`.
+check "exported SHELLOPTS with pipefail, exported function" 1 report \
+  "$default_shellopts:pipefail" fail_in_pipeline
+check "exported SHELLOPTS without pipefail, exported function" 0 silent \
+  "$default_shellopts" fail_in_pipeline
+# A shell function that is the command does not see `cronic`'s variables or
+# functions.
+check "exported function sees none of cronic's variables or functions" 0 silent \
+  "$default_shellopts" report_cronic_variables
+# ... nor a variable that is not exported, which BASH_ENV set within `cronic`.
+echo "cronic_from_bash_env=unexported" > "$work/bash-env"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "exported function does not see unexported variable from BASH_ENV" 0 \
+  silent "$default_shellopts" report_cronic_variables
+unset BASH_ENV
+# Under the caller's allexport, the command's environment contains none of
+# `cronic`'s variables, nor the POSIXLY_CORRECT that `cronic` assigns.
+# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+check "exported SHELLOPTS with allexport, environment has no cronic variable" 0 \
+  silent "$default_shellopts:allexport" \
+  sh -c 'env | grep -E "^(cronic_|POSIXLY_CORRECT=)" >&2; :'
+CRONIC="$REAL_CRONIC"
+
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
 # uppercase, both with and without any "cronic_" prefix (for example,
 # `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
 # The lowercase names that `cronic` assigns, such as `cronic_out`, are not
-# exported:  `cronic` does overwrite them, but environment variables
-# conventionally have uppercase names.
+# exported here, because environment variables conventionally have uppercase
+# names; the next test checks a few of them.
 variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
 if [ -z "$variable_names" ]; then
   echo "FAIL: found no variables in $CRONIC"
@@ -306,23 +497,150 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
+# Names that start with `cronic_` are reserved:  the command does not see a
+# variable or function with such a name that the caller exported.  The caller
+# also exports functions named like builtins that `cronic` uses, which must not
+# run in place of those builtins, though the command does see them.
+cat > "$work/cronic-with-cronic-names" << 'EOF'
+#!/bin/bash
+cronic_mine() {
+  exit 3
+}
+cronic_debug="caller's cronic_debug"
+export -f cronic_mine
+export cronic_debug
+builtin() { echo "function builtin ran" >&2; }
+compgen() { echo "function compgen ran" >&2; }
+declare() { echo "function declare ran" >&2; }
+eval() { echo "function eval ran" >&2; }
+export() { echo "function export ran" >&2; }
+read() { echo "function read ran" >&2; }
+set() { echo "function set ran" >&2; }
+unset() { echo "function unset ran" >&2; }
+command export -f builtin compgen declare eval export read set unset
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-cronic-names"
+CRONIC="$work/cronic-with-cronic-names"
+# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+check "caller's exported cronic_ variable is not seen" 0 silent \
+  sh -c '[ -z "${cronic_debug+set}" ]'
+check "caller's exported cronic_ function is not seen" 0 silent \
+  bash -c '! command declare -F cronic_mine'
+check "caller's exported functions are seen" 0 silent \
+  bash -c 'command declare -F builtin set unset > /dev/null'
+CRONIC="$REAL_CRONIC"
+
+# The caller may export functions named `builtin` and `command`, which `cronic`
+# uses to save the caller's functions; the command sees both of them.
+cat > "$work/cronic-with-builtin-and-command" << 'EOF'
+#!/bin/bash
+builtin() { echo "function builtin ran"; }
+command() { echo "function command ran"; }
+export -f builtin command
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-builtin-and-command"
+CRONIC="$work/cronic-with-builtin-and-command"
+# shellcheck disable=SC2016 # The expansion is for `bash` to do.
+check "caller's exported functions named builtin and command are seen" 1 \
+  "report:function builtin ran, function command ran" \
+  bash -c 'echo "$(builtin), $(command)"; false'
+CRONIC="$REAL_CRONIC"
+
+# A function whose name is not an identifier reaches the command, even when
+# the caller exported errexit.  A function that BASH_ENV defined, rather than
+# one that the caller exported, is not exported to the command.
+cat > "$work/cronic-with-odd-names" << 'EOF'
+#!/bin/bash
+my-fn() {
+  echo "my-fn ran"
+}
+export -f my-fn
+set -o errexit
+export SHELLOPTS
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-odd-names"
+echo 'from_bash_env() { :; }' > "$work/bash-env"
+CRONIC="$work/cronic-with-odd-names"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "caller's exported function whose name is not an identifier" 1 \
+  "report:my-fn ran" bash -c 'my-fn; false'
+check "function from BASH_ENV is not exported" 0 silent \
+  bash -c '! printenv "BASH_FUNC_from_bash_env%%"'
+unset BASH_ENV
+CRONIC="$REAL_CRONIC"
+
+# An alias that BASH_ENV defined does not change the caller's exported function,
+# just as it would not if bash ran the function directly.  BASH_ENV turns on
+# posix mode, because bash turns off expand_aliases when it leaves posix mode.
+# The caller sets BASH_ENV only for `cronic`, so that the caller's own
+# definition of the function contains no alias.
+cat > "$work/cronic-with-alias" << 'EOF'
+#!/bin/bash
+print_hi() {
+  echo hi
+}
+export -f print_hi
+BASH_ENV="$1"
+export BASH_ENV
+shift
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-alias"
+cat > "$work/bash-env" << 'EOF'
+shopt -s expand_aliases
+alias echo='echo ALIASED'
+set -o posix
+EOF
+CRONIC="$work/cronic-with-alias"
+check "alias from BASH_ENV does not change exported function" 1 "report:^hi$" \
+  "$work/bash-env" bash -c 'print_hi; false'
+CRONIC="$REAL_CRONIC"
+
+# A function that BASH_ENV made readonly cannot be removed, so `cronic` does not
+# run the command, but it fails with an error message rather than silently.
+echo 'grep() { echo "function grep ran"; }; readonly -f grep' > "$work/bash-env"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "readonly function from BASH_ENV" 1 "message:readonly function" true
+unset BASH_ENV
+
+# `bash -x cronic` does not trace `cronic` itself, but does trace running the
+# command.  The command does not inherit xtrace, because SHELLOPTS is not
+# exported, so its own `set -x` is not traced.
+grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"
+if has_xtracefd bash; then
+  check_goals "bash -x cronic, trace output" \
+    "$work/bash-x-trace-report.goal" /dev/null \
+    bash -x "$CRONIC" "$work/trace-and-stderr" 0
+else
+  echo "SKIP: bash -x cronic, trace output, because bash is older than 4.1"
+fi
+
 # Bash writes its trace lines to a separate file, so they are not error
 # output, whatever PS4 is.
 export PS4
-# shellcheck disable=SC2016 # The expansion is for the traced command to do.
-PS4='+${LINENO}: '
-check "bash, PS4 with expansions, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
-check "bash, PS4 with expansions, trace in the report" 3 \
-  "report:echo 'the standard output'$" "$work/trace-only" 3
-check "bash, PS4 with expansions, trace lines and real stderr" 0 \
-  "report:^a real error$" "$work/trace-and-stderr" 0
-PS4='+\D{%H}: '
-check "bash, PS4 with an escape, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
-PS4='[trace] '
-check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
+if $bash_xtracefd; then
+  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
+  PS4='+${LINENO}: '
+  check "bash, PS4 with expansions, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+  check "bash, PS4 with expansions, trace in the report" 3 \
+    "report:echo 'the standard output'$" "$work/trace-only" 3
+  check "bash, PS4 with expansions, trace lines and real stderr" 0 \
+    "report:^a real error$" "$work/trace-and-stderr" 0
+  PS4='+\D{%H}: '
+  check "bash, PS4 with an escape, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+  PS4='[trace] '
+  check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+else
+  echo "SKIP: tests of bash with any PS4, because bash is older than 4.1"
+fi
 
 # The tests below concern trace lines that a shell other than bash writes to
 # stderr; they are recognized by PS4.  Bash running as root does not import
