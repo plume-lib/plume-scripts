@@ -10,6 +10,7 @@
 # printed, and the exit status would be grep's 1 rather than the wrapped
 # command's.  (The temporary files would still be removed, by `cronic`'s EXIT
 # trap, so the left-behind-files check in `check` does not detect that bug.)
+#
 # The checks that catch that bug are the "trace-only stderr" checks that use
 # `stderr-lines` with a literal PS4, and the "nested trace in stderr" check,
 # whose bash script writes its trace lines to stderr whatever the bash version.
@@ -139,6 +140,7 @@ chmod +x "$work/stderr-lines"
 # not error output, whatever PS4 is.  An earlier bash, such as macOS's
 # /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
 # PS4 contains an expansion or an escape, so it reports them as error output.
+#
 # This tests for the features themselves, rather than for the bash version
 # that `cronic` tests for, so that it detects a wrong version test in `cronic`.
 # `cronic` and the bash scripts above all run under the first `bash` in PATH,
@@ -450,20 +452,12 @@ check "exported SHELLOPTS with allexport, command's variable exported" 0 silent 
 # produces no output at all:  `cronic` does not trace itself.
 check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
   "$default_shellopts:xtrace" "$work/trace-only" 0
-# With xtrace exported, the report's trace section is the trace of running the
-# command, followed by the command's own trace, with nothing that `cronic` did
-# to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
-# it appears under "TRACE OUTPUT".
-# Bash quotes a word in a trace line if it contains a space or a shell
-# metacharacter, so let bash write the expected trace of the path, which is
-# under the caller's TMPDIR.  The trace goes to a separate file descriptor,
-# and stderr is discarded, so that an unrelated warning from bash, such as for
-# an uninstalled locale, is not part of the expected trace.
-# shellcheck disable=SC2016 # The expansion is for bash to do.
-traced_command=$(bash -c 'BASH_XTRACEFD=3; set -x; : -- "$1" 0' sh "$work/trace-and-stderr" 3>&1 2> /dev/null | sed 's/^+ : /+ command /')
+# With xtrace exported, the report's trace section is the command's own trace,
+# with nothing that `cronic` did to set up the command's options or to run the
+# command, such as its `command -- ...` line.  Bash writes the trace via
+# BASH_XTRACEFD, so it appears under "TRACE OUTPUT".
 cat > "$work/trace-section.goal" << EOF
 TRACE OUTPUT:
-$traced_command
 + set -x
 + echo 'a real error'
 + exit 0
@@ -472,6 +466,19 @@ EOF
 check_trace_section "exported SHELLOPTS with xtrace, trace output" \
   "$work/trace-section.goal" \
   "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+# With xtrace exported, the trace lines of a builtin are nested 1 deeper than
+# the builtin, whose own trace is the `command -- ...` line, which is not
+# reported.  The trace of an EXIT trap that the builtin sets is reported, even
+# if the builtin returns normally rather than calling `exit`.
+cat > "$work/exit-trap-trace-section.goal" << 'EOF'
+TRACE OUTPUT:
+++ trap 'echo trapped >&2' EXIT
+++ echo trapped
+
+EOF
+check_trace_section "exported SHELLOPTS with xtrace, EXIT trap of a builtin" \
+  "$work/exit-trap-trace-section.goal" \
+  "$CRONIC" "$default_shellopts:xtrace" eval "trap 'echo trapped >&2' EXIT"
 
 CRONIC="$real_cronic"
 
@@ -512,12 +519,11 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
-# `bash -x cronic` does not trace `cronic` itself, but does trace running the
-# command.  The command does not inherit xtrace, because SHELLOPTS is not
-# exported, so its own `set -x` is not traced.
+# `bash -x cronic` traces neither `cronic` itself nor its `command -- ...` line.
+# The command does not inherit xtrace, because SHELLOPTS is not exported, so
+# its own `set -x` is not traced.
 cat > "$work/bash-x-trace-section.goal" << EOF
 TRACE OUTPUT:
-$traced_command
 + echo 'a real error'
 + exit 0
 

@@ -10,23 +10,26 @@
 #   execution traces from the error output, so jobs can be run with execution
 #   tracing to aid forensic debugging. Apart from its options, Cronic simply
 #   executes its arguments.
+#
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
-# The options and the treatment of execution traces are documented in function
-# `cronic_help`; run `cronic --help`.
+#
+# For usage information, run `cronic --help`.
+#
+# Limitations, which `cronic --help` documents:  every run produces output if
+# the caller exports the verbose option or runs `bash -v cronic`, or if the file
+# named by BASH_ENV writes to stderr.
+
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
 
-# Limitations, which `cronic --help` documents:  every run produces output if
-# the caller exports the verbose option or runs `bash -v cronic`, or if the file
-# named by BASH_ENV writes to stderr.
-
 # Save the caller's settings of the options that this script changes, as the
 # letters that `$-` uses for them, so that the command runs with them.  The
 # command inherits every other option, including every `shopt` option,
 # unchanged.  If this script ever changes another option, add its letter here.
+#
 # Then turn off xtrace, so that this script does not trace itself to stderr,
 # which would make every run produce output, and allexport, so that this script
 # does not export its variables to the command.  `cronic_caller_flags`, which is
@@ -76,6 +79,8 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "If the caller's xtrace is on, cronic's own trace of running COMMAND is"
+  echo "removed from the TRACE OUTPUT; that works only if PS4 contains no newline."
   echo "Do not run \"bash -v cronic\", nor export the verbose option (\"set -v\") via"
   echo "SHELLOPTS: bash would echo the lines of this script (and, if exported, of a"
   echo "bash COMMAND) to stderr, so every run would produce output."
@@ -192,20 +197,25 @@ fi
 
 # The command runs in a subshell rather than in this shell, so that a builtin
 # such as `exit` or `exec` cannot end this script before it reports.
+#
 # The subshell restores the caller's options that this script changed.
 # Otherwise, if the caller exported SHELLOPTS, a bash script that reads an unset
 # variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.  Of
 # those options, only nounset is on here, so a single `set` command turns it off
 # and turns on the caller's, so that the restoring is not traced.  The `:+`
 # avoids a bare `-`, which has a special meaning to `set`.
+#
 # `command` because a function of this script, such as `cronic_usage`, would
 # otherwise run in place of a program of the same name.
+#
 # The redirections apply to the whole subshell, so that they also capture what
 # it writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.
+#
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
 # command inherits.
+#
 # Limitation:  if the command is a builtin that runs code in the subshell, such
 # as `source` or `eval`, that code runs with the caller's options even if the
 # caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
@@ -220,6 +230,18 @@ set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
+
+# With the caller's xtrace on, the first line of the trace file is the trace of
+# the `command -- ...` line above, which is this script's, not the command's,
+# so it is removed.  (The `set` command before it is not traced.)  For a builtin
+# COMMAND, such as `exit`, that line is the builtin's own trace.  If PS4
+# contains a newline, then that trace spans several lines, of which only the
+# first is removed.  A bash before 4.1 writes the trace to stderr, and that line
+# is not removed from it.
+if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
+  sed 1d "$cronic_xtrace" > "$cronic_xtrace.reduced"
+  cronic_xtrace=$cronic_xtrace.reduced
+fi
 
 # End stderr with a newline, if it is not empty.  `grep` ends its output with a
 # newline, so without this, the filtered stderr would differ from the
@@ -282,11 +304,13 @@ fi
 # For example, git does this, and the POSIX standard requires it for make.
 # The full stderr output is shown, but file cronic_reduced_err is checked for
 # emptiness below.
+#
 # GNU make names itself by the name it was invoked as, without the directory,
 # such as `make`, `gmake`, `gnumake` (on macOS), or `mingw32-make`.  It quotes
 # the directory as 'dir' from version 4.0, and as `dir' before then; macOS's
 # /usr/bin/make is GNU make 3.81.
 # TODO: Expand this.
+#
 # `|| [ $? -eq 1 ]` because `grep -v` exits with status 1 when it selects no
 # lines.  If `grep` fails (status 2), the unreduced stderr is used.
 grep -a -E -v \
