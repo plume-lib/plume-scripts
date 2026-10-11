@@ -10,6 +10,7 @@
 # printed, and the exit status would be grep's 1 rather than the wrapped
 # command's.  (The temporary files would still be removed, by `cronic`'s EXIT
 # trap, so the left-behind-files check in `check` does not detect that bug.)
+#
 # The checks that catch that bug are the "trace-only stderr" checks that use
 # `stderr-lines` with a literal PS4, and the "nested trace in stderr" check,
 # whose bash script writes its trace lines to stderr whatever the bash version.
@@ -139,6 +140,7 @@ chmod +x "$work/stderr-lines"
 # not error output, whatever PS4 is.  An earlier bash, such as macOS's
 # /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
 # PS4 contains an expansion or an escape, so it reports them as error output.
+#
 # This tests for the features themselves, rather than for the bash version
 # that `cronic` tests for, so that it detects a wrong version test in `cronic`.
 # `cronic` and the bash scripts above all run under the first `bash` in PATH,
