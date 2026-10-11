@@ -28,7 +28,7 @@ if [[ -n $cronic_caller_function_names ]]; then
   cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
 fi
 while builtin read -r cronic_name; do
-  [[ -z $cronic_name ]] || unset -f -- "$cronic_name"
+  [[ -z $cronic_name ]] || unset -f -- "$cronic_name" || exit 1
 done <<< "$(builtin compgen -A function)"
 [ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
 
@@ -90,9 +90,11 @@ done <<< "$(builtin compgen -A function)"
 # name, such as `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT
 # turns posix mode off again, unless the caller's shell was already in posix
 # mode.  Their error output is not discarded:  if `unset` cannot remove a
-# function, such as one that BASH_ENV made readonly, then in posix mode bash
-# reports the error and exits, so cron sends email rather than failing
-# silently.
+# function, such as one that BASH_ENV made readonly, then bash reports the
+# error and this script exits, so cron sends email rather than failing
+# silently.  The exit is explicit because only bash 5.3 or later exits when, in
+# posix mode, `unset` fails on a readonly function.  `exit` is a special
+# builtin, so in posix mode no function runs in its place.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
