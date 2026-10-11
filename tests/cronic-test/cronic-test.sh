@@ -20,6 +20,27 @@
 
 set -eu
 
+# Do not let the user's environment file run in `cronic` or in the bash commands
+# below.  It could write to stderr, especially when an exported SHELLOPTS turns
+# on `-u` for it.
+unset BASH_ENV
+# Use the default PS4, which the goal files and the trace lines below assume.
+unset PS4
+# Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
+# to the commands below.  If SHELLOPTS is exported, then remove it from the
+# environment.  bash makes SHELLOPTS read-only, so it cannot be unset;
+# instead, this script runs again under the same bash, with SHELLOPTS removed
+# from its environment, so that the caller's options do not apply to this script
+# either.  Any other shell ignores SHELLOPTS, so it can simply unset it.
+# `printenv` matches the name exactly, unlike a search of the output of `env`,
+# which can match a line within the value of another variable.
+if printenv SHELLOPTS > /dev/null; then
+  if [ -n "${BASH:-}" ]; then
+    exec env -u SHELLOPTS "$BASH" "$0" "$@"
+  fi
+  unset SHELLOPTS
+fi
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
 
@@ -127,9 +148,110 @@ printf '%s\n' "$@" 1>&2
 EOF
 chmod +x "$work/stderr-lines"
 
+# A bash command that reads an unset variable.
+cat > "$work/read-unset" << 'EOF'
+#!/usr/bin/env bash
+unset CRONIC_TEST_UNSET_VARIABLE
+echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
+exit "$1"
+EOF
+chmod +x "$work/read-unset"
+
+# Runs `cronic` with SHELLOPTS set to its first argument and exported.
+cat > "$work/cronic-with-shellopts" << 'EOF2'
+#!/usr/bin/env bash
+shellopts="$1"
+shift
+exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
+EOF2
+chmod +x "$work/cronic-with-shellopts"
+
+# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
+# (bash 4.1 or later) writes its trace lines to a separate file, so they are
+# not error output, whatever PS4 is.  An earlier bash, such as macOS's
+# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
+# PS4 contains an expansion or an escape, so it reports them as error output.
+# This tests for the features themselves, rather than for the bash version
+# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
+# `cronic` and the bash scripts above all run under the first `bash` in PATH,
+# so that is the bash tested here.  The probe checks whether a trace line
+# reaches the file, rather than whether bash writes to stderr, because bash can
+# write an unrelated warning to stderr, such as for an uninstalled locale.
+if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
+  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
+  bash_has_xtracefd=true
+else
+  bash_has_xtracefd=false
+fi
+
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
   find "$TMPDIR" -mindepth 1 -maxdepth 1 2> /dev/null | sort
+}
+
+# run_cronic DESCRIPTION EXPECTED-STATUS COMMAND...: runs COMMAND, which runs
+# `cronic`, with its standard output in "$work/output" and its error output in
+# "$work/stderr".  If COMMAND exits with a status other than EXPECTED-STATUS,
+# or leaves temporary files behind, then reports a failure and returns 1.
+run_cronic() {
+  description="$1"
+  expected_status="$2"
+  shift 2
+
+  before="$(temp_files)"
+  actual_status=0
+  "$@" > "$work/output" 2> "$work/stderr" || actual_status=$?
+  after="$(temp_files)"
+
+  if [ "$actual_status" != "$expected_status" ]; then
+    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
+    cat "$work/output" "$work/stderr"
+    status=1
+    return 1
+  fi
+  if [ "$before" != "$after" ]; then
+    echo "FAIL: $description: temporary files were left behind:"
+    echo "$after"
+    status=1
+    return 1
+  fi
+}
+
+# compare_streams DESCRIPTION OUTPUT OUTPUT-GOAL STDERR-GOAL: after run_cronic,
+# reports success if the file OUTPUT, which is `cronic`'s output or a part of
+# it, has the contents of OUTPUT-GOAL, and `cronic`'s stderr has the contents of
+# STDERR-GOAL.
+compare_streams() {
+  if cmp -s "$3" "$2" && cmp -s "$4" "$work/stderr"; then
+    echo "PASS: $1"
+  else
+    echo "FAIL: $1: output:"
+    cat "$work/output"
+    echo "stderr:"
+    cat "$work/stderr"
+    status=1
+  fi
+}
+
+# check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
+# runs `cronic`, and checks that it exits with status 0, leaves no temporary
+# files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
+# section, through the following empty line, is the contents of GOAL-FILE.
+# Skips the check if bash lacks BASH_XTRACEFD, so that the report has no
+# "TRACE OUTPUT".
+check_trace_section() {
+  description="$1"
+  goal="$2"
+  shift 2
+
+  if [ "$bash_has_xtracefd" = false ]; then
+    echo "SKIP: $description, because bash lacks BASH_XTRACEFD"
+    return 0
+  fi
+
+  run_cronic "$description" 0 "$@" || return 0
+  sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+  compare_streams "$description" "$work/trace-section" "$goal" /dev/null
 }
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
@@ -137,26 +259,18 @@ temp_files() {
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
 # "report:TEXT", which also requires TEXT to appear in the report,
 # "report-once:TEXT", which also requires TEXT to appear on exactly one line of
-# the report, "message:TEXT", which requires TEXT to appear in output that need
-# not be a report, or "exactly:FILE", which requires the output to be the
-# contents of FILE.
+# the report, or "message:TEXT", which requires TEXT to appear in output that
+# need not be a report.
 check() {
   description="$1"
   expected_status="$2"
   expected_output="$3"
   shift 3
 
-  before="$(temp_files)"
-  actual_status=0
-  "$CRONIC" "$@" > "$work/output" 2>&1 || actual_status=$?
-  after="$(temp_files)"
-
-  if [ "$actual_status" != "$expected_status" ]; then
-    echo "FAIL: $description: exit status $actual_status, expected $expected_status"
-    cat "$work/output"
-    status=1
-    return
-  fi
+  run_cronic "$description" "$expected_status" "$CRONIC" "$@" || return 0
+  # The checks below examine both outputs, because `cronic` writes its usage
+  # messages to stderr.
+  cat "$work/stderr" >> "$work/output"
 
   case "$expected_output" in
     silent)
@@ -195,23 +309,7 @@ check() {
         return
       fi
       ;;
-    exactly:*)
-      if ! cmp -s "${expected_output#*:}" "$work/output"; then
-        echo "FAIL: $description: expected the output to be the contents of" \
-          "${expected_output#*:}, but got:"
-        cat "$work/output"
-        status=1
-        return
-      fi
-      ;;
   esac
-
-  if [ "$before" != "$after" ]; then
-    echo "FAIL: $description: temporary files were left behind:"
-    echo "$after"
-    status=1
-    return
-  fi
 
   echo "PASS: $description"
 }
@@ -354,104 +452,61 @@ check "EXIT trap of a traced command" 3 "report:^++* false$" \
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
   eval ': "$cronic_test_unset_variable"'
-# When the caller exports SHELLOPTS, a bash script runs with the caller's
-# options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
-# the script runs no startup file.
-# Creates "$work/cronic-with-NAME", which runs `cronic` with SHELLOPTS exported,
-# after `set OPTION` if OPTION is given.  `cronic` reads no startup file, so
-# that the user's BASH_ENV file does not run with the option on.  The
-# wrapper's own trace goes to /dev/null, so that with `set -x`, any trace in
-# the output comes from `cronic`.
-make_cronic_wrapper() { # NAME [OPTION]
-  cat > "$work/cronic-with-$1" << EOF
-#!/bin/bash
-unset BASH_ENV
-exec 3>&2 2> /dev/null
-${2:+set $2}
-export SHELLOPTS
-exec "$CRONIC" "\$@" 2>&3 3>&-
-EOF
-  chmod +x "$work/cronic-with-$1"
-}
-make_cronic_wrapper shellopts
-make_cronic_wrapper nounset -u
-make_cronic_wrapper errexit -e
-make_cronic_wrapper allexport -a
-make_cronic_wrapper xtrace -x
-make_cronic_wrapper verbose -v
-make_cronic_wrapper xtrace-verbose -xv
-saved_cronic="$CRONIC"
+
+# When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
+# the wrapped command, but the caller's options do.
+REAL_CRONIC="$CRONIC"
+export REAL_CRONIC
 CRONIC="$work/cronic-with-shellopts"
+default_shellopts=braceexpand:hashall:interactive-comments
+check "exported SHELLOPTS, command reads an unset variable" 0 silent \
+  "$default_shellopts" "$work/read-unset" 0
+check "exported SHELLOPTS, command ignores a failure" 0 silent \
+  "$default_shellopts" bash -c 'false; :'
+check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
+  "report:unbound variable" \
+  "$default_shellopts:nounset" "$work/read-unset" 0
+check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
+  "$default_shellopts:errexit" bash -c 'false; :'
+# With allexport exported, `cronic` does not export its own variables to the
+# command, but a variable that the command assigns is exported.
+check "exported SHELLOPTS with allexport, no cronic variables exported" 0 silent \
+  "$default_shellopts:allexport" sh -c '! env | grep -q "^cronic_"'
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
-check "bash script with an unset variable, SHELLOPTS exported" 0 silent \
-  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
-check "bash script with a failing command, SHELLOPTS exported" 0 silent \
-  env BASH_ENV= bash -c 'false; true'
-CRONIC="$work/cronic-with-nounset"
-# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
-check "bash script with an unset variable, caller's nounset exported" 127 \
-  "report:cronic_test_unset_variable" \
-  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
-CRONIC="$work/cronic-with-errexit"
-check "bash script with a failing command, caller's errexit exported" 1 report \
-  env BASH_ENV= bash -c 'false; true'
-# When the caller exports allexport, `cronic` does not export its own variables
-# to the command, but a variable that the command assigns is exported.
-CRONIC="$work/cronic-with-allexport"
-check "no cronic variables exported, caller's allexport exported" 0 silent \
-  sh -c '! env | grep -q "^cronic_"'
-# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
-check "command's variable exported, caller's allexport exported" 0 silent \
+check "exported SHELLOPTS with allexport, command's variable exported" 0 silent \
+  "$default_shellopts:allexport" \
   eval 'cronic_test_variable=1; sh -c "[ \"\$cronic_test_variable\" = 1 ]"'
-# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
-# (bash 4.1 or later) writes its trace lines to a separate file, so they are
-# not error output, whatever PS4 is.  An earlier bash, such as macOS's
-# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
-# PS4 contains an expansion or an escape, so it reports them as error output.
-# This tests for the features themselves, rather than for the bash version
-# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
-# `cronic` and the bash scripts above all run under the first `bash` in PATH,
-# so that is the bash tested here.  The probe checks whether a trace line
-# reaches the file, rather than whether bash writes to stderr, because bash can
-# write an unrelated warning to stderr, such as for an uninstalled locale.
-if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
-  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
-  bash_has_xtracefd=true
-else
-  bash_has_xtracefd=false
+# With xtrace exported, a successful command with only trace output on stderr
+# produces no output at all:  `cronic` does not trace itself.
+check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
+  "$default_shellopts:xtrace" "$work/trace-only" 0
+# With xtrace exported, the report's trace section is the command's own trace,
+# with nothing that `cronic` did to set up the command's options or to run the
+# command, such as its `command -- ...` line.  Bash writes the trace via
+# BASH_XTRACEFD, so it appears under "TRACE OUTPUT".
+cat > "$work/trace-section.goal" << EOF
+TRACE OUTPUT:
++ set -x
++ echo 'a real error'
++ exit 0
+
+EOF
+check_trace_section "exported SHELLOPTS with xtrace, trace output" \
+  "$work/trace-section.goal" \
+  "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+# With xtrace exported, the trace lines of a builtin are nested 1 deeper than
+# the builtin, whose own trace is the `command -- ...` line.  Under bash 4.1 or
+# later, that line is discarded.
+check "exported SHELLOPTS with xtrace, builtin that fails" 1 \
+  "report:^++ false$" "$default_shellopts:xtrace" eval false
+if [ "$bash_has_xtracefd" = true ] && grep -q -e "command --" "$work/output"; then
+  echo "FAIL: exported SHELLOPTS with xtrace, builtin that fails: the report" \
+    "traces cronic itself:"
+  cat "$work/output"
+  status=1
 fi
-# When the caller exports xtrace, `cronic` traces only the command, not itself.
-# A bash before 4.1 writes the trace to stderr, so `cronic` cannot discard the
-# trace of its `command -- ...` line.
-CRONIC="$work/cronic-with-xtrace"
-# check_xtrace DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: like
-# `check`, and also checks that the output does not trace `cronic` itself.
-check_xtrace() {
-  check "$@"
-  if grep -q -e cronic_ "$work/output" \
-    || { [ "$bash_has_xtracefd" = true ] && grep -q -e "command --" "$work/output"; }; then
-    echo "FAIL: $1: the report traces cronic itself:"
-    cat "$work/output"
-    status=1
-  fi
-}
-check_xtrace "bash script, caller's xtrace exported" 0 silent \
-  env BASH_ENV= bash -c 'true'
-check_xtrace "bash script that fails, caller's xtrace exported" 1 \
-  "report:^+ false$" env BASH_ENV= bash -c 'false'
-# A builtin's trace lines are nested 1 deeper than the builtin.
-check_xtrace "builtin that fails, caller's xtrace exported" 1 \
-  "report:^++ false$" eval false
-# When the caller exports verbose, bash echoes the lines of `cronic` through
-# the block that turns verbose off, but nothing more.  With xtrace on as well,
-# `cronic` runs the command through a function that it defines with `eval`.
-sed '/^} 2> \/dev\/null$/q' "$saved_cronic" > "$work/expected"
-for options in verbose xtrace-verbose; do
-  CRONIC="$work/cronic-with-$options"
-  check "caller's $options exported: cronic echoes only its first lines" 0 \
-    "exactly:$work/expected" true
-done
-CRONIC="$saved_cronic"
+
+CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
@@ -489,6 +544,19 @@ done
 check "caller's exported variables" 0 silent "$work/check-variables" $exported_names
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
+
+# `bash -x cronic` traces neither `cronic` itself nor its `command -- ...` line.
+# The command does not inherit xtrace, because SHELLOPTS is not exported, so
+# its own `set -x` is not traced.
+cat > "$work/bash-x-trace-section.goal" << EOF
+TRACE OUTPUT:
++ echo 'a real error'
++ exit 0
+
+EOF
+check_trace_section "bash -x cronic, trace output" \
+  "$work/bash-x-trace-section.goal" \
+  bash -x "$CRONIC" "$work/trace-and-stderr" 0
 
 export PS4
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
