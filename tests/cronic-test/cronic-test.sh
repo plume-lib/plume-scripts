@@ -558,6 +558,33 @@ check "function from BASH_ENV is not exported" 0 silent \
 unset BASH_ENV
 CRONIC="$REAL_CRONIC"
 
+# An alias that BASH_ENV defined does not change the caller's exported function,
+# just as it would not if bash ran the function directly.  BASH_ENV turns on
+# posix mode, because bash turns off expand_aliases when it leaves posix mode.
+# The caller sets BASH_ENV only for `cronic`, so that the caller's own
+# definition of the function contains no alias.
+cat > "$work/cronic-with-alias" << 'EOF'
+#!/bin/bash
+print_hi() {
+  echo hi
+}
+export -f print_hi
+BASH_ENV="$1"
+export BASH_ENV
+shift
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-alias"
+cat > "$work/bash-env" << 'EOF'
+shopt -s expand_aliases
+alias echo='echo ALIASED'
+set -o posix
+EOF
+CRONIC="$work/cronic-with-alias"
+check "alias from BASH_ENV does not change exported function" 1 "report:^hi$" \
+  "$work/bash-env" bash -c 'print_hi; false'
+CRONIC="$REAL_CRONIC"
+
 # A function that BASH_ENV made readonly cannot be removed, so `cronic` does not
 # run the command, but it fails with an error message rather than silently.
 echo 'grep() { echo "function grep ran"; }; readonly -f grep' > "$work/bash-env"

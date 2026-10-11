@@ -9,6 +9,7 @@
   fi
   set +vx
 } 2> /dev/null
+\unalias -a
 cronic_exported=$(export -pf)
 cronic_caller_functions=
 if [[ $'\n'$cronic_exported$'\n' == *$'\n'"export -f builtin"$'\n'* ]]; then
@@ -27,7 +28,7 @@ if [[ -n $cronic_caller_function_names ]]; then
   cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
 fi
 while builtin read -r cronic_name; do
-  unset -f -- "$cronic_name"
+  [[ -z $cronic_name ]] || unset -f -- "$cronic_name"
 done <<< "$(builtin compgen -A function)"
 [ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
 
@@ -63,6 +64,11 @@ done <<< "$(builtin compgen -A function)"
 # input, which would go to this script's stderr, so that cron would send email
 # for every run.  It comes before any comment, because bash echoes every line
 # that it reads while verbose is on.  The redirection discards its own trace.
+# The next command removes every alias, such as one that BASH_ENV defined, so
+# that no alias changes this script's commands or the caller's functions, which
+# the command gets back by re-parsing their definitions; the backslash stops an
+# alias named `unalias` from applying.  Bash imports the caller's exported
+# functions before it runs BASH_ENV, so their bodies never contain an alias.
 # The commands after it save the definitions of the caller's exported
 # functions, which bash has imported, and remove every function, including any
 # that BASH_ENV defined, so that none runs in place of a builtin or program that
