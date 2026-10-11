@@ -535,11 +535,12 @@ check "exported function does not see unexported variable from BASH_ENV" 0 \
   silent "$default_shellopts" report_cronic_variables
 unset BASH_ENV
 # Under the caller's allexport, the command's environment contains none of
-# `cronic`'s variables, nor the POSIXLY_CORRECT that `cronic` assigns.
-# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+# `cronic`'s variables, nor the POSIXLY_CORRECT that `cronic` assigns.  The
+# command is `bash` rather than `sh`, because when `sh` is bash, as on macOS,
+# it assigns POSIXLY_CORRECT itself, and allexport exports it.
 check "exported SHELLOPTS with allexport, environment has no cronic variable" 0 \
   silent "$default_shellopts:allexport" \
-  sh -c 'env | grep -E "^(cronic_|POSIXLY_CORRECT=)" >&2; :'
+  bash -c 'env | grep -E "^(cronic_|POSIXLY_CORRECT=)" >&2; :'
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -562,8 +563,10 @@ for name in $variable_names; do
     exported_names="$exported_names $exported"
   done
 done
+# `check-variables` runs under bash rather than `sh`, because when `sh` is
+# bash, as on macOS, it replaces the caller's POSIXLY_CORRECT by "y".
 cat > "$work/check-variables" << 'EOF'
-#!/bin/sh
+#!/usr/bin/env bash
 for name; do
   eval "value=\${$name-}"
   [ "$value" = "caller's $name" ] || exit 3
