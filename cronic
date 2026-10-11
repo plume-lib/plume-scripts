@@ -10,22 +10,25 @@
 #   execution traces from the error output, so jobs can be run with execution
 #   tracing to aid forensic debugging. Apart from its options, Cronic simply
 #   executes its arguments.
+#
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
-# The options and the treatment of execution traces are documented in function
-# `cronic_help`; run `cronic --help`.
+#
+# For usage information, run `cronic --help`.
+#
 # Names that start with `cronic_` are reserved for this script:  COMMAND does
 # not see a variable or function with such a name, even one that the caller
 # exported.  This script assumes that bash has the `compgen` builtin, which is
 # absent only if bash was built with `--disable-progcomp`.
+#
+# Limitations, which `cronic --help` documents:  every run produces output if
+# the caller exports the verbose option or runs `bash -v cronic`, or if the file
+# named by BASH_ENV writes to stderr.
+
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
-
-# Limitations, which `cronic --help` documents:  every run produces output if
-# the caller exports the verbose option or runs `bash -v cronic`, or if the file
-# named by BASH_ENV writes to stderr.
 
 # Save the caller's settings of the options that this script changes, as the
 # letters that `$-` uses for them, so that the command runs with them.  They
@@ -34,6 +37,7 @@
 # every `shopt` option, unchanged.  If this script ever changes another option,
 # add its letter here.  Posix mode, which has no letter, is saved in
 # `cronic_posix_off`, as the `set` arguments that turn it off again.
+#
 # Then turn on posix mode, by assigning POSIXLY_CORRECT, so that a special
 # builtin, such as `export`, `set`, or `unset`, runs in place of a function of
 # the same name that the caller exported.  Then turn off xtrace, so that this
@@ -146,6 +150,8 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "If the caller's xtrace is on, cronic's own trace of running COMMAND is"
+  echo "removed from the TRACE OUTPUT; that works only if PS4 contains no newline."
   echo "Do not run \"bash -v cronic\", nor export the verbose option (\"set -v\") via"
   echo "SHELLOPTS: bash would echo the lines of this script (and, if exported, of a"
   echo "bash COMMAND) to stderr, so every run would produce output."
@@ -263,12 +269,8 @@ fi
 # The command runs in a subshell rather than via `exec`, so that it can be a
 # shell builtin or an exported shell function, and rather than in this shell,
 # so that a builtin such as `exit` or `exec` cannot end this script before it
-# reports.  The redirections apply to the whole subshell, so that they also
-# capture what it writes after the command finishes, such as the output of an
-# EXIT trap that the command sets.  The subshell is not the operand of `||` or
-# the like, because then bash would ignore `set -e` throughout the subshell,
-# including in a shell function that it runs, and would remove "errexit" from
-# the SHELLOPTS that the command inherits.
+# reports.
+#
 # The subshell unsets this script's functions, which are the only ones that
 # remain, and every variable whose name starts with `cronic_`, so that the
 # command does not see them, and so that a function does not run in place of a
@@ -277,31 +279,26 @@ fi
 # variables before `unset` removes them.  It then defines the caller's
 # functions, which can replace a builtin, so the remaining commands run in
 # posix mode, as special builtins.
-# The last command restores the caller's options that this script changed.
-# Otherwise, if the caller exported SHELLOPTS, a bash script that reads an unset
-# variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.  Of
-# those options, only nounset and posix mode are on here, so a single `set`
-# command turns them off (posix mode only if the caller's shell was not in
-# posix mode) and turns on the caller's, so that the restoring is not traced.
-# The `:+` avoids a bare `-`, which has a special meaning to `set`.  That
-# command never turns posix mode off and on again, because doing so would
+#
+# The last command of the `eval` restores the caller's options that this script
+# changed.  Otherwise, if the caller exported SHELLOPTS, a bash script that
+# reads an unset variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash)
+# would fail.  Of those options, only nounset and posix mode are on here, so a
+# single `set` command turns them off (posix mode only if the caller's shell
+# was not in posix mode) and turns on the caller's, so that the restoring is
+# not traced.  The `:+` avoids a bare `-`, which has a special meaning to `set`.
+# That command never turns posix mode off and on again, because doing so would
 # replace the caller's value of POSIXLY_CORRECT by "y"; turning posix mode off
 # unsets POSIXLY_CORRECT.
-# With the caller's xtrace on, bash traces the line that runs the command,
-# which is this script's, not the command's.  So under bash 4.1 or later, the
-# subshell points the trace descriptor at /dev/null, and the redirection that
-# points it back at the trace file is on the line that runs the command, which
-# bash traces before performing the redirections.  That line is in a function,
-# `cronic_command`, rather than in an `eval`, because an `eval` would add a
-# level of nesting to every trace line of a builtin COMMAND.  The function is
-# defined by `eval` because the descriptor that a redirection changes, on the
-# left of the operator, must be written literally; only the right side may be
-# a variable.  The function is defined after the caller's functions, and it
-# unsets itself and restores the caller's options while the trace still goes
-# to /dev/null, so that the command does not see it.  The trace of a builtin
-# COMMAND, such as `exit`, is the line that runs it, so it is discarded too.
-# A bash before 4.1 writes the trace to stderr, which cannot be pointed at
-# /dev/null without discarding the command's error output.
+#
+# The redirections apply to the whole subshell, so that they also capture what
+# it writes after the command finishes, such as the output of an EXIT trap that
+# the command sets.
+#
+# The subshell is not the operand of `||` or the like, because then bash would
+# ignore `set -e` throughout the subshell, including in a shell function that it
+# runs, and would remove "errexit" from the SHELLOPTS that the command inherits.
+#
 # Limitation:  if the command is a builtin that runs code in the subshell, such
 # as `source` or `eval`, that code runs with the caller's options even if the
 # caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
@@ -310,32 +307,30 @@ set +e
 (
   # shellcheck disable=SC2046  # each name is a separate argument.
   unset -f $(compgen -A function)
-  cronic_setup="unset -v \"\${!cronic_@}\"
+  eval "unset -v \"\${!cronic_@}\"
     $cronic_caller_functions
     ${cronic_posix_off:+POSIXLY_CORRECT=y}
-    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}"
-  cronic_restore="set $cronic_posix_off +u${cronic_caller_flags:+ -$cronic_caller_flags}"
-  if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
-    eval "exec {cronic_saved_fd}>&$cronic_xtrace_fd $cronic_xtrace_fd> /dev/null"
-    # shellcheck disable=SC2154 # The `eval` above assigns cronic_saved_fd.
-    eval "$cronic_setup
-      cronic_command() {
-        unset -f cronic_command
-        $cronic_restore
-        \"\$@\" $cronic_xtrace_fd>&$cronic_saved_fd $cronic_saved_fd>&-
-      }"
-    cronic_command "$@"
-  else
-    eval "$cronic_setup
-      $cronic_restore"
-    "$@"
-  fi
+    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}
+    set $cronic_posix_off +u${cronic_caller_flags:+ -$cronic_caller_flags}"
+  "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
+
+# With the caller's xtrace on, the first line of the trace file is the trace of
+# the `"$@"` line above, which is this script's, not the command's, so it is
+# removed.  (The `set` command before it is not traced.)  For a builtin
+# COMMAND, such as `exit`, that line is the builtin's own trace.  If PS4
+# contains a newline, then that trace spans several lines, of which only the
+# first is removed.  A bash before 4.1 writes the trace to stderr, and that line
+# is not removed from it.
+if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
+  sed 1d "$cronic_xtrace" > "$cronic_xtrace.reduced"
+  cronic_xtrace=$cronic_xtrace.reduced
+fi
 
 # End stderr with a newline, if it is not empty.  `grep` ends its output with a
 # newline, so without this, the filtered stderr would differ from the
@@ -398,11 +393,13 @@ fi
 # For example, git does this, and the POSIX standard requires it for make.
 # The full stderr output is shown, but file cronic_reduced_err is checked for
 # emptiness below.
+#
 # GNU make names itself by the name it was invoked as, without the directory,
 # such as `make`, `gmake`, `gnumake` (on macOS), or `mingw32-make`.  It quotes
 # the directory as 'dir' from version 4.0, and as `dir' before then; macOS's
 # /usr/bin/make is GNU make 3.81.
 # TODO: Expand this.
+#
 # `|| [ $? -eq 1 ]` because `grep -v` exits with status 1 when it selects no
 # lines.  If `grep` fails (status 2), the unreduced stderr is used.
 grep -a -E -v \

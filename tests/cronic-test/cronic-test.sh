@@ -10,6 +10,7 @@
 # printed, and the exit status would be grep's 1 rather than the wrapped
 # command's.  (The temporary files would still be removed, by `cronic`'s EXIT
 # trap, so the left-behind-files check in `check` does not detect that bug.)
+#
 # The checks that catch that bug are the "trace-only stderr" checks that use
 # `stderr-lines` with a literal PS4, and the "nested trace in stderr" check,
 # whose bash script writes its trace lines to stderr whatever the bash version.
@@ -47,6 +48,7 @@ status=0
 # not error output, whatever PS4 is.  An earlier bash, such as macOS's
 # /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
 # PS4 contains an expansion or an escape, so it reports them as error output.
+#
 # This tests for the features themselves, rather than for the bash version
 # that `cronic` tests for, so that it detects a wrong version test in `cronic`.
 # `cronic` and the bash scripts below all run under the first `bash` in PATH,
@@ -423,10 +425,6 @@ check "exec builtin" 3 report exec "$work/trace-only" 3
 check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
   trap 'echo "from the trap" >&2' EXIT
 check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
-# The trace of an EXIT trap that a command sets, after turning on xtrace
-# itself, is reported.
-check "EXIT trap of a traced command" 3 "report:^++* false$" \
-  eval 'set -x; trap false EXIT; exit 3'
 # A builtin runs with `set +u`, as it would in an ordinary shell.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
@@ -491,15 +489,32 @@ else
   echo "SKIP: exported SHELLOPTS with xtrace, trace output, because bash is older than 4.1"
 fi
 # With xtrace exported, the trace lines of a builtin are nested 1 deeper than
-# the builtin, whose own trace is the line that runs it.  Under bash 4.1 or
-# later, that line is discarded.
-check "exported SHELLOPTS with xtrace, builtin that fails" 1 \
-  "report:^++ false$" "$default_shellopts:xtrace" eval false
-if [ "$bash_has_xtracefd" = true ] && grep -q -e "^+ eval false$" "$work/output"; then
-  echo "FAIL: exported SHELLOPTS with xtrace, builtin that fails: the report" \
-    "traces cronic itself:"
-  cat "$work/output"
-  status=1
+# the builtin, whose own trace is the line that runs it, which is not reported.
+# The trace of an EXIT trap that the builtin sets is reported, even if the
+# builtin returns normally rather than calling `exit`.
+cat > "$work/exit-trap-trace-report.goal" << 'EOF'
+Cronic detected failure or error output for the command:
+eval trap 'echo trapped >&2' EXIT
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+trapped
+
+STANDARD OUTPUT:
+
+TRACE OUTPUT:
+++ trap 'echo trapped >&2' EXIT
+++ echo trapped
+
+END OF CRONIC OUTPUT.
+EOF
+if [ "$bash_has_xtracefd" = true ]; then
+  check_goals "exported SHELLOPTS with xtrace, EXIT trap of a builtin" \
+    "$work/exit-trap-trace-report.goal" /dev/null \
+    "$CRONIC" "$default_shellopts:xtrace" eval "trap 'echo trapped >&2' EXIT"
+else
+  echo "SKIP: exported SHELLOPTS with xtrace, EXIT trap of a builtin, because bash is older than 4.1"
 fi
 
 # The caller's `-e` applies within an exported shell function that is the
