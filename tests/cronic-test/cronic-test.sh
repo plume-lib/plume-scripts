@@ -344,33 +344,27 @@ check "builtin with an unset variable" 0 silent \
 # options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
 # the script runs no startup file.
 # Creates "$work/cronic-with-NAME", which runs `cronic` with SHELLOPTS exported,
-# after `set OPTION` if OPTION is given.
+# after `set OPTION` if OPTION is given.  `cronic` reads no startup file, so
+# that the user's BASH_ENV file does not run with the option on.  The
+# wrapper's own trace goes to /dev/null, so that with `set -x`, any trace in
+# the output comes from `cronic`.
 make_cronic_wrapper() { # NAME [OPTION]
-  {
-    echo "#!/bin/bash"
-    if [ $# -gt 1 ]; then
-      echo "set $2"
-    fi
-    echo "export SHELLOPTS"
-    echo "exec \"$CRONIC\" \"\$@\""
-  } > "$work/cronic-with-$1"
+  cat > "$work/cronic-with-$1" << EOF
+#!/bin/bash
+unset BASH_ENV
+exec 3>&2 2> /dev/null
+${2:+set $2}
+export SHELLOPTS
+exec "$CRONIC" "\$@" 2>&3 3>&-
+EOF
   chmod +x "$work/cronic-with-$1"
 }
 make_cronic_wrapper shellopts
 make_cronic_wrapper nounset -u
 make_cronic_wrapper errexit -e
 make_cronic_wrapper allexport -a
-# The wrapper's own trace goes to /dev/null, and `cronic` reads no startup
-# file, so that any trace in the output comes from `cronic`.
-cat > "$work/cronic-with-xtrace" << EOF
-#!/bin/bash
-unset BASH_ENV
-exec 3>&2 2> /dev/null
-set -x
-export SHELLOPTS
-exec "$CRONIC" "\$@" 2>&3 3>&-
-EOF
-chmod +x "$work/cronic-with-xtrace"
+make_cronic_wrapper xtrace -x
+make_cronic_wrapper verbose -v
 saved_cronic="$CRONIC"
 CRONIC="$work/cronic-with-shellopts"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
@@ -407,6 +401,17 @@ if grep -q cronic_ "$work/output"; then
 else
   echo "PASS: caller's xtrace exported: the report does not trace cronic itself"
 fi
+# When the caller exports verbose, bash echoes the lines of `cronic` through
+# the block that turns verbose off, but nothing more.
+"$work/cronic-with-verbose" true > "$work/output" 2>&1
+sed '/^} 2> \/dev\/null$/q' "$saved_cronic" > "$work/expected"
+if cmp -s "$work/expected" "$work/output"; then
+  echo "PASS: caller's verbose exported: cronic echoes only its first lines"
+else
+  echo "FAIL: caller's verbose exported: cronic echoes more than its first lines:"
+  cat "$work/output"
+  status=1
+fi
 CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -416,7 +421,7 @@ CRONIC="$saved_cronic"
 # The lowercase names that `cronic` assigns, such as `cronic_out`, are not
 # exported:  `cronic` does overwrite them, but environment variables
 # conventionally have uppercase names.
-variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
+variable_names=$(sed -n 's/^[{ ]*\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
 if [ -z "$variable_names" ]; then
   echo "FAIL: found no variables in $CRONIC"
   status=1
