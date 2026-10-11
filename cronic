@@ -17,6 +17,20 @@
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
+# If the caller exported SHELLOPTS with xtrace on, then this script would
+# trace its own commands, and that trace would be reported as the command's.
+# So this script turns xtrace off, and turns it back on for the command.
+case $- in
+  *x*) case $(declare -p SHELLOPTS) in
+    'declare -'*x*) cronic_inherited_xtrace=true ;;
+    *) cronic_inherited_xtrace=false ;;
+  esac ;;
+  *) cronic_inherited_xtrace=false ;;
+esac
+if $cronic_inherited_xtrace; then
+  set +x
+fi
+
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
@@ -164,15 +178,22 @@ fi
 # a builtin such as `exit` or `exec` cannot end this script before it reports,
 # and so that the command sees none of this script's state:  not its functions,
 # its unexported variables, its positional parameters, or its `set -eu`.  The
-command does see the caller's environment, including any functions that the
-caller exported, just as it would if the caller ran it directly.  The
+# command does see the caller's environment, including any functions that the
+# caller exported.  If the caller exported SHELLOPTS, then the command inherits
+# the caller's options, except that errexit and nounset are off.  The
 # redirections apply to the whole process, so that they also capture what it
 # writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.  The command is passed as a string of quoted words rather
 # than as positional parameters, so that a builtin such as `eval` sees no
 # positional parameters.  The leading `''` quotes the first word, so that it is
 # never read as a reserved word such as `time` or `if`, nor as an assignment.
+# The fresh bash's `$0` is this script's, so that its error messages name this
+# script rather than bash.
 cronic_command="''$(printf '%q ' "$@")"
+# Bash does not trace `set -x` itself, so the trace starts with the command.
+if $cronic_inherited_xtrace; then
+  cronic_command="set -x; $cronic_command"
+fi
 # A non-interactive bash runs the file named by BASH_ENV when it starts.  This
 # script already ran that file, so BASH_ENV is empty while the fresh bash
 # starts, and the command string then restores it.  Otherwise the file would
@@ -187,7 +208,7 @@ fi
 # `set +u` matters even though the command runs in a fresh bash:  if the
 # caller exported SHELLOPTS, then the fresh bash inherits this script's options.
 set +eu
-BASH_ENV='' "$BASH" -c "$cronic_command" > "$cronic_out" 2> "$cronic_trace"
+BASH_ENV='' "$BASH" -c "$cronic_command" "$0" > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -eu
 

@@ -291,6 +291,31 @@ CRONIC="$work/cronic-with-shellopts"
 check "builtin with an unset variable, SHELLOPTS exported" 0 silent \
   eval ': "$cronic_test_unset_variable"'
 CRONIC="$saved_cronic"
+# When the caller exports SHELLOPTS with xtrace on, the trace in the report
+# shows only what the command runs, and not what `cronic` runs.  The wrapper
+# discards its own stderr, which holds its own trace.
+cat > "$work/cronic-with-xtrace" << EOF
+#!/bin/bash
+exec 2> /dev/null
+set -x
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+chmod +x "$work/cronic-with-xtrace"
+CRONIC="$work/cronic-with-xtrace"
+check "SHELLOPTS exported with xtrace on" 1 report false
+CRONIC="$saved_cronic"
+if [ "$(grep '^+' "$work/output")" != "+ false" ]; then
+  echo "FAIL: SHELLOPTS exported with xtrace on: the trace is not just \"+ false\":"
+  cat "$work/output"
+  status=1
+fi
+# The command's `$0` is `cronic`'s, so that error messages name `cronic`.
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "command's \$0 is cronic's" 0 silent \
+  eval 'case $0 in */cronic) ;; *) exit 1 ;; esac'
+check "command not found names cronic" 127 "report:cronic: line 1: cronic-test-no-such-command: command not found" \
+  cronic-test-no-such-command
 # A builtin cannot see or change `cronic`'s variables or functions.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin cannot see cronic's variables" 0 silent \
