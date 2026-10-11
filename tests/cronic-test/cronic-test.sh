@@ -26,14 +26,6 @@ set -eu
 unset BASH_ENV
 # Use the default PS4, which the goal files and the trace lines below assume.
 unset PS4
-# Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
-# to the commands below.  If SHELLOPTS is exported, then run this script again
-# without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
-# `printenv` matches the name exactly, unlike a search of the output of `env`,
-# which can match a line within the value of another variable.
-if printenv SHELLOPTS > /dev/null; then
-  exec env -u SHELLOPTS sh "$0" "$@"
-fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
@@ -159,15 +151,6 @@ cat > "$work/stderr-lines" << 'EOF'
 printf '%s\n' "$@" 1>&2
 EOF
 chmod +x "$work/stderr-lines"
-
-# A bash command that reads an unset variable.
-cat > "$work/read-unset" << 'EOF'
-#!/bin/bash
-unset CRONIC_TEST_UNSET_VARIABLE
-echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
-exit "$1"
-EOF
-chmod +x "$work/read-unset"
 
 # Runs `cronic` with SHELLOPTS set to its first argument and exported, and
 # with these exported shell functions:
@@ -451,13 +434,15 @@ REAL_CRONIC="$CRONIC"
 export REAL_CRONIC
 CRONIC="$work/cronic-with-shellopts"
 default_shellopts=braceexpand:hashall:interactive-comments
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "exported SHELLOPTS, command reads an unset variable" 0 silent \
-  "$default_shellopts" "$work/read-unset" 0
+  "$default_shellopts" bash -c ': "$cronic_test_unset_variable"'
 check "exported SHELLOPTS, command ignores a failure" 0 silent \
   "$default_shellopts" bash -c 'false; :'
-check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "exported SHELLOPTS with nounset, command reads an unset variable" 127 \
   "report:unbound variable" \
-  "$default_shellopts:nounset" "$work/read-unset" 0
+  "$default_shellopts:nounset" bash -c ': "$cronic_test_unset_variable"'
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
   "$default_shellopts:errexit" bash -c 'false; :'
 # With allexport exported, `cronic` does not export its own variables to the
@@ -476,6 +461,13 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
 # command, followed by the command's own trace, with nothing that `cronic` did
 # to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
 # it appears under "TRACE OUTPUT".
+# Bash quotes a word in a trace line if it contains a space or a shell
+# metacharacter, so let bash write the expected trace of the path, which is
+# under the caller's TMPDIR.  The trace goes to a separate file descriptor,
+# and stderr is discarded, so that an unrelated warning from bash, such as for
+# an uninstalled locale, is not part of the expected trace.
+# shellcheck disable=SC2016 # The expansion is for bash to do.
+traced_command=$(bash -c 'BASH_XTRACEFD=3; set -x; : "$1" 0' sh "$work/trace-and-stderr" 3>&1 2> /dev/null | sed 's/^+ : /+ /')
 cat > "$work/trace-report.goal" << EOF
 Cronic detected failure or error output for the command:
 $work/trace-and-stderr 0
@@ -488,7 +480,7 @@ a real error
 STANDARD OUTPUT:
 
 TRACE OUTPUT:
-+ $work/trace-and-stderr 0
+$traced_command
 + set -x
 + echo 'a real error'
 + exit 0
@@ -502,15 +494,6 @@ if [ "$bash_has_xtracefd" = true ]; then
 else
   echo "SKIP: exported SHELLOPTS with xtrace, trace output, because bash is older than 4.1"
 fi
-
-# With verbose exported, a successful command produces no report:  `cronic`
-# does not echo, into the command's error output, the commands that restore the
-# caller's options.  `cronic` echoes to its stderr only its lines through its
-# first command, which bash reads before `cronic` turns verbose off.
-sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
-check_goals "exported SHELLOPTS with verbose" \
-  /dev/null "$work/verbose-stderr.goal" \
-  "$CRONIC" "$default_shellopts:verbose" true
 
 # The caller's `-e` applies within an exported shell function that is the
 # command, and the caller's lack of `-e` does too.
