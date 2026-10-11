@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-{
-  cronic_caller_flags=${-//[^aeux]/}
-  set +x
-} 2> /dev/null
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -23,34 +19,31 @@
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
 
-# This script does not handle verbose:  if the caller exports SHELLOPTS with
-# verbose, or runs `bash -v cronic`, then bash echoes this script's lines to
-# stderr, so cron sends email for every run.  `cronic --help` says not to.
+# Limitations, which `cronic --help` documents:  every run produces output if
+# the caller exports the verbose option or runs `bash -v cronic`, or if the file
+# named by BASH_ENV writes to stderr.
 
-# Bash runs the file named by BASH_ENV, if any, before this script's first
-# command, so the caller's exported options, such as xtrace and nounset, apply
-# to that file and can make it write to stderr; such a cron job should unset
-# BASH_ENV.  `cronic --help` says so.
-
-# The first command in this file, just after the shebang, saves the caller's
-# settings of the shell options that this script changes for itself, as the
-# letters that `$-` uses for them:  allexport, errexit, nounset, and xtrace.
-# The command inherits every other option, including every `shopt` option,
-# unchanged.  If this script ever changes another option, add its letter there.
-
-# The first command then stops this script from tracing itself, which would go
-# to this script's stderr, so that cron would send email for every run.  The
-# redirection discards its own trace.  If the caller exports BASH_XTRACEFD,
-# then bash writes that trace to the caller's trace descriptor instead, not to
-# stderr.  If that descriptor is not open, then bash reports so on stderr
-# before it runs this script's first command, as for any bash script; cronic
-# cannot prevent that.
+# Save the caller's settings of the options that this script changes, as the
+# letters that `$-` uses for them, so that the command runs with them.  The
+# command inherits every other option, including every `shopt` option,
+# unchanged.  If this script ever changes another option, add its letter here.
+# Then turn off xtrace, so that this script does not trace itself to stderr,
+# which would make every run produce output, and allexport, so that this script
+# does not export its variables to the command.  `cronic_caller_flags`, which is
+# assigned before that, is un-exported explicitly.  The redirection discards
+# the trace of `set +ax` itself.  If the caller exports BASH_XTRACEFD, then
+# bash writes that trace to the caller's trace descriptor instead.  If that
+# descriptor is not open, then bash reports so on stderr before this script
+# runs, as for any bash script; cronic cannot prevent that.
+{
+  cronic_caller_flags=${-//[^aeux]/}
+  set +ax
+  export -n cronic_caller_flags
+} 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
-# as an error.  Do not export this script's variables to the command, even if
-# the caller's exported SHELLOPTS contains allexport.
-set -eu +a
-export -n cronic_caller_flags
+# as an error.
+set -eu
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -197,20 +190,19 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
-# Run the command with the caller's shell options rather than this
-# script's.  If the caller exported SHELLOPTS, then the command would otherwise
-# inherit this script's options, and a bash script that reads an unset variable
-# (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
 # The command runs in a subshell rather than in this shell, so that a builtin
 # such as `exit` or `exec` cannot end this script before it reports.
+# The subshell restores the caller's options that this script changed.
+# Otherwise, if the caller exported SHELLOPTS, a bash script that reads an unset
+# variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.  Of
+# those options, only nounset is on here, so a single `set` command turns it off
+# and turns on the caller's, so that the restoring is not traced.  The `:+`
+# avoids a bare `-`, which has a special meaning to `set`.
 # `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.  The redirections
-# apply to the whole subshell, so that they also capture what it writes after
-# the command finishes, such as the output of an EXIT trap that the command
-# sets.  Of the options that this script changes, only nounset is on here, so
-# the subshell turns it off and turns on the caller's, in a single `set`
-# command, so that the restoring is not traced.  The `:+` avoids
-# a bare `-`, which has a special meaning to `set`.
+# otherwise run in place of a program of the same name.
+# The redirections apply to the whole subshell, so that they also capture what
+# it writes after the command finishes, such as the output of an EXIT trap that
+# the command sets.
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
 # command inherits.
