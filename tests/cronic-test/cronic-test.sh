@@ -7,8 +7,9 @@
 # `cronic` filters trace lines out of stderr with `grep -v`, which exits with
 # status 1 when it selects no lines.  `cronic` runs under `set -e`, so an
 # unguarded `grep -v` would abort the script at that point:  no report would be
-# printed, the exit status would be grep's 1 rather than the wrapped command's,
-# and the temporary files would be left behind.
+# printed, and the exit status would be grep's 1 rather than the wrapped
+# command's.  (The temporary files would still be removed, by `cronic`'s EXIT
+# trap, so the left-behind-files check in `check` does not detect that bug.)
 
 set -eu
 
@@ -16,6 +17,8 @@ set -eu
 # below.  It could write to stderr, especially when an exported SHELLOPTS turns
 # on `-u` for it.
 unset BASH_ENV
+# Use the default PS4, which the goal files and the trace lines below assume.
+unset PS4
 # Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
 # to the commands below.  If SHELLOPTS is exported, then run this script again
 # without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
@@ -40,11 +43,17 @@ mkdir "$TMPDIR"
 
 status=0
 
-# Whether `cronic`, which runs under /bin/bash, writes the execution trace to a
-# separate file, via BASH_XTRACEFD, which bash 4.1 or later supports.  If not,
-# then bash writes its trace to stderr, like any other shell, and the tests
-# that depend on the separate file are skipped.
-if /bin/bash -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'; then
+# has_xtracefd BASH: succeeds if `cronic`, run under the bash program BASH,
+# writes the execution trace to a separate file, via BASH_XTRACEFD, which bash
+# 4.1 or later supports.  If not, then bash writes its trace to stderr, like any
+# other shell, and the tests that depend on the separate file are skipped.
+has_xtracefd() {
+  # shellcheck disable=SC2016  # the expansions are for bash, not this shell.
+  "$1" -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'
+}
+# Whether `cronic`, which runs under /bin/bash, writes the trace to a separate
+# file.
+if has_xtracefd /bin/bash; then
   bash_xtracefd=true
 else
   bash_xtracefd=false
@@ -443,6 +452,12 @@ export BASH_ENV
 check "exported function does not see unexported variable from BASH_ENV" 0 \
   silent "$default_shellopts" report_cronic_variables
 unset BASH_ENV
+# Under the caller's allexport, the command's environment contains none of
+# `cronic`'s variables, nor the POSIXLY_CORRECT that `cronic` assigns.
+# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+check "exported SHELLOPTS with allexport, environment has no cronic variable" 0 \
+  silent "$default_shellopts:allexport" \
+  sh -c 'env | grep -E "^(cronic_|POSIXLY_CORRECT=)" >&2; :'
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -597,7 +612,7 @@ unset BASH_ENV
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.
 grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"
-if $bash_xtracefd; then
+if has_xtracefd bash; then
   check_goals "bash -x cronic, trace output" \
     "$work/bash-x-trace-report.goal" /dev/null \
     bash -x "$CRONIC" "$work/trace-and-stderr" 0

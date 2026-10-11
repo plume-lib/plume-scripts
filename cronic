@@ -1,6 +1,6 @@
 #!/bin/bash
 {
-  cronic_caller_flags=${-//[^euvx]/}
+  cronic_caller_opts=$SHELLOPTS
   if [[ :$SHELLOPTS: == *:posix:* ]]; then
     cronic_posix_off=
   else
@@ -53,17 +53,23 @@ done <<< "$(builtin compgen -A function)"
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
-# The first command saves the caller's shell options, as the letters that `$-`
-# uses for them, before this script changes them for itself.  They include any
-# option that BASH_ENV set, because bash runs BASH_ENV before this script's
-# first line and does not record the options that it started with.  This script
-# changes only errexit, nounset, verbose, and xtrace, so the command inherits
-# the caller's other `set -o` options, and its `shopt` options, without any
-# restoring; an option that this script changes must be added to the pattern.
+# The first command saves the caller's `set -o` shell options, as the
+# colon-separated list of those that are on, before this script changes any of
+# them for itself.  They include any option that BASH_ENV set, because bash runs
+# BASH_ENV before this script's first line and does not record the options that
+# it started with.  This script changes no `shopt` option, so the command
+# inherits those without any restoring.
 # The first command then stops this script from tracing itself or echoing its
 # input, which would go to this script's stderr, so that cron would send email
 # for every run.  It comes before any comment, because bash echoes every line
 # that it reads while verbose is on.  The redirection discards its own trace.
+# Verbose is handled only partly:  bash echoes this script's lines through the
+# end of the first command to stderr before that command can turn verbose off.
+# So if the caller exports SHELLOPTS with verbose, or runs `bash -v cronic`,
+# then cron sends email for every run.
+# Likewise, bash runs the file named by BASH_ENV, if any, before this script's
+# first command, so an exported xtrace, verbose, or nounset applies to that file
+# and can make it write to stderr; such a cron job should unset BASH_ENV.
 # The next command removes every alias, such as one that BASH_ENV defined, so
 # that no alias changes this script's commands or the caller's functions, which
 # the command gets back by re-parsing their definitions; the backslash stops an
@@ -131,6 +137,10 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "Under \"set -v\" exported via SHELLOPTS, or \"bash -v cronic\", bash echoes the"
+  echo "first lines of cronic to stderr before cronic can turn verbose off."
+  echo "Likewise, bash runs the BASH_ENV file, if any, before cronic starts, so"
+  echo "exported shell options can make that file write to stderr."
   exit 0
 }
 
@@ -246,9 +256,10 @@ fi
 # The command runs in a subshell rather than via `exec`, so that it can be a
 # shell builtin or an exported shell function, and rather than in this shell,
 # so that a builtin such as `exit` or `exec` cannot end this script before it
-# reports.  The subshell is not the left operand of `||`, because bash would
-# then ignore `set -e` throughout the subshell, including in a shell function
-# that it runs.
+# reports.  The subshell is not the operand of `||` or the like, because then
+# bash would ignore `set -e` throughout the subshell, including in a shell
+# function that it runs, and would remove "errexit" from the SHELLOPTS that the
+# command inherits.
 # The subshell unsets this script's functions, which are the only ones that
 # remain, and every variable whose name starts with `cronic_`, so that the
 # command does not see them, and so that a function does not run in place of a
@@ -257,9 +268,24 @@ fi
 # cronic_caller_* variables before `unset` removes them.  It then defines the
 # caller's functions, which can replace a builtin, so the remaining commands run
 # in posix mode, as special builtins.  The last command turns posix mode off
-# (unless the caller's shell was in posix mode), turns off this script's
-# nounset (errexit is off already), and turns on the caller's options, so that
-# the restoring is neither traced nor echoed.
+# (unless the caller's shell was in posix mode), turns off every other option
+# that is on, which includes nounset, and turns on the caller's other options,
+# so that the restoring is neither traced nor echoed.  That command never turns
+# posix mode off and on again, because doing so would replace the caller's
+# value of POSIXLY_CORRECT by "y"; turning posix mode off unsets
+# POSIXLY_CORRECT.  The options to turn off are those of this script, which the
+# subshell inherits, apart from posix mode.
+# Limitation:  if the command is a builtin that runs code in the subshell, such
+# as `source` or `eval`, that code runs with the caller's options even if the
+# caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
+# that code silently expands an unset variable to the empty string.
+cronic_set_args=$cronic_posix_off
+for cronic_opt in ${SHELLOPTS//:/ }; do
+  [ "$cronic_opt" = posix ] || cronic_set_args+=" +o $cronic_opt"
+done
+for cronic_opt in ${cronic_caller_opts//:/ }; do
+  [ "$cronic_opt" = posix ] || cronic_set_args+=" -o $cronic_opt"
+done
 set +e
 (
   # shellcheck disable=SC2046  # each name is a separate argument.
@@ -268,7 +294,7 @@ set +e
     $cronic_caller_functions
     ${cronic_posix_off:+POSIXLY_CORRECT=y}
     ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}
-    set +u $cronic_posix_off${cronic_caller_flags:+ -$cronic_caller_flags}"
+    set $cronic_set_args"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
@@ -308,8 +334,8 @@ cronic_pattern=$(cronic_trace_pattern)
 if [ -n "$cronic_pattern" ] && grep -q "$cronic_pattern" "$cronic_trace"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
-  # `set -e` would abort the script here, before it produces its report,
-  # exits with the wrapped command's status, and removes its temporary files.
+  # `set -e` would abort the script here, before it produces its report, and
+  # it would exit with status 1 rather than with the wrapped command's status.
   grep -v "$cronic_pattern" "$cronic_trace" > "$cronic_err" || true
 else
   cronic_err=$cronic_trace
