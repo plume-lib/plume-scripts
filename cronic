@@ -23,14 +23,17 @@
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
 
-# The first command saves the caller's `set -o` shell options, as the
-# colon-separated list of those that are on, before this script changes any of
-# them for itself.  This script changes no `shopt` option, so the command
+# The first command (lines 2-5) saves the caller's `set -o` shell options, as
+# the colon-separated list of those that are on, before this script changes any
+# of them for itself.  This script changes no `shopt` option, so the command
 # inherits those without any restoring.
 # The first command then stops this script from tracing itself or echoing its
 # input, which would go to this script's stderr, so that cron would send email
-# for every run.  It comes before any comment, because bash echoes every line
-# that it reads while verbose is on.  The redirection discards its own trace.
+# for every run.  The redirection discards its own trace.
+# Do not add anything, not even a comment, before or within the first command,
+# because bash echoes to stderr every line that it reads while verbose is on.
+# The verbose check in tests/cronic-test/cronic-test.sh expects that echo to
+# end at the first line that is exactly `} 2> /dev/null`.
 # Verbose is handled only partly:  bash echoes this script's lines through the
 # end of the first command to stderr before that command can turn verbose off.
 # So if the caller exports SHELLOPTS with verbose, or runs `bash -v cronic`,
@@ -198,10 +201,13 @@ fi
 # otherwise run in place of a program of the same name.  The redirections
 # apply to the whole subshell, so that they also capture what it writes after
 # the command finishes, such as the output of an EXIT trap that the command
-# sets.  The subshell turns off every option that is on, which includes
-# nounset, and turns on the caller's, in a single `set` command, so that the
-# restoring is neither traced nor echoed.
-# SHELLOPTS is not empty here, because nounset is on.  The `:+` avoids a bare
+# sets.  The subshell turns off every option that is on but that the caller
+# had off, and turns on the caller's, in a single `set` command, so that the
+# restoring is neither traced nor echoed.  It does not turn off and back on an
+# option that the caller had on, because that cannot always be undone:  turning
+# off privileged resets the effective user and group IDs to the real ones.
+# That `set` command has an argument, because nounset is on here, so either
+# the caller had it on or the subshell turns it off.  The `:+` avoids a bare
 # `set -o`, which would print the options, when the caller had none on.
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
@@ -211,9 +217,16 @@ fi
 # caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
 # that code silently expands an unset variable to the empty string.
 set +e
+cronic_off_opts=
+for cronic_opt in ${SHELLOPTS//:/ }; do
+  case ":$cronic_caller_opts:" in
+    *":$cronic_opt:"*) ;;
+    *) cronic_off_opts="$cronic_off_opts +o $cronic_opt" ;;
+  esac
+done
 (
   # shellcheck disable=SC2086  # each option name and +o or -o is an argument.
-  set +o ${SHELLOPTS//:/ +o } ${cronic_caller_opts:+-o ${cronic_caller_opts//:/ -o }}
+  set $cronic_off_opts ${cronic_caller_opts:+-o ${cronic_caller_opts//:/ -o }}
   command -- "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?

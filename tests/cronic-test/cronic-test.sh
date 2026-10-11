@@ -27,12 +27,20 @@ unset BASH_ENV
 # Use the default PS4, which the goal files and the trace lines below assume.
 unset PS4
 # Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
-# to the commands below.  If SHELLOPTS is exported, then run this script again
-# without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
+# to the commands below.  If SHELLOPTS is exported, then remove it from the
+# environment.  bash makes SHELLOPTS read-only, so it cannot be unset, but
+# `export -n` stops exporting it; then this script runs again under the same
+# bash, so that the caller's options do not apply to this script either.  Any
+# other shell ignores SHELLOPTS, so it can simply unset it.
 # `printenv` matches the name exactly, unlike a search of the output of `env`,
 # which can match a line within the value of another variable.
 if printenv SHELLOPTS > /dev/null; then
-  exec env -u SHELLOPTS sh "$0" "$@"
+  if [ -n "${BASH:-}" ]; then
+    # shellcheck disable=SC3045  # this branch runs only under bash.
+    export -n SHELLOPTS
+    exec "$BASH" "$0" "$@"
+  fi
+  unset SHELLOPTS
 fi
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -144,7 +152,7 @@ chmod +x "$work/stderr-lines"
 
 # A bash command that reads an unset variable.
 cat > "$work/read-unset" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 unset CRONIC_TEST_UNSET_VARIABLE
 echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
 exit "$1"
@@ -153,12 +161,30 @@ chmod +x "$work/read-unset"
 
 # Runs `cronic` with SHELLOPTS set to its first argument and exported.
 cat > "$work/cronic-with-shellopts" << 'EOF2'
-#!/bin/bash
+#!/usr/bin/env bash
 shellopts="$1"
 shift
 exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
 EOF2
 chmod +x "$work/cronic-with-shellopts"
+
+# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
+# (bash 4.1 or later) writes its trace lines to a separate file, so they are
+# not error output, whatever PS4 is.  An earlier bash, such as macOS's
+# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
+# PS4 contains an expansion or an escape, so it reports them as error output.
+# This tests for the features themselves, rather than for the bash version
+# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
+# `cronic` and the bash scripts above all run under the first `bash` in PATH,
+# so that is the bash tested here.  The probe checks whether a trace line
+# reaches the file, rather than whether bash writes to stderr, because bash can
+# write an unrelated warning to stderr, such as for an uninstalled locale.
+if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
+  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
+  bash_has_xtracefd=true
+else
+  bash_has_xtracefd=false
+fi
 
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
@@ -209,21 +235,19 @@ compare_streams() {
   fi
 }
 
-# check_trace_section DESCRIPTION BASH GOAL-FILE COMMAND...: runs COMMAND,
-# which runs `cronic` under the bash program BASH, and checks that it exits
-# with status 0, leaves no temporary files, writes nothing to stderr, and
-# produces a report whose "TRACE OUTPUT" section, through the following empty
-# line, is the contents of GOAL-FILE.  Skips the check if BASH is older than
-# 4.1, which lacks BASH_XTRACEFD, so that the report has no "TRACE OUTPUT".
+# check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
+# runs `cronic`, and checks that it exits with status 0, leaves no temporary
+# files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
+# section, through the following empty line, is the contents of GOAL-FILE.
+# Skips the check if bash lacks BASH_XTRACEFD, so that the report has no
+# "TRACE OUTPUT".
 check_trace_section() {
   description="$1"
-  bash_program="$2"
-  goal="$3"
-  shift 3
+  goal="$2"
+  shift 2
 
-  # shellcheck disable=SC2016  # the expansions are for bash, not this shell.
-  if ! "$bash_program" -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'; then
-    echo "SKIP: $description, because $bash_program is older than 4.1"
+  if [ "$bash_has_xtracefd" = false ]; then
+    echo "SKIP: $description, because bash lacks BASH_XTRACEFD"
     return 0
   fi
 
@@ -466,7 +490,7 @@ TRACE OUTPUT:
 + exit 0
 
 EOF
-check_trace_section "exported SHELLOPTS with xtrace, trace output" bash \
+check_trace_section "exported SHELLOPTS with xtrace, trace output" \
   "$work/trace-section.goal" \
   "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
 
@@ -530,27 +554,10 @@ TRACE OUTPUT:
 + exit 0
 
 EOF
-check_trace_section "bash -x cronic, trace output" bash \
+check_trace_section "bash -x cronic, trace output" \
   "$work/bash-x-trace-section.goal" \
   bash -x "$CRONIC" "$work/trace-and-stderr" 0
 
-# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
-# (bash 4.1 or later) writes its trace lines to a separate file, so they are
-# not error output, whatever PS4 is.  An earlier bash, such as macOS's
-# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
-# PS4 contains an expansion or an escape, so it reports them as error output.
-# This tests for the features themselves, rather than for the bash version
-# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
-# `cronic` and the bash scripts above all run under the first `bash` in PATH,
-# so that is the bash tested here.  The probe checks whether a trace line
-# reaches the file, rather than whether bash writes to stderr, because bash can
-# write an unrelated warning to stderr, such as for an uninstalled locale.
-if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
-  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
-  bash_has_xtracefd=true
-else
-  bash_has_xtracefd=false
-fi
 export PS4
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${LINENO}: '
