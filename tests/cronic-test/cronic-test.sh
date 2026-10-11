@@ -158,12 +158,12 @@ EOF
 chmod +x "$work/read-unset"
 
 # Runs `cronic` with SHELLOPTS set to its first argument and exported.
-cat > "$work/cronic-with-shellopts" << 'EOF2'
+cat > "$work/cronic-with-shellopts" << 'EOF'
 #!/usr/bin/env bash
 shellopts="$1"
 shift
 exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
-EOF2
+EOF
 chmod +x "$work/cronic-with-shellopts"
 
 # A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
@@ -229,6 +229,10 @@ compare_streams() {
     cat "$work/output"
     echo "stderr:"
     cat "$work/stderr"
+    echo "differences from the goal output:"
+    diff "$3" "$2" || true
+    echo "differences from the goal stderr:"
+    diff "$4" "$work/stderr" || true
     status=1
   fi
 }
@@ -480,9 +484,14 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
 # command, followed by the command's own trace, with nothing that `cronic` did
 # to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
 # it appears under "TRACE OUTPUT".
+# Bash quotes a word in a trace line if it contains a space or a shell
+# metacharacter, so let bash write the expected trace of the path, which is
+# under the caller's TMPDIR.
+# shellcheck disable=SC2016 # The expansion is for bash to do.
+traced_command=$(bash -c 'set -x; : -- "$1" 0' sh "$work/trace-and-stderr" 2>&1 | sed 's/^+ : /+ command /')
 cat > "$work/trace-section.goal" << EOF
 TRACE OUTPUT:
-+ command -- $work/trace-and-stderr 0
+$traced_command
 + set -x
 + echo 'a real error'
 + exit 0
@@ -536,7 +545,7 @@ unset $exported_names
 # exported, so its own `set -x` is not traced.
 cat > "$work/bash-x-trace-section.goal" << EOF
 TRACE OUTPUT:
-+ command -- $work/trace-and-stderr 0
+$traced_command
 + echo 'a real error'
 + exit 0
 
