@@ -23,11 +23,21 @@
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
 
-# The first command, just after the shebang, saves the caller's settings of the
-# shell options that this script changes for itself, as the letters that `$-`
-# uses for them:  allexport, errexit, nounset, and xtrace.  The command inherits
-# every other option, including every `shopt` option, unchanged.  If this
-# script ever changes another option, add its letter there.
+# This script does not handle verbose:  if the caller exports SHELLOPTS with
+# verbose, or runs `bash -v cronic`, then bash echoes this script's lines to
+# stderr, so cron sends email for every run.  `cronic --help` says not to.
+
+# Bash runs the file named by BASH_ENV, if any, before this script's first
+# command, so the caller's exported options, such as xtrace and nounset, apply
+# to that file and can make it write to stderr; such a cron job should unset
+# BASH_ENV.  `cronic --help` says so.
+
+# The first command in this file, just after the shebang, saves the caller's
+# settings of the shell options that this script changes for itself, as the
+# letters that `$-` uses for them:  allexport, errexit, nounset, and xtrace.
+# The command inherits every other option, including every `shopt` option,
+# unchanged.  If this script ever changes another option, add its letter there.
+
 # The first command then stops this script from tracing itself, which would go
 # to this script's stderr, so that cron would send email for every run.  The
 # redirection discards its own trace.  If the caller exports BASH_XTRACEFD,
@@ -35,13 +45,6 @@
 # stderr.  If that descriptor is not open, then bash reports so on stderr
 # before it runs this script's first command, as for any bash script; cronic
 # cannot prevent that.
-# This script does not handle verbose:  if the caller exports SHELLOPTS with
-# verbose, or runs `bash -v cronic`, then bash echoes this script's lines to
-# stderr, so cron sends email for every run.  `cronic --help` says not to.
-# Bash runs the file named by BASH_ENV, if any, before this script's first
-# command, so the caller's exported options, such as xtrace and nounset, apply
-# to that file and can make it write to stderr; such a cron job should unset
-# BASH_ENV.  `cronic --help` says so.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.  Do not export this script's variables to the command, even if
@@ -83,9 +86,9 @@ cronic_help() {
   echo "Do not run \"bash -v cronic\", nor export the verbose option (\"set -v\") via"
   echo "SHELLOPTS: bash would echo the lines of this script (and, if exported, of a"
   echo "bash COMMAND) to stderr, so every run would produce output."
-  echo "Bash runs the file named by BASH_ENV, if any, before cronic starts, so"
-  echo "exported shell options can make that file write to stderr.  To prevent that,"
-  echo "unset BASH_ENV."
+  echo "Bash runs the file named by BASH_ENV, if any, before cronic's own code, so"
+  echo "cronic cannot capture that file's output, and exported shell options can make"
+  echo "that file write to stderr.  To prevent that, unset BASH_ENV."
   exit 0
 }
 

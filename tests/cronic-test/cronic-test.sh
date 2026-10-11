@@ -217,26 +217,6 @@ run_cronic() {
   fi
 }
 
-# compare_streams DESCRIPTION OUTPUT OUTPUT-GOAL STDERR-GOAL: after run_cronic,
-# reports success if the file OUTPUT, which is `cronic`'s output or a part of
-# it, has the contents of OUTPUT-GOAL, and `cronic`'s stderr has the contents of
-# STDERR-GOAL.
-compare_streams() {
-  if cmp -s "$3" "$2" && cmp -s "$4" "$work/stderr"; then
-    echo "PASS: $1"
-  else
-    echo "FAIL: $1: output:"
-    cat "$work/output"
-    echo "stderr:"
-    cat "$work/stderr"
-    echo "differences from the goal output:"
-    diff "$3" "$2" || true
-    echo "differences from the goal stderr:"
-    diff "$4" "$work/stderr" || true
-    status=1
-  fi
-}
-
 # check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
 # runs `cronic`, and checks that it exits with status 0, leaves no temporary
 # files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
@@ -255,7 +235,17 @@ check_trace_section() {
 
   run_cronic "$description" 0 "$@" || return 0
   sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
-  compare_streams "$description" "$work/trace-section" "$goal" /dev/null
+  if cmp -s "$goal" "$work/trace-section" && [ ! -s "$work/stderr" ]; then
+    echo "PASS: $description"
+  else
+    echo "FAIL: $description: output:"
+    cat "$work/output"
+    echo "stderr:"
+    cat "$work/stderr"
+    echo "differences from the goal trace section:"
+    diff "$goal" "$work/trace-section" || true
+    status=1
+  fi
 }
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
@@ -486,9 +476,11 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
 # it appears under "TRACE OUTPUT".
 # Bash quotes a word in a trace line if it contains a space or a shell
 # metacharacter, so let bash write the expected trace of the path, which is
-# under the caller's TMPDIR.
+# under the caller's TMPDIR.  The trace goes to a separate file descriptor,
+# and stderr is discarded, so that an unrelated warning from bash, such as for
+# an uninstalled locale, is not part of the expected trace.
 # shellcheck disable=SC2016 # The expansion is for bash to do.
-traced_command=$(bash -c 'set -x; : -- "$1" 0' sh "$work/trace-and-stderr" 2>&1 | sed 's/^+ : /+ command /')
+traced_command=$(bash -c 'BASH_XTRACEFD=3; set -x; : -- "$1" 0' sh "$work/trace-and-stderr" 3>&1 2> /dev/null | sed 's/^+ : /+ command /')
 cat > "$work/trace-section.goal" << EOF
 TRACE OUTPUT:
 $traced_command
