@@ -28,17 +28,15 @@ unset BASH_ENV
 unset PS4
 # Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
 # to the commands below.  If SHELLOPTS is exported, then remove it from the
-# environment.  bash makes SHELLOPTS read-only, so it cannot be unset, but
-# `export -n` stops exporting it; then this script runs again under the same
-# bash, so that the caller's options do not apply to this script either.  Any
-# other shell ignores SHELLOPTS, so it can simply unset it.
+# environment.  bash makes SHELLOPTS read-only, so it cannot be unset;
+# instead, this script runs again under the same bash, with SHELLOPTS removed
+# from its environment, so that the caller's options do not apply to this script
+# either.  Any other shell ignores SHELLOPTS, so it can simply unset it.
 # `printenv` matches the name exactly, unlike a search of the output of `env`,
 # which can match a line within the value of another variable.
 if printenv SHELLOPTS > /dev/null; then
   if [ -n "${BASH:-}" ]; then
-    # shellcheck disable=SC3045  # this branch runs only under bash.
-    export -n SHELLOPTS
-    exec "$BASH" "$0" "$@"
+    exec env -u SHELLOPTS "$BASH" "$0" "$@"
   fi
   unset SHELLOPTS
 fi
