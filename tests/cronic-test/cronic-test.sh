@@ -137,8 +137,9 @@ temp_files() {
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
 # "report:TEXT", which also requires TEXT to appear in the report,
 # "report-once:TEXT", which also requires TEXT to appear on exactly one line of
-# the report, or "message:TEXT", which requires TEXT to appear in output that
-# need not be a report.
+# the report, "message:TEXT", which requires TEXT to appear in output that need
+# not be a report, or "exactly:FILE", which requires the output to be the
+# contents of FILE.
 check() {
   description="$1"
   expected_status="$2"
@@ -189,6 +190,15 @@ check() {
       if ! grep -q -e "${expected_output#*:}" "$work/output"; then
         echo "FAIL: $description: expected the output to contain" \
           "\"${expected_output#*:}\", but got:"
+        cat "$work/output"
+        status=1
+        return
+      fi
+      ;;
+    exactly:*)
+      if ! cmp -s "${expected_output#*:}" "$work/output"; then
+        echo "FAIL: $description: expected the output to be the contents of" \
+          "${expected_output#*:}, but got:"
         cat "$work/output"
         status=1
         return
@@ -403,15 +413,10 @@ else
 fi
 # When the caller exports verbose, bash echoes the lines of `cronic` through
 # the block that turns verbose off, but nothing more.
-"$work/cronic-with-verbose" true > "$work/output" 2>&1
+CRONIC="$work/cronic-with-verbose"
 sed '/^} 2> \/dev\/null$/q' "$saved_cronic" > "$work/expected"
-if cmp -s "$work/expected" "$work/output"; then
-  echo "PASS: caller's verbose exported: cronic echoes only its first lines"
-else
-  echo "FAIL: caller's verbose exported: cronic echoes more than its first lines:"
-  cat "$work/output"
-  status=1
-fi
+check "caller's verbose exported: cronic echoes only its first lines" 0 \
+  "exactly:$work/expected" true
 CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -421,7 +426,7 @@ CRONIC="$saved_cronic"
 # The lowercase names that `cronic` assigns, such as `cronic_out`, are not
 # exported:  `cronic` does overwrite them, but environment variables
 # conventionally have uppercase names.
-variable_names=$(sed -n 's/^[{ ]*\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
+variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
 if [ -z "$variable_names" ]; then
   echo "FAIL: found no variables in $CRONIC"
   status=1
