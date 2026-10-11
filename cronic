@@ -25,18 +25,15 @@
 # BASH_VERSINFO check below.
 
 # The block at the top of this script is first, because with the caller's
-# verbose on, bash echoes each line of this script to stderr as it reads it,
-# until `set +v` runs.  `cronic_caller_flags` holds the caller's shell options
-# that this script changes, as the letters that `$-` uses for them, which this
-# script restores for the command.  They include any that the caller passed by
-# exporting SHELLOPTS.  This script turns xtrace off, so that its own commands
-# are not traced to stderr, which would make every run produce output; the
-# redirection discards the trace of `set +avx` itself.  This script turns
-# verbose off, so that bash echoes only the lines through the block, not the
-# whole script.  With verbose on, every run therefore produces output: the
-# echo of those lines.  This script turns allexport off, so that its own
-# variables are not exported to the command; `cronic_caller_flags`, which is
-# assigned before that, is un-exported explicitly.
+# verbose on, bash echoes each line to stderr as it reads it, until `set +v`
+# runs; so with verbose on, every run echoes those lines.
+# `cronic_caller_flags` holds the caller's shell options that this script
+# changes (including any passed by exporting SHELLOPTS), as the letters that
+# `$-` uses for them; this script restores them for the command.  It turns off
+# verbose and xtrace so that its own commands are not echoed or traced, and
+# allexport so that its own variables are not exported to the command
+# (`cronic_caller_flags`, assigned before that, is un-exported explicitly).
+# The redirection discards the trace of `set +avx` itself.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
