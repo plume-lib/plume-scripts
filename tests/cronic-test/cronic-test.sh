@@ -400,7 +400,7 @@ check "bash script, caller's xtrace exported" 0 silent \
   env BASH_ENV= bash -c 'true'
 check "bash script that fails, caller's xtrace exported" 1 "report:^+ false$" \
   env BASH_ENV= bash -c 'false'
-if grep -q cronic_ "$work/output"; then
+if grep -q -e cronic_ -e "command --" "$work/output"; then
   echo "FAIL: caller's xtrace exported: the report traces cronic itself:"
   cat "$work/output"
   status=1
