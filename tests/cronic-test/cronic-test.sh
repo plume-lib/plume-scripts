@@ -336,6 +336,10 @@ check "exec builtin" 3 report exec "$work/trace-only" 3
 check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
   trap 'echo "from the trap" >&2' EXIT
 check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
+# The trace of an EXIT trap that a command sets, after turning on xtrace
+# itself, is reported.
+check "EXIT trap of a traced command" 3 "report:^++* false$" \
+  eval 'set -x; trap false EXIT; exit 3'
 # A builtin runs with `set +u`, as it would in an ordinary shell.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
@@ -394,19 +398,45 @@ check "no cronic variables exported, caller's allexport exported" 0 silent \
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "command's variable exported, caller's allexport exported" 0 silent \
   eval 'cronic_test_variable=1; sh -c "[ \"\$cronic_test_variable\" = 1 ]"'
-# When the caller exports xtrace, `cronic` traces only the command, not itself.
-CRONIC="$work/cronic-with-xtrace"
-check "bash script, caller's xtrace exported" 0 silent \
-  env BASH_ENV= bash -c 'true'
-check "bash script that fails, caller's xtrace exported" 1 "report:^+ false$" \
-  env BASH_ENV= bash -c 'false'
-if grep -q -e cronic_ -e "command --" "$work/output"; then
-  echo "FAIL: caller's xtrace exported: the report traces cronic itself:"
-  cat "$work/output"
-  status=1
+# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
+# (bash 4.1 or later) writes its trace lines to a separate file, so they are
+# not error output, whatever PS4 is.  An earlier bash, such as macOS's
+# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
+# PS4 contains an expansion or an escape, so it reports them as error output.
+# This tests for the features themselves, rather than for the bash version
+# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
+# `cronic` and the bash scripts above all run under the first `bash` in PATH,
+# so that is the bash tested here.  The probe checks whether a trace line
+# reaches the file, rather than whether bash writes to stderr, because bash can
+# write an unrelated warning to stderr, such as for an uninstalled locale.
+if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
+  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
+  bash_has_xtracefd=true
 else
-  echo "PASS: caller's xtrace exported: the report does not trace cronic itself"
+  bash_has_xtracefd=false
 fi
+# When the caller exports xtrace, `cronic` traces only the command, not itself.
+# A bash before 4.1 writes the trace to stderr, so `cronic` cannot discard the
+# trace of its `command -- ...` line.
+CRONIC="$work/cronic-with-xtrace"
+# check_xtrace DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: like
+# `check`, and also checks that the output does not trace `cronic` itself.
+check_xtrace() {
+  check "$@"
+  if grep -q -e cronic_ "$work/output" \
+    || { [ "$bash_has_xtracefd" = true ] && grep -q -e "command --" "$work/output"; }; then
+    echo "FAIL: $1: the report traces cronic itself:"
+    cat "$work/output"
+    status=1
+  fi
+}
+check_xtrace "bash script, caller's xtrace exported" 0 silent \
+  env BASH_ENV= bash -c 'true'
+check_xtrace "bash script that fails, caller's xtrace exported" 1 \
+  "report:^+ false$" env BASH_ENV= bash -c 'false'
+# A builtin's trace lines are nested 1 deeper than the builtin.
+check_xtrace "builtin that fails, caller's xtrace exported" 1 \
+  "report:^++ false$" eval false
 CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -446,23 +476,6 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 # shellcheck disable=SC2086  # each name is a separate argument.
 unset $exported_names
 
-# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
-# (bash 4.1 or later) writes its trace lines to a separate file, so they are
-# not error output, whatever PS4 is.  An earlier bash, such as macOS's
-# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
-# PS4 contains an expansion or an escape, so it reports them as error output.
-# This tests for the features themselves, rather than for the bash version
-# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
-# `cronic` and the bash scripts above all run under the first `bash` in PATH,
-# so that is the bash tested here.  The probe checks whether a trace line
-# reaches the file, rather than whether bash writes to stderr, because bash can
-# write an unrelated warning to stderr, such as for an uninstalled locale.
-if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
-  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
-  bash_has_xtracefd=true
-else
-  bash_has_xtracefd=false
-fi
 export PS4
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${LINENO}: '

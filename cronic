@@ -185,24 +185,32 @@ fi
 # sets.  The subshell restores the caller's `-a`, `-e`, `-u`, and `-x` options,
 # replacing this script's, for a builtin and also for a bash script when the
 # caller exported SHELLOPTS.  The `:+` avoids a bare `-`, which has a special
-# meaning to `set`.  With the caller's xtrace on, bash traces the `set` command
-# and the `command -- ...` line, which are this script's, not the command's.
-# So the subshell points the trace descriptor at /dev/null, and the redirection
-# that points it back at the trace file is on the `command` line itself, which
-# bash traces before performing the redirections.  `eval` because a
-# redirection's target descriptor must be written literally.  The trace of a
-# builtin COMMAND, such as `exit`, is the `command -- ...` line, so it is
-# discarded too.
+# meaning to `set`.  With the caller's xtrace on, bash traces the
+# `command -- ...` line, which is this script's, not the command's.  So under
+# bash 4.1 or later, the subshell points the trace descriptor at /dev/null, and
+# the redirection that points it back at the trace file is on the `command` line
+# itself, which bash traces before performing the redirections.  That line is in
+# a function, rather than in an `eval`, because an `eval` would add a level of
+# nesting to every trace line of a builtin COMMAND.  The function is defined by
+# `eval` because the descriptor that a redirection changes, on the left of the
+# operator, must be written literally; only the right side may be a variable.
+# The trace of a builtin COMMAND, such as `exit`, is the `command -- ...` line,
+# so it is discarded too.  A bash before 4.1 writes the trace to stderr, which
+# cannot be pointed at /dev/null without discarding the command's error output.
 set +e
 (
-  cronic_redirections=
-  if [ -n "${cronic_xtrace_fd-}" ]; then
+  if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
     eval "exec {cronic_saved_fd}>&$cronic_xtrace_fd $cronic_xtrace_fd> /dev/null"
     # shellcheck disable=SC2154 # The `eval` above assigns cronic_saved_fd.
-    cronic_redirections="$cronic_xtrace_fd>&$cronic_saved_fd $cronic_saved_fd>&-"
+    eval "cronic_command() {
+      command -- \"\$@\" $cronic_xtrace_fd>&$cronic_saved_fd $cronic_saved_fd>&-
+    }"
+    set +u${cronic_caller_flags:+ -$cronic_caller_flags}
+    cronic_command "$@"
+  else
+    set +u${cronic_caller_flags:+ -$cronic_caller_flags}
+    command -- "$@"
   fi
-  set +u${cronic_caller_flags:+ -$cronic_caller_flags}
-  eval "command -- \"\$@\" $cronic_redirections"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
