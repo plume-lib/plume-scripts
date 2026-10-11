@@ -198,6 +198,7 @@ set +e
   cronic_redirections=
   if [ -n "${cronic_xtrace_fd-}" ]; then
     eval "exec {cronic_saved_fd}>&$cronic_xtrace_fd $cronic_xtrace_fd> /dev/null"
+    # shellcheck disable=SC2154 # The `eval` above assigns cronic_saved_fd.
     cronic_redirections="$cronic_xtrace_fd>&$cronic_saved_fd $cronic_saved_fd>&-"
   fi
   set +u${cronic_caller_flags:+ -$cronic_caller_flags}
