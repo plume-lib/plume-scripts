@@ -297,6 +297,12 @@ set -e
 export SHELLOPTS
 exec "$CRONIC" "\$@"
 EOF
+cat > "$work/cronic-with-allexport" << EOF
+#!/bin/bash
+set -a
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
 # The wrapper's own trace goes to /dev/null, and `cronic` reads no startup
 # file, so that any trace in the output comes from `cronic`.
 cat > "$work/cronic-with-xtrace" << EOF
@@ -308,7 +314,8 @@ export SHELLOPTS
 exec "$CRONIC" "\$@" 2>&3 3>&-
 EOF
 chmod +x "$work/cronic-with-shellopts" "$work/cronic-with-nounset" \
-  "$work/cronic-with-errexit" "$work/cronic-with-xtrace"
+  "$work/cronic-with-errexit" "$work/cronic-with-allexport" \
+  "$work/cronic-with-xtrace"
 saved_cronic="$CRONIC"
 CRONIC="$work/cronic-with-shellopts"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
@@ -324,6 +331,14 @@ check "bash script with an unset variable, caller's nounset exported" 127 \
 CRONIC="$work/cronic-with-errexit"
 check "bash script with a failing command, caller's errexit exported" 1 report \
   env BASH_ENV= bash -c 'false; true'
+# When the caller exports allexport, `cronic` does not export its own variables
+# to the command, but a variable that the command assigns is exported.
+CRONIC="$work/cronic-with-allexport"
+check "no cronic variables exported, caller's allexport exported" 0 silent \
+  sh -c '! env | grep -q "^cronic_"'
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "command's variable exported, caller's allexport exported" 0 silent \
+  eval 'cronic_test_variable=1; sh -c "[ \"\$cronic_test_variable\" = 1 ]"'
 # When the caller exports xtrace, `cronic` traces only the command, not itself.
 CRONIC="$work/cronic-with-xtrace"
 check "bash script, caller's xtrace exported" 0 silent \
