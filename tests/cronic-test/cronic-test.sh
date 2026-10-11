@@ -280,29 +280,23 @@ check "builtin with an unset variable" 0 silent \
 # When the caller exports SHELLOPTS, a bash script runs with the caller's
 # options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
 # the script runs no startup file.
-cat > "$work/cronic-with-shellopts" << EOF
-#!/bin/bash
-export SHELLOPTS
-exec "$CRONIC" "\$@"
-EOF
-cat > "$work/cronic-with-nounset" << EOF
-#!/bin/bash
-set -u
-export SHELLOPTS
-exec "$CRONIC" "\$@"
-EOF
-cat > "$work/cronic-with-errexit" << EOF
-#!/bin/bash
-set -e
-export SHELLOPTS
-exec "$CRONIC" "\$@"
-EOF
-cat > "$work/cronic-with-allexport" << EOF
-#!/bin/bash
-set -a
-export SHELLOPTS
-exec "$CRONIC" "\$@"
-EOF
+# Creates "$work/cronic-with-NAME", which runs `cronic` with SHELLOPTS exported,
+# after `set OPTION` if OPTION is given.
+make_cronic_wrapper() { # NAME [OPTION]
+  {
+    echo "#!/bin/bash"
+    if [ $# -gt 1 ]; then
+      echo "set $2"
+    fi
+    echo "export SHELLOPTS"
+    echo "exec \"$CRONIC\" \"\$@\""
+  } > "$work/cronic-with-$1"
+  chmod +x "$work/cronic-with-$1"
+}
+make_cronic_wrapper shellopts
+make_cronic_wrapper nounset -u
+make_cronic_wrapper errexit -e
+make_cronic_wrapper allexport -a
 # The wrapper's own trace goes to /dev/null, and `cronic` reads no startup
 # file, so that any trace in the output comes from `cronic`.
 cat > "$work/cronic-with-xtrace" << EOF
@@ -313,9 +307,7 @@ set -x
 export SHELLOPTS
 exec "$CRONIC" "\$@" 2>&3 3>&-
 EOF
-chmod +x "$work/cronic-with-shellopts" "$work/cronic-with-nounset" \
-  "$work/cronic-with-errexit" "$work/cronic-with-allexport" \
-  "$work/cronic-with-xtrace"
+chmod +x "$work/cronic-with-xtrace"
 saved_cronic="$CRONIC"
 CRONIC="$work/cronic-with-shellopts"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
