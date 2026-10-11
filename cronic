@@ -16,9 +16,16 @@
 #
 # For usage information, run `cronic --help`.
 #
+# Names that start with `cronic_` are reserved for this script:  COMMAND does
+# not see a variable or function with such a name, even one that the caller
+# exported.  This script assumes that bash has the `compgen` builtin, which is
+# absent only if bash was built with `--disable-progcomp`.
+#
 # Limitations, which `cronic --help` documents:  every run produces output if
 # the caller exports the verbose option or runs `bash -v cronic`, or if the file
-# named by BASH_ENV writes to stderr.
+# named by BASH_ENV writes to stderr.  COMMAND does not see a function named
+# `builtin` that the caller exported, because this script removes it so that it
+# can run builtins via `builtin`.
 
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
@@ -26,23 +33,76 @@
 # BASH_VERSINFO check below.
 
 # Save the caller's settings of the options that this script changes, as the
-# letters that `$-` uses for them, so that the command runs with them.  The
-# command inherits every other option, including every `shopt` option,
-# unchanged.  If this script ever changes another option, add its letter here.
+# letters that `$-` uses for them, so that the command runs with them.  They
+# include any option that BASH_ENV set, because bash runs BASH_ENV before this
+# script's first line.  The command inherits every other option, including
+# every `shopt` option, unchanged.  If this script ever changes another option,
+# add its letter here.  Posix mode, which has no letter, is saved in
+# `cronic_caller_posix`, which is non-empty if the caller's shell was in posix
+# mode.
 #
-# Then turn off xtrace, so that this script does not trace itself to stderr,
-# which would make every run produce output, and allexport, so that this script
-# does not export its variables to the command.  `cronic_caller_flags`, which is
-# assigned before that, is un-exported explicitly.  The redirection discards
-# the trace of `set +ax` itself.  If the caller exports BASH_XTRACEFD, then
-# bash writes that trace to the caller's trace descriptor instead.  If that
-# descriptor is not open, then bash reports so on stderr before this script
-# runs, as for any bash script; cronic cannot prevent that.
+# Then turn on posix mode, by assigning POSIXLY_CORRECT, so that a special
+# builtin, such as `export`, `set`, or `unset`, runs in place of a function of
+# the same name that the caller exported.  Then turn off xtrace, so that this
+# script does not trace itself to stderr, which would make every run produce
+# output, and allexport, so that this script does not export its variables to
+# the command.  The variables assigned before that are un-exported explicitly,
+# or, for POSIXLY_CORRECT, unset below.  The redirection discards the trace of
+# this block.  If the caller exports BASH_XTRACEFD, then bash writes that trace
+# to the caller's trace descriptor instead.  If that descriptor is not open,
+# then bash reports so on stderr before this script runs, as for any bash
+# script; cronic cannot prevent that.
 {
   cronic_caller_flags=${-//[^aeux]/}
+  if [[ :$SHELLOPTS: == *:posix:* ]]; then
+    cronic_caller_posix=y
+  else
+    cronic_caller_posix=
+    POSIXLY_CORRECT=y
+  fi
   set +ax
-  export -n cronic_caller_flags
+  export -n cronic_caller_flags cronic_caller_posix
 } 2> /dev/null
+
+# The next command removes every alias, such as one that BASH_ENV defined, so
+# that no alias changes this script's commands or the caller's functions, which
+# the command gets back by re-parsing their definitions; the backslash stops an
+# alias named `unalias` from applying.  Bash imports the caller's exported
+# functions before it runs BASH_ENV, so their bodies never contain an alias.
+# The commands after it save the definitions of the caller's exported
+# functions, which bash has imported, and remove every function, including any
+# that BASH_ENV defined, so that none runs in place of a builtin or program that
+# this script uses.  The command gets the exported functions back.  In posix
+# mode, `export -pf` lists the names of the exported functions.  Once any
+# function named `builtin` is removed, `builtin` runs the other builtins.
+# `declare -f` runs with posix mode off, because posix mode rejects a function
+# name, such as `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT
+# turns posix mode off again, unless the caller's shell was already in posix
+# mode, before the loop that removes the functions, because in posix mode bash
+# 3.2 also rejects such a name in `unset -f`.  The loop runs `unset` and
+# `exit` via `builtin`, so that no function runs in their place.  Their error
+# output is not discarded:  if `unset` cannot remove a function, such as one
+# that BASH_ENV made readonly, then bash reports the error and this script
+# exits, so cron sends email rather than failing silently.
+\unalias -a
+cronic_exported=$(export -pf)
+unset -f builtin
+cronic_caller_functions=
+cronic_caller_function_names=
+while builtin read -r cronic_name; do
+  cronic_name=${cronic_name#export -f }
+  if [[ -n $cronic_name && $cronic_name != cronic_* && $cronic_name != builtin ]]; then
+    builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
+    cronic_caller_function_names+=$cronic_name_quoted
+  fi
+done <<< "$cronic_exported"
+if [[ -n $cronic_caller_function_names ]]; then
+  cronic_caller_functions=$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
+fi
+[[ -n $cronic_caller_posix ]] || unset POSIXLY_CORRECT
+while builtin read -r cronic_name; do
+  [[ -z $cronic_name ]] || builtin unset -f -- "$cronic_name" || builtin exit 1
+done <<< "$(builtin compgen -A function)"
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -73,6 +133,16 @@ cronic_help() {
   echo "                       is less likely to be overlooked"
   echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
+  echo "COMMAND may be a program, a shell builtin, or a shell function that the"
+  echo "caller exported; a function runs in place of a program of the same name."
+  echo "Names that start with \"cronic_\" are reserved:  COMMAND does not see a"
+  echo "variable or function with such a name, even one that the caller exported."
+  echo "Nor does COMMAND see a function named \"builtin\" that the caller exported,"
+  echo "because cronic removes it so that it can run builtins via \"builtin\"."
+  echo "COMMAND runs with the caller's shell options, such as errexit, nounset,"
+  echo "and xtrace (including any that BASH_ENV sets), rather than with this"
+  echo "script's.  This script never traces itself, so \"bash -x cronic COMMAND\""
+  echo "traces only the running of COMMAND."
   echo "Execution traces (from \"set -x\") are not treated as error output."
   echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
   echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
@@ -195,26 +265,36 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
-# The command runs in a subshell rather than in this shell, so that a builtin
-# such as `exit` or `exec` cannot end this script before it reports.
+# The command runs in a subshell rather than via `exec`, so that it can be a
+# shell builtin or an exported shell function, and rather than in this shell,
+# so that a builtin such as `exit` or `exec` cannot end this script before it
+# reports.
 #
-# The subshell restores the caller's options that this script changed.
-# Otherwise, if the caller exported SHELLOPTS, a bash script that reads an unset
-# variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.  Of
-# those options, only nounset is on here, so a single `set` command turns it off
-# and turns on the caller's, so that the restoring is not traced.  The `:+`
-# avoids a bare `-`, which has a special meaning to `set`.
+# The subshell unsets this script's functions, which are the only ones that
+# remain, and every variable whose name starts with `cronic_`, so that the
+# command does not see them, and so that a function does not run in place of a
+# program of the same name.  The names of this script's functions are
+# identifiers, so they need no quoting.  The `eval` expands the cronic_*
+# variables before `unset` removes them.  If `unset` cannot remove one, such as
+# one that BASH_ENV made readonly, then the subshell exits without running the
+# command, and the report shows the error.  The `eval` then defines the caller's
+# functions, which can replace a builtin, so the remaining commands run via
+# `builtin`.
 #
-# `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.
+# The last command of the `eval` restores the caller's options that this script
+# changed.  Otherwise, if the caller exported SHELLOPTS, a bash script that
+# reads an unset variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash)
+# would fail.  Of those options, only nounset is on here, so a single `set`
+# command turns it off and turns on the caller's, so that the restoring is not
+# traced.  The `:+` avoids a bare `-`, which has a special meaning to `set`.
 #
 # The redirections apply to the whole subshell, so that they also capture what
 # it writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.
 #
 # The subshell is not the operand of `||` or the like, because then bash would
-# ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
-# command inherits.
+# ignore `set -e` throughout the subshell, including in a shell function that it
+# runs, and would remove "errexit" from the SHELLOPTS that the command inherits.
 #
 # Limitation:  if the command is a builtin that runs code in the subshell, such
 # as `source` or `eval`, that code runs with the caller's options even if the
@@ -222,8 +302,13 @@ fi
 # that code silently expands an unset variable to the empty string.
 set +e
 (
-  set +u${cronic_caller_flags:+ -$cronic_caller_flags}
-  command -- "$@"
+  # shellcheck disable=SC2046  # each name is a separate argument.
+  unset -f $(compgen -A function)
+  eval "unset -v \"\${!cronic_@}\" || exit 1
+    $cronic_caller_functions
+    ${cronic_caller_function_names:+builtin export -f --$cronic_caller_function_names}
+    builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
+  "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
@@ -232,8 +317,8 @@ set -e
 unset BASH_XTRACEFD
 
 # With the caller's xtrace on, the first line of the trace file is the trace of
-# the `command -- ...` line above, which is this script's, not the command's,
-# so it is removed.  (The `set` command before it is not traced.)  For a builtin
+# the `"$@"` line above, which is this script's, not the command's, so it is
+# removed.  (The `set` command before it is not traced.)  For a builtin
 # COMMAND, such as `exit`, that line is the builtin's own trace.  If PS4
 # contains a newline, then that trace spans several lines, of which only the
 # first is removed.  A bash before 4.1 writes the trace to stderr, and that line
