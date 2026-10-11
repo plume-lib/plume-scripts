@@ -1,5 +1,4 @@
 #!/bin/bash
-{ set +v; } 2> /dev/null # If the caller exported SHELLOPTS with verbose on, echo no more of this script.
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -17,22 +16,6 @@
 # `cronic_help`; run `cronic --help`.
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
-
-# If the caller exported SHELLOPTS with xtrace on, then this script would
-# trace its own commands, and that trace would be reported as the command's.
-# So this script turns xtrace off, and turns it back on for the command.  The
-# trace of this test goes to /dev/null rather than to the caller's stderr.  The
-# regular expression matches the attributes of SHELLOPTS, such as "-rx", and
-# not its value, which contains "xtrace".  When xtrace is on but SHELLOPTS is
-# not exported, as under `bash -x cronic`, this script is traced as usual.
-{
-  if [[ $- == *x* && $(declare -p SHELLOPTS) =~ ^declare\ -[a-z]*x ]]; then
-    cronic_inherited_xtrace=true
-    set +x
-  else
-    cronic_inherited_xtrace=false
-  fi
-} 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -177,43 +160,21 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
-# The command runs in a fresh bash process rather than in this shell, so that
-# a builtin such as `exit` or `exec` cannot end this script before it reports,
-# and so that the command sees none of this script's state:  not its functions,
-# its unexported variables, its positional parameters, or its `set -eu`.  The
-# command does see the caller's environment, including any functions that the
-# caller exported.  If the caller exported SHELLOPTS, then the command inherits
-# the caller's options, except that errexit, nounset, and verbose are off.  The
-# redirections apply to the whole process, so that they also capture what it
-# writes after the command finishes, such as the output of an EXIT trap that
-# the command sets.  The command is passed as a string of quoted words rather
-# than as positional parameters, so that a builtin such as `eval` sees no
-# positional parameters.  The leading `''` quotes the first word, so that it is
-# never read as a reserved word such as `time` or `if`, nor as an assignment.
-# The fresh bash's `$0` is this script's, so that its error messages name this
-# script rather than bash.
-cronic_command="''$(printf '%q ' "$@")"
-# Bash does not trace `set -x` itself, so the trace starts with the command.
-if $cronic_inherited_xtrace; then
-  cronic_command="set -x; $cronic_command"
-fi
-# A non-interactive bash runs the file named by BASH_ENV when it starts.  This
-# script already ran that file, so BASH_ENV is empty while the fresh bash
-# starts, and the command string then restores it.  Otherwise the file would
-# run twice, and its output would be reported as the command's.  This script
-# has BASH_ENV only if the caller exported it, so the restored value is still
-# exported.
-if [ -n "${BASH_ENV+set}" ]; then
-  cronic_command="BASH_ENV=$(printf '%q' "$BASH_ENV"); $cronic_command"
-else
-  cronic_command="unset BASH_ENV; $cronic_command"
-fi
-# `set +u` matters even though the command runs in a fresh bash:  if the
-# caller exported SHELLOPTS, then the fresh bash inherits this script's options.
-set +eu
-BASH_ENV='' "$BASH" -c "$cronic_command" "$0" > "$cronic_out" 2> "$cronic_trace"
+# The command runs in a subshell rather than in this shell, so that a builtin
+# such as `exit` or `exec` cannot end this script before it reports.
+# `command` because a function of this script, such as `cronic_usage`, would
+# otherwise run in place of a program of the same name.  The redirections
+# apply to the whole subshell, so that they also capture what it writes after
+# the command finishes, such as the output of an EXIT trap that the command
+# sets.  `set +u` hides this script's `set -u` from a builtin, and also from a
+# bash script when the caller exported SHELLOPTS.
+set +e
+(
+  set +u
+  command -- "$@"
+) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
-set -eu
+set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
