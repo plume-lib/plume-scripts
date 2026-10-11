@@ -14,17 +14,16 @@
 # Extended by Michael Ernst to add the --expected-status, --permit-stderr, and
 # --duplicate-stderr options, which may be given in any order.
 #
-# The options and the treatment of execution traces are documented in function
-# `cronic_help`; run `cronic --help`.
+# For usage information, run `cronic --help`.
 #
+# Limitations, which `cronic --help` documents:  every run produces output if
+# the caller exports the verbose option or runs `bash -v cronic`, or if the file
+# named by BASH_ENV writes to stderr.
+
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
-
-# Limitations, which `cronic --help` documents:  every run produces output if
-# the caller exports the verbose option or runs `bash -v cronic`, or if the file
-# named by BASH_ENV writes to stderr.
 
 # Save the caller's settings of the options that this script changes, as the
 # letters that `$-` uses for them, so that the command runs with them.  The
