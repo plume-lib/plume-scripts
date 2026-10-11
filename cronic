@@ -19,15 +19,24 @@
 
 # Save the caller's shell options, as the letters that `$-` uses for them,
 # before this script changes them for itself.  This script changes only
-# allexport, errexit, and nounset, so the command inherits the caller's other
-# `set -o` options, and its `shopt` options, without any restoring; an option
-# that this script changes must be added to the pattern.
-cronic_caller_flags=${-//[^aeu]/}
-
-# Exit if a command exits with a non-zero status, and treat unset variables
-# as an error.  Do not export this script's variables to the command, even if
-# the caller's exported SHELLOPTS contains allexport.
-set -eu +a
+# allexport, errexit, nounset, verbose, and xtrace, so the command inherits the
+# caller's other `set -o` options, and its `shopt` options, without any
+# restoring; an option that this script changes must be added to the pattern.
+# `$(set +o)` would save every `set -o` option, but bash turns off verbose in a
+# command substitution, so `set +o` there would report verbose as off.
+#
+# Then, exit if a command exits with a non-zero status, and treat unset
+# variables as an error.  Do not export this script's variables to the command,
+# even if the caller's exported SHELLOPTS contains allexport.  Do not trace this
+# script's own commands, even if the caller's exported SHELLOPTS contains
+# verbose or xtrace, so that the report's "TRACE OUTPUT" is the command's.
+# The traces of these two commands are discarded, so that this script produces
+# no output when the command succeeds.  (The lines that verbose prints before
+# this point cannot be discarded.)
+{
+  cronic_caller_flags=${-//[^aeuvx]/}
+  set -eu +a +vx
+} 2> /dev/null
 export -n cronic_caller_flags
 
 # Prints the usage line.
@@ -178,10 +187,12 @@ fi
 # `command` because a function of this script, such as `cronic_usage`, would
 # otherwise run in place of a program of the same name.  The subshell turns off
 # this script's nounset (errexit is off already) in the same command that turns
-# on the caller's options.  The `:+` avoids a trailing `-`, which would turn off
-# the caller's verbose and xtrace.  The redirections are on the command rather
-# than on the subshell, so that the execution traces of the subshell's own
-# commands go to this script's standard error rather than to the command's.
+# on the caller's options, so that only the `command` line is traced.  The `:+`
+# avoids a bare `-`, which has a special meaning to `set`.  The redirections are
+# on the command rather than on the subshell, so that the trace of the `command`
+# line does not go to the command's standard error; under bash 4.1 or later,
+# it goes to the trace file, and under an older bash, to this script's
+# standard error.
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
 # command inherits.

@@ -315,6 +315,21 @@ check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
   "$default_shellopts:errexit" bash -c 'false; :'
+# shellcheck disable=SC2016 # The expansion is for the command to do.
+check "exported SHELLOPTS with allexport, command's environment" 0 silent \
+  "$default_shellopts:allexport" bash -c \
+  'case $SHELLOPTS in *allexport*) ;; *) exit 2 ;; esac
+   ! printenv cronic_caller_flags && ! printenv cronic_out'
+check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
+  "$default_shellopts:xtrace" "$work/read-unset" 0
+check "exported SHELLOPTS with xtrace, trace in the report" 3 \
+  "report:^+ exit 3$" "$default_shellopts:xtrace" bash -c 'exit 3'
+# The trace in the report is the command's, not `cronic`'s own.
+if grep -q -e '^+ set ' -e '^+ cronic_' "$work/output"; then
+  echo "FAIL: exported SHELLOPTS with xtrace, cronic's own commands are traced:"
+  cat "$work/output"
+  status=1
+fi
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
