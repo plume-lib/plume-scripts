@@ -80,6 +80,8 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "If the caller's xtrace is on, cronic's own trace of running COMMAND is"
+  echo "removed from the TRACE OUTPUT; that works only if PS4 contains no newline."
   echo "Do not run \"bash -v cronic\", nor export the verbose option (\"set -v\") via"
   echo "SHELLOPTS: bash would echo the lines of this script (and, if exported, of a"
   echo "bash COMMAND) to stderr, so every run would produce output."
@@ -211,19 +213,6 @@ fi
 # it writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.
 #
-# With the caller's xtrace on, bash traces the `command -- ...` line, which is
-# this script's, not the command's.  So under bash 4.1 or later, the subshell
-# points the trace descriptor at /dev/null, and the redirection that points it
-# back at the trace file is on the `command` line itself, which bash traces
-# before performing the redirections.  That line is in a function, rather than
-# in an `eval`, because an `eval` would add a level of nesting to every trace
-# line of a builtin COMMAND.  The function is defined by `eval` because the
-# descriptor that a redirection changes, on the left of the operator, must be
-# written literally; only the right side may be a variable.  The trace of a
-# builtin COMMAND, such as `exit`, is the `command -- ...` line, so it is
-# discarded too.  A bash before 4.1 writes the trace to stderr, which cannot be
-# pointed at /dev/null without discarding the command's error output.
-#
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
 # command inherits.
@@ -234,24 +223,26 @@ fi
 # that code silently expands an unset variable to the empty string.
 set +e
 (
-  if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
-    eval "exec {cronic_saved_fd}>&$cronic_xtrace_fd $cronic_xtrace_fd> /dev/null"
-    # shellcheck disable=SC2154 # The `eval` above assigns cronic_saved_fd.
-    eval "cronic_command() {
-      command -- \"\$@\" $cronic_xtrace_fd>&$cronic_saved_fd $cronic_saved_fd>&-
-    }"
-    set +u${cronic_caller_flags:+ -$cronic_caller_flags}
-    cronic_command "$@"
-  else
-    set +u${cronic_caller_flags:+ -$cronic_caller_flags}
-    command -- "$@"
-  fi
+  set +u${cronic_caller_flags:+ -$cronic_caller_flags}
+  command -- "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
+
+# With the caller's xtrace on, the first line of the trace file is the trace of
+# the `command -- ...` line above, which is this script's, not the command's,
+# so it is removed.  (The `set` command before it is not traced.)  For a builtin
+# COMMAND, such as `exit`, that line is the builtin's own trace.  If PS4
+# contains a newline, then that trace spans several lines, of which only the
+# first is removed.  A bash before 4.1 writes the trace to stderr, and that line
+# is not removed from it.
+if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
+  sed 1d "$cronic_xtrace" > "$cronic_xtrace.reduced"
+  cronic_xtrace=$cronic_xtrace.reduced
+fi
 
 # End stderr with a newline, if it is not empty.  `grep` ends its output with a
 # newline, so without this, the filtered stderr would differ from the

@@ -481,6 +481,17 @@ if [ "$bash_has_xtracefd" = true ] && grep -q -e "command --" "$work/output"; th
   cat "$work/output"
   status=1
 fi
+# With xtrace exported, the trace of an EXIT trap that a builtin sets is
+# reported, even if the builtin returns normally rather than calling `exit`.
+cat > "$work/exit-trap-trace-section.goal" << 'EOF'
+TRACE OUTPUT:
+++ trap 'echo trapped >&2' EXIT
+++ echo trapped
+
+EOF
+check_trace_section "exported SHELLOPTS with xtrace, EXIT trap of a builtin" \
+  "$work/exit-trap-trace-section.goal" \
+  "$CRONIC" "$default_shellopts:xtrace" eval "trap 'echo trapped >&2' EXIT"
 
 CRONIC="$real_cronic"
 
