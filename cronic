@@ -18,8 +18,14 @@
 # feature of a later bash only after checking the version.
 
 # The caller's shell options, which this script restores for the command.
-# They include any that the caller passed by exporting SHELLOPTS.
-cronic_caller_flags=$-
+# They include any that the caller passed by exporting SHELLOPTS.  This script
+# turns xtrace off, so that its own commands are not traced to stderr, which
+# would make every run produce output; the redirection discards the trace of
+# `set +x` itself.
+{
+  cronic_caller_flags=$-
+  set +x
+} 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -170,14 +176,16 @@ fi
 # otherwise run in place of a program of the same name.  The redirections
 # apply to the whole subshell, so that they also capture what it writes after
 # the command finishes, such as the output of an EXIT trap that the command
-# sets.  The subshell restores the caller's `-e` and `-u` options, replacing
-# this script's, for a builtin and also for a bash script when the caller
-# exported SHELLOPTS.
+# sets.  The subshell restores the caller's `-e`, `-u`, and `-x` options,
+# replacing this script's, for a builtin and also for a bash script when the
+# caller exported SHELLOPTS.  `-x` is restored last, so that only the command
+# is traced.
 set +e
 (
   set +u
   case $cronic_caller_flags in *e*) set -e ;; esac
   case $cronic_caller_flags in *u*) set -u ;; esac
+  case $cronic_caller_flags in *x*) set -x ;; esac
   command -- "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
