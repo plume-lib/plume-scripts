@@ -423,6 +423,10 @@ check "exec builtin" 3 report exec "$work/trace-only" 3
 check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
   trap 'echo "from the trap" >&2' EXIT
 check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
+# The trace of an EXIT trap that a command sets, after turning on xtrace
+# itself, is reported.
+check "EXIT trap of a traced command" 3 "report:^++* false$" \
+  eval 'set -x; trap false EXIT; exit 3'
 # A builtin runs with `set +u`, as it would in an ordinary shell.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
@@ -457,17 +461,10 @@ check "exported SHELLOPTS with allexport, command's variable exported" 0 silent 
 # produces no output at all:  `cronic` does not trace itself.
 check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
   "$default_shellopts:xtrace" "$work/trace-only" 0
-# With xtrace exported, the report's trace section is the trace of running the
-# command, followed by the command's own trace, with nothing that `cronic` did
-# to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
-# it appears under "TRACE OUTPUT".
-# Bash quotes a word in a trace line if it contains a space or a shell
-# metacharacter, so let bash write the expected trace of the path, which is
-# under the caller's TMPDIR.  The trace goes to a separate file descriptor,
-# and stderr is discarded, so that an unrelated warning from bash, such as for
-# an uninstalled locale, is not part of the expected trace.
-# shellcheck disable=SC2016 # The expansion is for bash to do.
-traced_command=$(bash -c 'BASH_XTRACEFD=3; set -x; : "$1" 0' sh "$work/trace-and-stderr" 3>&1 2> /dev/null | sed 's/^+ : /+ /')
+# With xtrace exported, the report's trace section is the command's own trace,
+# with nothing that `cronic` did to set up the command's options or to run the
+# command.  Bash writes the trace via BASH_XTRACEFD, so it appears under
+# "TRACE OUTPUT".
 cat > "$work/trace-report.goal" << EOF
 Cronic detected failure or error output for the command:
 $work/trace-and-stderr 0
@@ -480,7 +477,6 @@ a real error
 STANDARD OUTPUT:
 
 TRACE OUTPUT:
-$traced_command
 + set -x
 + echo 'a real error'
 + exit 0
@@ -493,6 +489,17 @@ if [ "$bash_has_xtracefd" = true ]; then
     "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
 else
   echo "SKIP: exported SHELLOPTS with xtrace, trace output, because bash is older than 4.1"
+fi
+# With xtrace exported, the trace lines of a builtin are nested 1 deeper than
+# the builtin, whose own trace is the line that runs it.  Under bash 4.1 or
+# later, that line is discarded.
+check "exported SHELLOPTS with xtrace, builtin that fails" 1 \
+  "report:^++ false$" "$default_shellopts:xtrace" eval false
+if [ "$bash_has_xtracefd" = true ] && grep -q -e "^+ eval false$" "$work/output"; then
+  echo "FAIL: exported SHELLOPTS with xtrace, builtin that fails: the report" \
+    "traces cronic itself:"
+  cat "$work/output"
+  status=1
 fi
 
 # The caller's `-e` applies within an exported shell function that is the
@@ -510,6 +517,8 @@ check "exported SHELLOPTS without pipefail, exported function" 0 silent \
 # functions.
 check "exported function sees none of cronic's variables or functions" 0 silent \
   "$default_shellopts" report_cronic_variables
+check "exported function sees none of cronic's variables or functions, xtrace" \
+  0 silent "$default_shellopts:xtrace" report_cronic_variables
 # ... nor a variable that is not exported, which BASH_ENV set within `cronic`.
 echo "cronic_from_bash_env=unexported" > "$work/bash-env"
 BASH_ENV="$work/bash-env"
@@ -676,7 +685,7 @@ export BASH_ENV
 check "readonly function from BASH_ENV" 1 "message:readonly function" true
 unset BASH_ENV
 
-# `bash -x cronic` does not trace `cronic` itself, but does trace running the
+# `bash -x cronic` traces neither `cronic` itself nor the line that runs the
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.
 grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"

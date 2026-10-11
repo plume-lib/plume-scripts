@@ -287,6 +287,21 @@ fi
 # command never turns posix mode off and on again, because doing so would
 # replace the caller's value of POSIXLY_CORRECT by "y"; turning posix mode off
 # unsets POSIXLY_CORRECT.
+# With the caller's xtrace on, bash traces the line that runs the command,
+# which is this script's, not the command's.  So under bash 4.1 or later, the
+# subshell points the trace descriptor at /dev/null, and the redirection that
+# points it back at the trace file is on the line that runs the command, which
+# bash traces before performing the redirections.  That line is in a function,
+# `cronic_command`, rather than in an `eval`, because an `eval` would add a
+# level of nesting to every trace line of a builtin COMMAND.  The function is
+# defined by `eval` because the descriptor that a redirection changes, on the
+# left of the operator, must be written literally; only the right side may be
+# a variable.  The function is defined after the caller's functions, and it
+# unsets itself and restores the caller's options while the trace still goes
+# to /dev/null, so that the command does not see it.  The trace of a builtin
+# COMMAND, such as `exit`, is the line that runs it, so it is discarded too.
+# A bash before 4.1 writes the trace to stderr, which cannot be pointed at
+# /dev/null without discarding the command's error output.
 # Limitation:  if the command is a builtin that runs code in the subshell, such
 # as `source` or `eval`, that code runs with the caller's options even if the
 # caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
@@ -295,12 +310,26 @@ set +e
 (
   # shellcheck disable=SC2046  # each name is a separate argument.
   unset -f $(compgen -A function)
-  eval "unset -v \"\${!cronic_@}\"
+  cronic_setup="unset -v \"\${!cronic_@}\"
     $cronic_caller_functions
     ${cronic_posix_off:+POSIXLY_CORRECT=y}
-    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}
-    set $cronic_posix_off +u${cronic_caller_flags:+ -$cronic_caller_flags}"
-  "$@"
+    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}"
+  cronic_restore="set $cronic_posix_off +u${cronic_caller_flags:+ -$cronic_caller_flags}"
+  if [ -n "${cronic_xtrace_fd-}" ] && [[ $cronic_caller_flags == *x* ]]; then
+    eval "exec {cronic_saved_fd}>&$cronic_xtrace_fd $cronic_xtrace_fd> /dev/null"
+    # shellcheck disable=SC2154 # The `eval` above assigns cronic_saved_fd.
+    eval "$cronic_setup
+      cronic_command() {
+        unset -f cronic_command
+        $cronic_restore
+        \"\$@\" $cronic_xtrace_fd>&$cronic_saved_fd $cronic_saved_fd>&-
+      }"
+    cronic_command "$@"
+  else
+    eval "$cronic_setup
+      $cronic_restore"
+    "$@"
+  fi
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
