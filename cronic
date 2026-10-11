@@ -200,11 +200,11 @@ cronic_trace_pattern() {
   # multibyte character is repeated as a whole, whatever the locale.
   local LC_ALL=C
   [[ $PS4 =~ ^([$'\xc0'-$'\xff'][$'\x80'-$'\xbf']*|.) ]]
-  local first
-  first=$(cronic_bre_quote "${BASH_REMATCH[0]}")
+  local first=${BASH_REMATCH[0]}
+  local rest=${PS4#"$first"}
   # `\{1,\}` rather than GNU's `\+`, which is not a POSIX basic regular
   # expression.
-  printf '^\\(%s\\)\\{1,\\}%s\n' "$first" "$(cronic_bre_quote "${PS4#"${BASH_REMATCH[0]}"}")"
+  printf '^\\(%s\\)\\{1,\\}%s\n' "$(cronic_bre_quote "$first")" "$(cronic_bre_quote "$rest")"
 }
 
 # Each `grep` that reads the wrapped command's output uses `-a`, so that it
@@ -213,12 +213,14 @@ cronic_trace_pattern() {
 # binary and print only a "Binary file ... matches" notice in place of the
 # lines it selects, so that a real error could go unreported.
 cronic_pattern=$(cronic_trace_pattern)
-if [ -n "$cronic_pattern" ] && grep -a -q "$cronic_pattern" "$cronic_trace"; then
-  # `|| true` because `grep -v` exits with status 1 when it selects no lines,
-  # which happens whenever stderr consists only of trace lines.  Without it,
-  # `set -e` would abort the script here, before it produces its report, and
-  # it would exit with status 1 rather than with the wrapped command's status.
-  grep -a -v "$cronic_pattern" "$cronic_trace" > "$cronic_err" || true
+if [ -n "$cronic_pattern" ]; then
+  # `|| [ $? -eq 1 ]` because `grep -v` exits with status 1 when it selects no
+  # lines, which happens whenever stderr consists only of trace lines.  Without
+  # it, `set -e` would abort the script here, before it produces its report,
+  # and it would exit with status 1 rather than with the wrapped command's
+  # status.  If `grep` fails (status 2), the unfiltered stderr is used, rather
+  # than an empty or truncated file cronic_err that could hide an error.
+  grep -a -v "$cronic_pattern" "$cronic_trace" > "$cronic_err" || [ $? -eq 1 ] || cronic_err=$cronic_trace
 else
   cronic_err=$cronic_trace
 fi
@@ -232,11 +234,12 @@ fi
 # the directory as 'dir' from version 4.0, and as `dir' before then; macOS's
 # /usr/bin/make is GNU make 3.81.
 # TODO: Expand this.
-# `|| true` because `grep -v` exits with status 1 when it selects no lines.
+# `|| [ $? -eq 1 ]` because `grep -v` exits with status 1 when it selects no
+# lines.  If `grep` fails (status 2), the unreduced stderr is used.
 grep -a -E -v \
   -e '^Everything up-to-date$' \
   -e '^[[:alnum:]_.-]*make(\[[0-9]+\])?: (Entering|Leaving) directory '"[\`']"'.*'"'"'$' \
-  "$cronic_err" > "$cronic_reduced_err" || true
+  "$cronic_err" > "$cronic_reduced_err" || [ $? -eq 1 ] || cronic_reduced_err=$cronic_err
 
 if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
   echo "Cronic detected failure or error output for the command:"
@@ -264,7 +267,7 @@ if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ]
   fi
   echo "STANDARD OUTPUT:"
   cat "$cronic_out"
-  if [ "$cronic_trace" != "$cronic_err" ]; then
+  if ! cmp -s "$cronic_trace" "$cronic_err"; then
     echo
     echo "TRACE-ERROR OUTPUT:"
     cat "$cronic_trace"
