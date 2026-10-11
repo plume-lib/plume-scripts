@@ -135,9 +135,10 @@ temp_files() {
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
-# "report:TEXT", which also requires TEXT to appear in the report, or
-# "message:TEXT", which requires TEXT to appear in output that need not be a
-# report.
+# "report:TEXT", which also requires TEXT to appear in the report,
+# "report-once:TEXT", which also requires TEXT to appear on exactly one line of
+# the report, or "message:TEXT", which requires TEXT to appear in output that
+# need not be a report.
 check() {
   description="$1"
   expected_status="$2"
@@ -175,6 +176,15 @@ check() {
       ;;
   esac
   case "$expected_output" in
+    report-once:*)
+      if [ "$(grep -c -e "${expected_output#*:}" "$work/output")" -ne 1 ]; then
+        echo "FAIL: $description: expected exactly one line of the output to" \
+          "contain \"${expected_output#*:}\", but got:"
+        cat "$work/output"
+        status=1
+        return
+      fi
+      ;;
     report:* | message:*)
       if ! grep -q -e "${expected_output#*:}" "$work/output"; then
         echo "FAIL: $description: expected the output to contain" \
@@ -221,6 +231,17 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 # ... but a real error among them is still reported.
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
+
+# Error output that does not end with a newline is shown once, on a line of
+# its own, both when trace lines are filtered out of it and when they are not.
+check "stderr without a final newline" 0 "report-once:^oops$" \
+  sh -c 'printf oops >&2'
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+$X '
+export PS4
+check "stderr without a final newline, unfiltered" 0 "report-once:^oops$" \
+  sh -c 'printf oops >&2'
+unset PS4
 
 # Error output that `grep` would treat as binary is still reported.
 check "binary stderr" 0 "report:error$" "$work/binary-stderr"

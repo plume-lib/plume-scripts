@@ -19,9 +19,9 @@
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.  Letting PATH choose bash exposes nothing new:
 # PATH also chooses the wrapped command, which runs with the same privileges.
-# Its uses of `sed` and `cmp` are POSIX, as are its uses of `grep` apart from
-# `-a`.  `grep -a` and `mktemp -d` with a template are not POSIX, but macOS,
-# the BSDs, and GNU support them.  CI runs its tests on macOS, under /bin/bash.
+# Its uses of `sed`, `cmp`, `tail`, and `wc` are POSIX, as are its uses of
+# `grep` apart from `-a`.  `grep -a` and `mktemp -d` with a template are not
+# POSIX, but macOS, the BSDs, and GNU support them.  CI runs its tests on macOS, under /bin/bash.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -176,6 +176,15 @@ set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
+
+# End stderr with a newline, if it is not empty.  `grep` ends its output with a
+# newline, so without this, the filtered stderr would differ from the
+# unfiltered stderr even when `grep` removed no line, and the report would
+# show the same output twice.  The newline also keeps the last line of stderr
+# off the line of the report's next heading.
+if [ -s "$cronic_trace" ] && [ "$(tail -c 1 "$cronic_trace" | wc -l)" -eq 0 ]; then
+  echo >> "$cronic_trace"
+fi
 
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.
