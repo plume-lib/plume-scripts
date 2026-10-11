@@ -187,8 +187,9 @@ run_cronic() {
 
 # check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
 # runs `cronic`, and checks that it exits with status 0, leaves no temporary
-# files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
-# section, through the following empty line, is the contents of GOAL-FILE.
+# files, writes nothing to stderr, and produces a complete report whose "TRACE
+# OUTPUT" section, through the following empty line, is the contents of
+# GOAL-FILE.
 # Skips the check if bash lacks BASH_XTRACEFD, so that the report has no
 # "TRACE OUTPUT".
 check_trace_section() {
@@ -203,7 +204,9 @@ check_trace_section() {
 
   run_cronic "$description" 0 "$@" || return 0
   sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
-  if cmp -s "$goal" "$work/trace-section" && [ ! -s "$work/stderr" ]; then
+  if cmp -s "$goal" "$work/trace-section" \
+    && grep -q "^END OF CRONIC OUTPUT.$" "$work/output" \
+    && [ ! -s "$work/stderr" ]; then
     echo "PASS: $description"
   else
     echo "FAIL: $description: output:"
