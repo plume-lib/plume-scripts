@@ -17,9 +17,27 @@
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
-# Exit if a command exits with a non-zero status, and treat unset variables
-# as an error.
-set -eu
+# Save the caller's shell options, as the letters that `$-` uses for them,
+# before this script changes them for itself.  This script changes only
+# allexport, errexit, nounset, verbose, and xtrace, so the command inherits the
+# caller's other `set -o` options, and its `shopt` options, without any
+# restoring; an option that this script changes must be added to the pattern.
+# `$(set +o)` would save every `set -o` option, but bash turns off verbose in a
+# command substitution, so `set +o` there would report verbose as off.
+#
+# Then, exit if a command exits with a non-zero status, and treat unset
+# variables as an error.  Do not export this script's variables to the command,
+# even if the caller's exported SHELLOPTS contains allexport.  Do not trace this
+# script's own commands, even if the caller's exported SHELLOPTS contains
+# verbose or xtrace, so that the report's "TRACE OUTPUT" is the command's.
+# The traces of these two commands are discarded, so that this script produces
+# no output when the command succeeds.  (The lines that verbose prints before
+# this point cannot be discarded.)
+{
+  cronic_caller_flags=${-//[^aeuvx]/}
+  set -eu +a +vx
+} 2> /dev/null
+export -n cronic_caller_flags
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -160,12 +178,31 @@ if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)));
   export BASH_XTRACEFD=$cronic_xtrace_fd
 fi
 
+# Run the command with the caller's `set -o` shell options rather than this
+# script's.  If the caller exported SHELLOPTS, then the command would otherwise
+# inherit this script's options, and a bash script that reads an unset variable
+# (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.
 # The command runs in a subshell rather than in this shell, so that a builtin
 # such as `exit` or `exec` cannot end this script before it reports.
 # `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.
+# otherwise run in place of a program of the same name.  The subshell turns off
+# this script's nounset (errexit is off already) in the same command that turns
+# on the caller's options, so that only the `command` line is traced.  The `:+`
+# avoids a bare `-`, which has a special meaning to `set`.  The redirections are
+# on the command rather than on the subshell, so that the trace of the `command`
+# line does not go to the command's standard error; under bash 4.1 or later,
+# it goes to the trace file, and under an older bash, to this script's
+# standard error.
+# The subshell is not the operand of `||` or the like, because then bash would
+# ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
+# command inherits.
+# Limitation:  if the command is a builtin that runs code in the subshell, such
+# as `source` or `eval`, that code runs with the caller's options even if the
+# caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
+# that code silently expands an unset variable to the empty string.
 set +e
 (
+  set +u${cronic_caller_flags:+ -$cronic_caller_flags}
   command -- "$@" > "$cronic_out" 2> "$cronic_trace"
 )
 cronic_result=$?

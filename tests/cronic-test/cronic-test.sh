@@ -13,6 +13,19 @@
 
 set -eu
 
+# Do not let the user's environment file run in `cronic` or in the bash commands
+# below.  It could write to stderr, especially when an exported SHELLOPTS turns
+# on `-u` for it.
+unset BASH_ENV
+# Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
+# to the commands below.  If SHELLOPTS is exported, then run this script again
+# without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
+# `printenv` matches the name exactly, unlike a search of the output of `env`,
+# which can match a line within the value of another variable.
+if printenv SHELLOPTS > /dev/null; then
+  exec env -u SHELLOPTS sh "$0" "$@"
+fi
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 CRONIC="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)/cronic"
 
@@ -87,6 +100,24 @@ cat > "$work/stderr-lines" << 'EOF'
 printf '%s\n' "$@" 1>&2
 EOF
 chmod +x "$work/stderr-lines"
+
+# A bash command that reads an unset variable.
+cat > "$work/read-unset" << 'EOF'
+#!/bin/bash
+unset CRONIC_TEST_UNSET_VARIABLE
+echo "value: ${CRONIC_TEST_UNSET_VARIABLE}" > /dev/null
+exit "$1"
+EOF
+chmod +x "$work/read-unset"
+
+# Runs `cronic` with SHELLOPTS set to its first argument and exported.
+cat > "$work/cronic-with-shellopts" << 'EOF2'
+#!/bin/bash
+shellopts="$1"
+shift
+exec env SHELLOPTS="$shellopts" "$REAL_CRONIC" "$@"
+EOF2
+chmod +x "$work/cronic-with-shellopts"
 
 # temp_files: prints `cronic`'s temporary files, in a canonical order.
 temp_files() {
@@ -268,6 +299,38 @@ check "builtin command" 0 silent :
 # A builtin that would end the shell does not prevent the report.
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
+
+# When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
+# the wrapped command, but the caller's options do.
+REAL_CRONIC="$CRONIC"
+export REAL_CRONIC
+CRONIC="$work/cronic-with-shellopts"
+default_shellopts=braceexpand:hashall:interactive-comments
+check "exported SHELLOPTS, command reads an unset variable" 0 silent \
+  "$default_shellopts" "$work/read-unset" 0
+check "exported SHELLOPTS, command ignores a failure" 0 silent \
+  "$default_shellopts" bash -c 'false; :'
+check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
+  "report:unbound variable" \
+  "$default_shellopts:nounset" "$work/read-unset" 0
+check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
+  "$default_shellopts:errexit" bash -c 'false; :'
+# shellcheck disable=SC2016 # The expansion is for the command to do.
+check "exported SHELLOPTS with allexport, command's environment" 0 silent \
+  "$default_shellopts:allexport" bash -c \
+  'case $SHELLOPTS in *allexport*) ;; *) exit 2 ;; esac
+   ! printenv cronic_caller_flags && ! printenv cronic_out'
+check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
+  "$default_shellopts:xtrace" "$work/read-unset" 0
+check "exported SHELLOPTS with xtrace, trace in the report" 3 \
+  "report:^+ exit 3$" "$default_shellopts:xtrace" bash -c 'exit 3'
+# The trace in the report is the command's, not `cronic`'s own.
+if grep -q -e '^+ set ' -e '^+ cronic_' "$work/output"; then
+  echo "FAIL: exported SHELLOPTS with xtrace, cronic's own commands are traced:"
+  cat "$work/output"
+  status=1
+fi
+CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
