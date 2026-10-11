@@ -348,33 +348,28 @@ check "builtin with an unset variable" 0 silent \
 # options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
 # the script runs no startup file.
 # Creates "$work/cronic-with-NAME", which runs `cronic` with SHELLOPTS exported,
-# after `set OPTION` if OPTION is given.
+# after `set OPTION` if OPTION is given.  `cronic` reads no startup file, so
+# that the user's BASH_ENV file does not run with the option on.  The
+# wrapper's own trace goes to /dev/null, so that with `set -x`, any trace in
+# the output comes from `cronic`.
 make_cronic_wrapper() { # NAME [OPTION]
-  {
-    echo "#!/bin/bash"
-    if [ $# -gt 1 ]; then
-      echo "set $2"
-    fi
-    echo "export SHELLOPTS"
-    echo "exec \"$CRONIC\" \"\$@\""
-  } > "$work/cronic-with-$1"
+  cat > "$work/cronic-with-$1" << EOF
+#!/bin/bash
+unset BASH_ENV
+exec 3>&2 2> /dev/null
+${2:+set $2}
+export SHELLOPTS
+exec "$CRONIC" "\$@" 2>&3 3>&-
+EOF
   chmod +x "$work/cronic-with-$1"
 }
 make_cronic_wrapper shellopts
 make_cronic_wrapper nounset -u
 make_cronic_wrapper errexit -e
 make_cronic_wrapper allexport -a
-# The wrapper's own trace goes to /dev/null, and `cronic` reads no startup
-# file, so that any trace in the output comes from `cronic`.
-cat > "$work/cronic-with-xtrace" << EOF
-#!/bin/bash
-unset BASH_ENV
-exec 3>&2 2> /dev/null
-set -x
-export SHELLOPTS
-exec "$CRONIC" "\$@" 2>&3 3>&-
-EOF
-chmod +x "$work/cronic-with-xtrace"
+make_cronic_wrapper xtrace -x
+make_cronic_wrapper verbose -v
+make_cronic_wrapper xtrace-verbose -xv
 saved_cronic="$CRONIC"
 CRONIC="$work/cronic-with-shellopts"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
@@ -437,6 +432,20 @@ check_xtrace "bash script that fails, caller's xtrace exported" 1 \
 # A builtin's trace lines are nested 1 deeper than the builtin.
 check_xtrace "builtin that fails, caller's xtrace exported" 1 \
   "report:^++ false$" eval false
+# When the caller exports verbose, bash echoes the lines of `cronic` through
+# the block that turns verbose off, but nothing more.  With xtrace on as well,
+# `cronic` runs the command through a function that it defines with `eval`.
+sed '/^} 2> \/dev\/null$/q' "$saved_cronic" > "$work/expected"
+for options in verbose xtrace-verbose; do
+  "$work/cronic-with-$options" true > "$work/output" 2>&1
+  if cmp -s "$work/expected" "$work/output"; then
+    echo "PASS: caller's $options exported: cronic echoes only its first lines"
+  else
+    echo "FAIL: caller's $options exported: cronic echoes more than its first lines:"
+    cat "$work/output"
+    status=1
+  fi
+done
 CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
@@ -446,7 +455,7 @@ CRONIC="$saved_cronic"
 # The lowercase names that `cronic` assigns, such as `cronic_out`, are not
 # exported:  `cronic` does overwrite them, but environment variables
 # conventionally have uppercase names.
-variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
+variable_names=$(sed -n 's/^[{ ]*\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
 if [ -z "$variable_names" ]; then
   echo "FAIL: found no variables in $CRONIC"
   status=1
