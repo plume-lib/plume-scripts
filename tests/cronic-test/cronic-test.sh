@@ -558,6 +558,14 @@ check "function from BASH_ENV is not exported" 0 silent \
 unset BASH_ENV
 CRONIC="$REAL_CRONIC"
 
+# A function that BASH_ENV made readonly cannot be removed, so `cronic` does not
+# run the command, but it fails with an error message rather than silently.
+echo 'grep() { echo "function grep ran"; }; readonly -f grep' > "$work/bash-env"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "readonly function from BASH_ENV" 1 "message:readonly function" true
+unset BASH_ENV
+
 # `bash -x cronic` does not trace `cronic` itself, but does trace running the
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.

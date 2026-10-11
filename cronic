@@ -8,28 +8,28 @@
     POSIXLY_CORRECT=y
   fi
   set +vx
-  cronic_exported=$(export -pf)
-  cronic_caller_functions=
-  if [[ $'\n'$cronic_exported$'\n' == *$'\n'"export -f builtin"$'\n'* ]]; then
-    cronic_caller_functions=$(unset -f command; unset POSIXLY_CORRECT; command declare -f builtin)
-  fi
-  unset -f builtin
-  cronic_caller_function_names=
-  while builtin read -r cronic_name; do
-    cronic_name=${cronic_name#export -f }
-    if [[ -n $cronic_name && $cronic_name != cronic_* ]]; then
-      builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
-      cronic_caller_function_names+=$cronic_name_quoted
-    fi
-  done <<< "$cronic_exported"
-  if [[ -n $cronic_caller_function_names ]]; then
-    cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
-  fi
-  while builtin read -r cronic_name; do
-    unset -f -- "$cronic_name"
-  done <<< "$(builtin compgen -A function)"
-  [ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
 } 2> /dev/null
+cronic_exported=$(export -pf)
+cronic_caller_functions=
+if [[ $'\n'$cronic_exported$'\n' == *$'\n'"export -f builtin"$'\n'* ]]; then
+  cronic_caller_functions=$(unset -f command; unset POSIXLY_CORRECT; command declare -f builtin)
+fi
+unset -f builtin
+cronic_caller_function_names=
+while builtin read -r cronic_name; do
+  cronic_name=${cronic_name#export -f }
+  if [[ -n $cronic_name && $cronic_name != cronic_* ]]; then
+    builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
+    cronic_caller_function_names+=$cronic_name_quoted
+  fi
+done <<< "$cronic_exported"
+if [[ -n $cronic_caller_function_names ]]; then
+  cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
+fi
+while builtin read -r cronic_name; do
+  unset -f -- "$cronic_name"
+done <<< "$(builtin compgen -A function)"
+[ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -53,7 +53,9 @@
 # feature of a later bash only after checking the version.
 
 # The first command saves the caller's shell options, as the letters that `$-`
-# uses for them, before this script changes them for itself.  This script
+# uses for them, before this script changes them for itself.  They include any
+# option that BASH_ENV set, because bash runs BASH_ENV before this script's
+# first line and does not record the options that it started with.  This script
 # changes only errexit, nounset, verbose, and xtrace, so the command inherits
 # the caller's other `set -o` options, and its `shopt` options, without any
 # restoring; an option that this script changes must be added to the pattern.
@@ -61,8 +63,8 @@
 # input, which would go to this script's stderr, so that cron would send email
 # for every run.  It comes before any comment, because bash echoes every line
 # that it reads while verbose is on.  The redirection discards its own trace.
-# Finally, the first command saves the definitions of the caller's exported
-# functions, which bash has imported, and removes every function, including any
+# The commands after it save the definitions of the caller's exported
+# functions, which bash has imported, and remove every function, including any
 # that BASH_ENV defined, so that none runs in place of a builtin or program that
 # this script uses.  The command gets the exported functions back.  Assigning
 # POSIXLY_CORRECT turns on posix mode, in which a special builtin, such as
@@ -75,7 +77,10 @@
 # `declare -f` runs with posix mode off, because posix mode rejects a function
 # name, such as `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT
 # turns posix mode off again, unless the caller's shell was already in posix
-# mode.
+# mode.  Their error output is not discarded:  if `unset` cannot remove a
+# function, such as one that BASH_ENV made readonly, then in posix mode bash
+# reports the error and exits, so cron sends email rather than failing
+# silently.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -111,8 +116,9 @@ cronic_help() {
   echo "Names that start with \"cronic_\" are reserved:  COMMAND does not see a"
   echo "variable or function with such a name, even one that the caller exported."
   echo "COMMAND runs with the caller's shell options, such as errexit, nounset,"
-  echo "and xtrace, rather than with this script's.  This script never traces"
-  echo "itself, so \"bash -x cronic COMMAND\" traces only the running of COMMAND."
+  echo "and xtrace (including any that BASH_ENV sets), rather than with this"
+  echo "script's.  This script never traces itself, so \"bash -x cronic COMMAND\""
+  echo "traces only the running of COMMAND."
   echo "Execution traces (from \"set -x\") are not treated as error output."
   echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
   echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
