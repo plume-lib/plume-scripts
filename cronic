@@ -19,14 +19,22 @@
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
 
-# The caller's shell options that this script changes, as the letters that `$-`
-# uses for them, which this script restores for the command.  They include any
-# that the caller passed by exporting SHELLOPTS.  This script turns xtrace off,
-# so that its own commands are not traced to stderr, which would make every run
-# produce output; the redirection discards the trace of `set +x` itself.  It
-# turns allexport off, so that its own variables are not exported to the
-# command; `cronic_caller_flags`, which is assigned before that, is un-exported
-# explicitly.
+# Limitations, which `cronic --help` documents:  every run produces output if
+# the caller exports the verbose option or runs `bash -v cronic`, or if the file
+# named by BASH_ENV writes to stderr.
+
+# Save the caller's settings of the options that this script changes, as the
+# letters that `$-` uses for them, so that the command runs with them.  The
+# command inherits every other option, including every `shopt` option,
+# unchanged.  If this script ever changes another option, add its letter here.
+# Then turn off xtrace, so that this script does not trace itself to stderr,
+# which would make every run produce output, and allexport, so that this script
+# does not export its variables to the command.  `cronic_caller_flags`, which is
+# assigned before that, is un-exported explicitly.  The redirection discards
+# the trace of `set +ax` itself.  If the caller exports BASH_XTRACEFD, then
+# bash writes that trace to the caller's trace descriptor instead.  If that
+# descriptor is not open, then bash reports so on stderr before this script
+# runs, as for any bash script; cronic cannot prevent that.
 {
   cronic_caller_flags=${-//[^aeux]/}
   set +ax
@@ -68,6 +76,12 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "Do not run \"bash -v cronic\", nor export the verbose option (\"set -v\") via"
+  echo "SHELLOPTS: bash would echo the lines of this script (and, if exported, of a"
+  echo "bash COMMAND) to stderr, so every run would produce output."
+  echo "Bash runs the file named by BASH_ENV, if any, before cronic's own code, so"
+  echo "cronic cannot capture that file's output, and exported shell options can make"
+  echo "that file write to stderr.  To prevent that, unset BASH_ENV."
   exit 0
 }
 
@@ -178,16 +192,24 @@ fi
 
 # The command runs in a subshell rather than in this shell, so that a builtin
 # such as `exit` or `exec` cannot end this script before it reports.
+# The subshell restores the caller's options that this script changed.
+# Otherwise, if the caller exported SHELLOPTS, a bash script that reads an unset
+# variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash) would fail.  Of
+# those options, only nounset is on here, so a single `set` command turns it off
+# and turns on the caller's, so that the restoring is not traced.  The `:+`
+# avoids a bare `-`, which has a special meaning to `set`.
 # `command` because a function of this script, such as `cronic_usage`, would
-# otherwise run in place of a program of the same name.  The redirections
-# apply to the whole subshell, so that they also capture what it writes after
-# the command finishes, such as the output of an EXIT trap that the command
-# sets.  The subshell restores the caller's `-a`, `-e`, `-u`, and `-x` options,
-# replacing this script's, for a builtin and also for a bash script when the
-# caller exported SHELLOPTS.  It turns off this script's nounset (errexit is off
-# already) in the same command that turns on the caller's options, so that only
-# the command is traced.  The `:+` avoids a bare `-`, which has a special
-# meaning to `set`.
+# otherwise run in place of a program of the same name.
+# The redirections apply to the whole subshell, so that they also capture what
+# it writes after the command finishes, such as the output of an EXIT trap that
+# the command sets.
+# The subshell is not the operand of `||` or the like, because then bash would
+# ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
+# command inherits.
+# Limitation:  if the command is a builtin that runs code in the subshell, such
+# as `source` or `eval`, that code runs with the caller's options even if the
+# caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
+# that code silently expands an unset variable to the empty string.
 set +e
 (
   set +u${cronic_caller_flags:+ -$cronic_caller_flags}
