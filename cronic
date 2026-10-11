@@ -38,8 +38,10 @@
 # and can make it write to stderr; such a cron job should unset BASH_ENV.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
-# as an error.
-set -eu
+# as an error.  Do not export this script's variables to the command, even if
+# the caller's exported SHELLOPTS contains allexport.
+set -eu +a
+export -n cronic_caller_opts
 
 # Prints the usage line.
 cronic_usage_line() {
@@ -196,6 +198,13 @@ fi
 # a single `set` command, so that the restoring is neither traced nor echoed.
 # SHELLOPTS is not empty here, because nounset is on.  The `:+` avoids a bare
 # `set -o`, which would print the options, when the caller had none on.
+# The subshell is not the operand of `||` or the like, because then bash would
+# ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the
+# command inherits.
+# Limitation:  if the command is a builtin that runs code in the subshell, such
+# as `source` or `eval`, that code runs with the caller's options even if the
+# caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
+# that code silently expands an unset variable to the empty string.
 set +e
 (
   # shellcheck disable=SC2086  # each option name and +o or -o is an argument.
@@ -239,8 +248,8 @@ cronic_pattern=$(cronic_trace_pattern)
 if [ -n "$cronic_pattern" ] && grep -q "$cronic_pattern" "$cronic_trace"; then
   # `|| true` because `grep -v` exits with status 1 when it selects no lines,
   # which happens whenever stderr consists only of trace lines.  Without it,
-  # `set -e` would abort the script here, before it produces its report,
-  # exits with the wrapped command's status, and removes its temporary files.
+  # `set -e` would abort the script here, before it produces its report, and
+  # it would exit with status 1 rather than with the wrapped command's status.
   grep -v "$cronic_pattern" "$cronic_trace" > "$cronic_err" || true
 else
   cronic_err=$cronic_trace
