@@ -235,6 +235,16 @@ check_goals() {
   fi
 }
 
+# check_trace_goals: like check_goals, but skips the check if bash lacks
+# BASH_XTRACEFD, so that the report has no "TRACE OUTPUT".
+check_trace_goals() {
+  if [ "$bash_has_xtracefd" = false ]; then
+    echo "SKIP: $1, because bash is older than 4.1"
+    return 0
+  fi
+  check_goals "$@"
+}
+
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
@@ -481,13 +491,9 @@ TRACE OUTPUT:
 
 END OF CRONIC OUTPUT.
 EOF
-if [ "$bash_has_xtracefd" = true ]; then
-  check_goals "exported SHELLOPTS with xtrace, trace output" \
-    "$work/trace-report.goal" /dev/null \
-    "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
-else
-  echo "SKIP: exported SHELLOPTS with xtrace, trace output, because bash is older than 4.1"
-fi
+check_trace_goals "exported SHELLOPTS with xtrace, trace output" \
+  "$work/trace-report.goal" /dev/null \
+  "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
 # With xtrace exported, the trace lines of a builtin are nested 1 deeper than
 # the builtin, whose own trace is the line that runs it, which is not reported.
 # The trace of an EXIT trap that the builtin sets is reported, even if the
@@ -509,13 +515,9 @@ TRACE OUTPUT:
 
 END OF CRONIC OUTPUT.
 EOF
-if [ "$bash_has_xtracefd" = true ]; then
-  check_goals "exported SHELLOPTS with xtrace, EXIT trap of a builtin" \
-    "$work/exit-trap-trace-report.goal" /dev/null \
-    "$CRONIC" "$default_shellopts:xtrace" eval "trap 'echo trapped >&2' EXIT"
-else
-  echo "SKIP: exported SHELLOPTS with xtrace, EXIT trap of a builtin, because bash is older than 4.1"
-fi
+check_trace_goals "exported SHELLOPTS with xtrace, EXIT trap of a builtin" \
+  "$work/exit-trap-trace-report.goal" /dev/null \
+  "$CRONIC" "$default_shellopts:xtrace" eval "trap 'echo trapped >&2' EXIT"
 
 # The caller's `-e` applies within an exported shell function that is the
 # command, and the caller's lack of `-e` does too.
@@ -620,11 +622,12 @@ check "caller's exported cronic_ variable is not seen" 0 silent \
 check "caller's exported cronic_ function is not seen" 0 silent \
   bash -c '! command declare -F cronic_mine'
 check "caller's exported functions are seen" 0 silent \
-  bash -c 'command declare -F builtin set unset > /dev/null'
+  bash -c 'command declare -F set unset > /dev/null'
 CRONIC="$REAL_CRONIC"
 
-# The caller may export functions named `builtin` and `command`, which `cronic`
-# uses to save the caller's functions; the command sees both of them.
+# The command does not see the caller's exported function named `builtin`,
+# which `cronic` removes so that it can run builtins via `builtin`, but it does
+# see one named `command`.
 cat > "$work/cronic-with-builtin-and-command" << 'EOF'
 #!/bin/bash
 builtin() { echo "function builtin ran"; }
@@ -635,9 +638,9 @@ EOF
 chmod +x "$work/cronic-with-builtin-and-command"
 CRONIC="$work/cronic-with-builtin-and-command"
 # shellcheck disable=SC2016 # The expansion is for `bash` to do.
-check "caller's exported functions named builtin and command are seen" 1 \
-  "report:function builtin ran, function command ran" \
-  bash -c 'echo "$(builtin), $(command)"; false'
+check "caller's exported function named builtin is not seen, command is" 1 \
+  "report:^no builtin, function command ran$" \
+  bash -c 'declare -F builtin || echo "no builtin, $(command)"; false'
 CRONIC="$REAL_CRONIC"
 
 # A function whose name is not an identifier reaches the command, even when
@@ -704,13 +707,9 @@ unset BASH_ENV
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.
 grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"
-if [ "$bash_has_xtracefd" = true ]; then
-  check_goals "bash -x cronic, trace output" \
-    "$work/bash-x-trace-report.goal" /dev/null \
-    bash -x "$CRONIC" "$work/trace-and-stderr" 0
-else
-  echo "SKIP: bash -x cronic, trace output, because bash is older than 4.1"
-fi
+check_trace_goals "bash -x cronic, trace output" \
+  "$work/bash-x-trace-report.goal" /dev/null \
+  bash -x "$CRONIC" "$work/trace-and-stderr" 0
 
 # When `bash_has_xtracefd` is true, bash writes its trace lines to a separate
 # file, so they are not error output, whatever PS4 is.

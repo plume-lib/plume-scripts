@@ -23,7 +23,9 @@
 #
 # Limitations, which `cronic --help` documents:  every run produces output if
 # the caller exports the verbose option or runs `bash -v cronic`, or if the file
-# named by BASH_ENV writes to stderr.
+# named by BASH_ENV writes to stderr.  COMMAND does not see a function named
+# `builtin` that the caller exported, because this script removes it so that it
+# can run builtins via `builtin`.
 
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
@@ -36,7 +38,8 @@
 # script's first line.  The command inherits every other option, including
 # every `shopt` option, unchanged.  If this script ever changes another option,
 # add its letter here.  Posix mode, which has no letter, is saved in
-# `cronic_posix_off`, as the `set` arguments that turn it off again.
+# `cronic_caller_posix`, which is non-empty if the caller's shell was in posix
+# mode.
 #
 # Then turn on posix mode, by assigning POSIXLY_CORRECT, so that a special
 # builtin, such as `export`, `set`, or `unset`, runs in place of a function of
@@ -52,13 +55,13 @@
 {
   cronic_caller_flags=${-//[^aeux]/}
   if [[ :$SHELLOPTS: == *:posix:* ]]; then
-    cronic_posix_off=
+    cronic_caller_posix=y
   else
-    cronic_posix_off="+o posix"
+    cronic_caller_posix=
     POSIXLY_CORRECT=y
   fi
   set +ax
-  export -n cronic_caller_flags cronic_posix_off
+  export -n cronic_caller_flags cronic_caller_posix
 } 2> /dev/null
 
 # The next command removes every alias, such as one that BASH_ENV defined, so
@@ -70,11 +73,8 @@
 # functions, which bash has imported, and remove every function, including any
 # that BASH_ENV defined, so that none runs in place of a builtin or program that
 # this script uses.  The command gets the exported functions back.  In posix
-# mode, `export -pf` lists the names of the exported functions.  Once
-# `builtin` is saved (via `command`, in a subshell that removes any function
-# named `command`) and removed, it runs the other builtins.  `builtin` needs
-# that separate path because `command` cannot be removed first:  `builtin`
-# saves the definition of `command` along with the caller's other functions.
+# mode, `export -pf` lists the names of the exported functions.  Once any
+# function named `builtin` is removed, `builtin` runs the other builtins.
 # `declare -f` runs with posix mode off, because posix mode rejects a function
 # name, such as `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT
 # turns posix mode off again, unless the caller's shell was already in posix
@@ -86,23 +86,20 @@
 # exits, so cron sends email rather than failing silently.
 \unalias -a
 cronic_exported=$(export -pf)
-cronic_caller_functions=
-if [[ $'\n'$cronic_exported$'\n' == *$'\n'"export -f builtin"$'\n'* ]]; then
-  cronic_caller_functions=$(unset -f command; unset POSIXLY_CORRECT; command declare -f builtin)
-fi
 unset -f builtin
+cronic_caller_functions=
 cronic_caller_function_names=
 while builtin read -r cronic_name; do
   cronic_name=${cronic_name#export -f }
-  if [[ -n $cronic_name && $cronic_name != cronic_* ]]; then
+  if [[ -n $cronic_name && $cronic_name != cronic_* && $cronic_name != builtin ]]; then
     builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
     cronic_caller_function_names+=$cronic_name_quoted
   fi
 done <<< "$cronic_exported"
 if [[ -n $cronic_caller_function_names ]]; then
-  cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
+  cronic_caller_functions=$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
 fi
-[[ -z $cronic_posix_off ]] || unset POSIXLY_CORRECT
+[[ -n $cronic_caller_posix ]] || unset POSIXLY_CORRECT
 while builtin read -r cronic_name; do
   [[ -z $cronic_name ]] || builtin unset -f -- "$cronic_name" || builtin exit 1
 done <<< "$(builtin compgen -A function)"
@@ -140,6 +137,8 @@ cronic_help() {
   echo "caller exported; a function runs in place of a program of the same name."
   echo "Names that start with \"cronic_\" are reserved:  COMMAND does not see a"
   echo "variable or function with such a name, even one that the caller exported."
+  echo "Nor does COMMAND see a function named \"builtin\" that the caller exported,"
+  echo "because cronic removes it so that it can run builtins via \"builtin\"."
   echo "COMMAND runs with the caller's shell options, such as errexit, nounset,"
   echo "and xtrace (including any that BASH_ENV sets), rather than with this"
   echo "script's.  This script never traces itself, so \"bash -x cronic COMMAND\""
@@ -277,19 +276,15 @@ fi
 # program of the same name.  The names of this script's functions are
 # identifiers, so they need no quoting.  The `eval` expands the cronic_*
 # variables before `unset` removes them.  It then defines the caller's
-# functions, which can replace a builtin, so the remaining commands run in
-# posix mode, as special builtins.
+# functions, which can replace a builtin, so the remaining commands run via
+# `builtin`.
 #
 # The last command of the `eval` restores the caller's options that this script
 # changed.  Otherwise, if the caller exported SHELLOPTS, a bash script that
 # reads an unset variable (as `/usr/bin/texi2dvi` does when /bin/sh is bash)
-# would fail.  Of those options, only nounset and posix mode are on here, so a
-# single `set` command turns them off (posix mode only if the caller's shell
-# was not in posix mode) and turns on the caller's, so that the restoring is
-# not traced.  The `:+` avoids a bare `-`, which has a special meaning to `set`.
-# That command never turns posix mode off and on again, because doing so would
-# replace the caller's value of POSIXLY_CORRECT by "y"; turning posix mode off
-# unsets POSIXLY_CORRECT.
+# would fail.  Of those options, only nounset is on here, so a single `set`
+# command turns it off and turns on the caller's, so that the restoring is not
+# traced.  The `:+` avoids a bare `-`, which has a special meaning to `set`.
 #
 # The redirections apply to the whole subshell, so that they also capture what
 # it writes after the command finishes, such as the output of an EXIT trap that
@@ -309,9 +304,8 @@ set +e
   unset -f $(compgen -A function)
   eval "unset -v \"\${!cronic_@}\"
     $cronic_caller_functions
-    ${cronic_posix_off:+POSIXLY_CORRECT=y}
-    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}
-    set $cronic_posix_off +u${cronic_caller_flags:+ -$cronic_caller_flags}"
+    ${cronic_caller_function_names:+builtin export -f --$cronic_caller_function_names}
+    builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
