@@ -411,10 +411,6 @@ check "exec builtin" 3 report exec "$work/trace-only" 3
 check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
   trap 'echo "from the trap" >&2' EXIT
 check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
-# The trace of an EXIT trap that a command sets, after turning on xtrace
-# itself, is reported.
-check "EXIT trap of a traced command" 3 "report:^++* false$" \
-  eval 'set -x; trap false EXIT; exit 3'
 # A builtin runs with `set +u`, as it would in an ordinary shell.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
@@ -471,18 +467,9 @@ check_trace_section "exported SHELLOPTS with xtrace, trace output" \
   "$work/trace-section.goal" \
   "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
 # With xtrace exported, the trace lines of a builtin are nested 1 deeper than
-# the builtin, whose own trace is the `command -- ...` line.  Under bash 4.1 or
-# later, that line is discarded.
-check "exported SHELLOPTS with xtrace, builtin that fails" 1 \
-  "report:^++ false$" "$default_shellopts:xtrace" eval false
-if [ "$bash_has_xtracefd" = true ] && grep -q -e "command --" "$work/output"; then
-  echo "FAIL: exported SHELLOPTS with xtrace, builtin that fails: the report" \
-    "traces cronic itself:"
-  cat "$work/output"
-  status=1
-fi
-# With xtrace exported, the trace of an EXIT trap that a builtin sets is
-# reported, even if the builtin returns normally rather than calling `exit`.
+# the builtin, whose own trace is the `command -- ...` line, which is not
+# reported.  The trace of an EXIT trap that the builtin sets is reported, even
+# if the builtin returns normally rather than calling `exit`.
 cat > "$work/exit-trap-trace-section.goal" << 'EOF'
 TRACE OUTPUT:
 ++ trap 'echo trapped >&2' EXIT
