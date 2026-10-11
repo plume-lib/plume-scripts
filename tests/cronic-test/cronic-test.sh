@@ -292,17 +292,18 @@ check "builtin with an unset variable, SHELLOPTS exported" 0 silent \
   eval ': "$cronic_test_unset_variable"'
 CRONIC="$saved_cronic"
 # When the caller exports SHELLOPTS with xtrace on, the trace in the report
-# shows only what the command runs, and not what `cronic` runs.  The wrapper
-# discards its own stderr, which holds its own trace.
+# shows only what the command runs, and not what `cronic` runs, and `cronic`
+# writes nothing to stderr when the command succeeds.  Bash reads SHELLOPTS
+# from the environment when it starts.  The wrapper unsets BASH_ENV, because
+# bash traces the file that BASH_ENV names before `cronic` can turn xtrace off.
 cat > "$work/cronic-with-xtrace" << EOF
-#!/bin/bash
-exec 2> /dev/null
-set -x
-export SHELLOPTS
-exec "$CRONIC" "\$@"
+#!/bin/sh
+unset BASH_ENV
+SHELLOPTS=xtrace exec "$CRONIC" "\$@"
 EOF
 chmod +x "$work/cronic-with-xtrace"
 CRONIC="$work/cronic-with-xtrace"
+check "SHELLOPTS exported with xtrace on, success" 0 silent true
 check "SHELLOPTS exported with xtrace on" 1 report false
 CRONIC="$saved_cronic"
 if [ "$(grep '^+' "$work/output")" != "+ false" ]; then
@@ -310,6 +311,33 @@ if [ "$(grep '^+' "$work/output")" != "+ false" ]; then
   cat "$work/output"
   status=1
 fi
+# When the caller exports SHELLOPTS with verbose on, the command does not echo
+# its input to stderr, which would be reported as error output.  Bash echoes
+# the first lines of `cronic` before `cronic` turns verbose off, so the output
+# is not empty.
+cat > "$work/cronic-with-verbose" << EOF
+#!/bin/sh
+unset BASH_ENV
+SHELLOPTS=verbose exec "$CRONIC" "\$@"
+EOF
+chmod +x "$work/cronic-with-verbose"
+CRONIC="$work/cronic-with-verbose"
+check "SHELLOPTS exported with verbose on" 0 "message:^#!/bin/bash$" true
+CRONIC="$saved_cronic"
+if grep -q "^END OF CRONIC OUTPUT.$" "$work/output"; then
+  echo "FAIL: SHELLOPTS exported with verbose on: unexpected report:"
+  cat "$work/output"
+  status=1
+fi
+# When xtrace is on but SHELLOPTS is not exported, `cronic` itself is traced.
+cat > "$work/cronic-under-bash-x" << EOF
+#!/bin/sh
+exec bash -x "$CRONIC" "\$@"
+EOF
+chmod +x "$work/cronic-under-bash-x"
+CRONIC="$work/cronic-under-bash-x"
+check "bash -x cronic" 0 "message:^+ set -eu$" true
+CRONIC="$saved_cronic"
 # The command's `$0` is `cronic`'s, so that error messages name `cronic`.
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "command's \$0 is cronic's" 0 silent \

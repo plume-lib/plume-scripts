@@ -1,4 +1,5 @@
 #!/bin/bash
+{ set +v; } 2> /dev/null # If the caller exported SHELLOPTS with verbose on, echo no more of this script.
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -19,17 +20,19 @@
 
 # If the caller exported SHELLOPTS with xtrace on, then this script would
 # trace its own commands, and that trace would be reported as the command's.
-# So this script turns xtrace off, and turns it back on for the command.
-case $- in
-  *x*) case $(declare -p SHELLOPTS) in
-    'declare -'*x*) cronic_inherited_xtrace=true ;;
-    *) cronic_inherited_xtrace=false ;;
-  esac ;;
-  *) cronic_inherited_xtrace=false ;;
-esac
-if $cronic_inherited_xtrace; then
-  set +x
-fi
+# So this script turns xtrace off, and turns it back on for the command.  The
+# trace of this test goes to /dev/null rather than to the caller's stderr.  The
+# regular expression matches the attributes of SHELLOPTS, such as "-rx", and
+# not its value, which contains "xtrace".  When xtrace is on but SHELLOPTS is
+# not exported, as under `bash -x cronic`, this script is traced as usual.
+{
+  if [[ $- == *x* && $(declare -p SHELLOPTS) =~ ^declare\ -[a-z]*x ]]; then
+    cronic_inherited_xtrace=true
+    set +x
+  else
+    cronic_inherited_xtrace=false
+  fi
+} 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -180,7 +183,7 @@ fi
 # its unexported variables, its positional parameters, or its `set -eu`.  The
 # command does see the caller's environment, including any functions that the
 # caller exported.  If the caller exported SHELLOPTS, then the command inherits
-# the caller's options, except that errexit and nounset are off.  The
+# the caller's options, except that errexit, nounset, and verbose are off.  The
 # redirections apply to the whole process, so that they also capture what it
 # writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.  The command is passed as a string of quoted words rather
