@@ -17,6 +17,10 @@
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
+# The caller's shell options, which this script restores for the command.
+# They include any that the caller passed by exporting SHELLOPTS.
+cronic_caller_flags=$-
+
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
 set -eu
@@ -166,11 +170,14 @@ fi
 # otherwise run in place of a program of the same name.  The redirections
 # apply to the whole subshell, so that they also capture what it writes after
 # the command finishes, such as the output of an EXIT trap that the command
-# sets.  `set +u` hides this script's `set -u` from a builtin, and also from a
-# bash script when the caller exported SHELLOPTS.
+# sets.  The subshell restores the caller's `-e` and `-u` options, replacing
+# this script's, for a builtin and also for a bash script when the caller
+# exported SHELLOPTS.
 set +e
 (
   set +u
+  case $cronic_caller_flags in *e*) set -e ;; esac
+  case $cronic_caller_flags in *u*) set -u ;; esac
   command -- "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?

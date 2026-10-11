@@ -277,20 +277,43 @@ check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "builtin with an unset variable" 0 silent \
   eval ': "$cronic_test_unset_variable"'
-# A bash script runs with `set +u` even when the caller exports SHELLOPTS,
-# which would otherwise pass `cronic`'s own `set -u` to the script.  BASH_ENV
-# is empty so that the script runs no startup file.
+# When the caller exports SHELLOPTS, a bash script runs with the caller's
+# options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
+# the script runs no startup file.
 cat > "$work/cronic-with-shellopts" << EOF
 #!/bin/bash
 export SHELLOPTS
 exec "$CRONIC" "\$@"
 EOF
-chmod +x "$work/cronic-with-shellopts"
+cat > "$work/cronic-with-nounset" << EOF
+#!/bin/bash
+set -u
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+cat > "$work/cronic-with-errexit" << EOF
+#!/bin/bash
+set -e
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+chmod +x "$work/cronic-with-shellopts" "$work/cronic-with-nounset" \
+  "$work/cronic-with-errexit"
 saved_cronic="$CRONIC"
 CRONIC="$work/cronic-with-shellopts"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "bash script with an unset variable, SHELLOPTS exported" 0 silent \
   env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
+check "bash script with a failing command, SHELLOPTS exported" 0 silent \
+  env BASH_ENV= bash -c 'false; true'
+CRONIC="$work/cronic-with-nounset"
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "bash script with an unset variable, caller's nounset exported" 127 \
+  "report:cronic_test_unset_variable" \
+  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
+CRONIC="$work/cronic-with-errexit"
+check "bash script with a failing command, caller's errexit exported" 1 report \
+  env BASH_ENV= bash -c 'false; true'
 CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
