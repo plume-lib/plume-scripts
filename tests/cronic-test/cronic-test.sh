@@ -40,6 +40,16 @@ mkdir "$TMPDIR"
 
 status=0
 
+# Whether `cronic`, which runs under /bin/bash, writes the execution trace to a
+# separate file, via BASH_XTRACEFD, which bash 4.1 or later supports.  If not,
+# then bash writes its trace to stderr, like any other shell, and the tests
+# that depend on the separate file are skipped.
+if /bin/bash -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'; then
+  bash_xtracefd=true
+else
+  bash_xtracefd=false
+fi
+
 # A command whose stderr is nothing but trace lines.
 cat > "$work/trace-only" << 'EOF'
 #!/bin/bash
@@ -168,18 +178,18 @@ run_cronic() {
   fi
 }
 
-# check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
-# runs `cronic`, and checks that it exits with status 0, leaves no temporary
-# files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
-# section, through the following empty line, is the contents of GOAL-FILE.
-check_trace_section() {
+# check_goals DESCRIPTION OUTPUT-GOAL STDERR-GOAL COMMAND...: runs COMMAND,
+# which runs `cronic`, and checks that it exits with status 0, leaves no
+# temporary files, and writes the contents of OUTPUT-GOAL to standard output
+# and the contents of STDERR-GOAL to stderr.
+check_goals() {
   description="$1"
-  goal="$2"
-  shift 2
+  output_goal="$2"
+  stderr_goal="$3"
+  shift 3
 
   run_cronic "$description" 0 "$@" || return 0
-  sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
-  if [ ! -s "$work/stderr" ] && cmp -s "$goal" "$work/trace-section"; then
+  if cmp -s "$output_goal" "$work/output" && cmp -s "$stderr_goal" "$work/stderr"; then
     echo "PASS: $description"
   else
     echo "FAIL: $description: output:"
@@ -375,35 +385,41 @@ check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
 # command, followed by the command's own trace, with nothing that `cronic` did
 # to set up the command's options.  Bash writes the trace via BASH_XTRACEFD, so
 # it appears under "TRACE OUTPUT".
-cat > "$work/trace-section.goal" << EOF
+cat > "$work/trace-report.goal" << EOF
+Cronic detected failure or error output for the command:
+$work/trace-and-stderr 0
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+a real error
+
+STANDARD OUTPUT:
+
 TRACE OUTPUT:
 + $work/trace-and-stderr 0
 + set -x
 + echo 'a real error'
 + exit 0
 
+END OF CRONIC OUTPUT.
 EOF
-check_trace_section "exported SHELLOPTS with xtrace, trace output" \
-  "$work/trace-section.goal" \
-  "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+if $bash_xtracefd; then
+  check_goals "exported SHELLOPTS with xtrace, trace output" \
+    "$work/trace-report.goal" /dev/null \
+    "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
+else
+  echo "SKIP: exported SHELLOPTS with xtrace, trace output, because bash is older than 4.1"
+fi
 
 # With verbose exported, a successful command produces no report:  `cronic`
 # does not echo, into the command's error output, the commands that restore the
 # caller's options.  `cronic` echoes to its stderr only its lines through its
 # first command, which bash reads before `cronic` turns verbose off.
 sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
-if run_cronic "exported SHELLOPTS with verbose" 0 \
-  "$CRONIC" "$default_shellopts:verbose" true; then
-  if [ ! -s "$work/output" ] && cmp -s "$work/verbose-stderr.goal" "$work/stderr"; then
-    echo "PASS: exported SHELLOPTS with verbose"
-  else
-    echo "FAIL: exported SHELLOPTS with verbose: output:"
-    cat "$work/output"
-    echo "stderr:"
-    cat "$work/stderr"
-    status=1
-  fi
-fi
+check_goals "exported SHELLOPTS with verbose" \
+  /dev/null "$work/verbose-stderr.goal" \
+  "$CRONIC" "$default_shellopts:verbose" true
 
 # The caller's `-e` applies within an exported shell function that is the
 # command, and the caller's lack of `-e` does too.
@@ -467,7 +483,9 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 unset $exported_names
 
 # Names that start with `cronic_` are reserved:  the command does not see a
-# variable or function with such a name that the caller exported.
+# variable or function with such a name that the caller exported, even when the
+# caller also exported functions named like the builtins that `cronic` uses to
+# hide such names.
 cat > "$work/cronic-with-cronic-names" << 'EOF'
 #!/bin/bash
 cronic_mine() {
@@ -476,6 +494,11 @@ cronic_mine() {
 cronic_debug="caller's cronic_debug"
 export -f cronic_mine
 export cronic_debug
+compgen() { echo "function compgen ran" >&2; }
+eval() { echo "function eval ran" >&2; }
+read() { echo "function read ran" >&2; }
+unset() { echo "function unset ran" >&2; }
+export -f compgen eval read unset
 exec "$REAL_CRONIC" "$@"
 EOF
 chmod +x "$work/cronic-with-cronic-names"
@@ -490,34 +513,36 @@ CRONIC="$REAL_CRONIC"
 # `bash -x cronic` does not trace `cronic` itself, but does trace running the
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.
-cat > "$work/bash-x-trace-section.goal" << EOF
-TRACE OUTPUT:
-+ $work/trace-and-stderr 0
-+ echo 'a real error'
-+ exit 0
-
-EOF
-check_trace_section "bash -x cronic, trace output" \
-  "$work/bash-x-trace-section.goal" \
-  bash -x "$CRONIC" "$work/trace-and-stderr" 0
+grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"
+if $bash_xtracefd; then
+  check_goals "bash -x cronic, trace output" \
+    "$work/bash-x-trace-report.goal" /dev/null \
+    bash -x "$CRONIC" "$work/trace-and-stderr" 0
+else
+  echo "SKIP: bash -x cronic, trace output, because bash is older than 4.1"
+fi
 
 # Bash writes its trace lines to a separate file, so they are not error
 # output, whatever PS4 is.
 export PS4
-# shellcheck disable=SC2016 # The expansion is for the traced command to do.
-PS4='+${LINENO}: '
-check "bash, PS4 with expansions, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
-check "bash, PS4 with expansions, trace in the report" 3 \
-  "report:echo 'the standard output'$" "$work/trace-only" 3
-check "bash, PS4 with expansions, trace lines and real stderr" 0 \
-  "report:^a real error$" "$work/trace-and-stderr" 0
-PS4='+\D{%H}: '
-check "bash, PS4 with an escape, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
-PS4='[trace] '
-check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
-  "$work/trace-only" 0
+if $bash_xtracefd; then
+  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
+  PS4='+${LINENO}: '
+  check "bash, PS4 with expansions, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+  check "bash, PS4 with expansions, trace in the report" 3 \
+    "report:echo 'the standard output'$" "$work/trace-only" 3
+  check "bash, PS4 with expansions, trace lines and real stderr" 0 \
+    "report:^a real error$" "$work/trace-and-stderr" 0
+  PS4='+\D{%H}: '
+  check "bash, PS4 with an escape, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+  PS4='[trace] '
+  check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
+    "$work/trace-only" 0
+else
+  echo "SKIP: tests of bash with any PS4, because bash is older than 4.1"
+fi
 
 # The tests below concern trace lines that a shell other than bash writes to
 # stderr; they are recognized by PS4.  Bash running as root does not import

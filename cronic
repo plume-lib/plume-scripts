@@ -64,8 +64,13 @@ cronic_help() {
   echo "                       is less likely to be overlooked"
   echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
+  echo "COMMAND may be a program, a shell builtin, or a shell function that the"
+  echo "caller exported; a function runs in place of a program of the same name."
   echo "Names that start with \"cronic_\" are reserved:  COMMAND does not see a"
   echo "variable or function with such a name, even one that the caller exported."
+  echo "COMMAND runs with the caller's shell options, such as errexit, nounset,"
+  echo "and xtrace, rather than with this script's.  This script never traces"
+  echo "itself, so \"bash -x cronic COMMAND\" traces only the running of COMMAND."
   echo "Execution traces (from \"set -x\") are not treated as error output."
   echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
   echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
@@ -200,20 +205,23 @@ fi
 # nounset (errexit is off already) in the same command that turns on the
 # caller's options, so that the restoring is neither traced nor echoed.  The
 # `:+` avoids a bare `set -`, which would turn off verbose and xtrace.
+# Each command is run via `builtin`, because the caller's exported functions
+# have been imported, and outside posix mode a function such as `unset` would
+# run in place of the builtin of the same name.
 set +e
 (
-  while read -r cronic_name; do
-    unset -f "$cronic_name"
-  done <<< "$(compgen -A function cronic_)"
-  eval "unset -v \"\${!cronic_@}\"
-    set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
+  while builtin read -r cronic_name; do
+    builtin unset -f "$cronic_name"
+  done <<< "$(builtin compgen -A function cronic_)"
+  builtin eval "builtin unset -v \"\${!cronic_@}\"
+    builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
-unset BASH_XTRACEFD
+builtin unset BASH_XTRACEFD
 
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.
