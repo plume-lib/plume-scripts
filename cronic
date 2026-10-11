@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 {
-  cronic_caller_flags=${-//[^aeuvx]/}
-  set +vx
+  cronic_caller_flags=${-//[^aeux]/}
+  set +x
 } 2> /dev/null
 
 # Cronic v2 - cron job report wrapper
@@ -25,23 +25,18 @@
 
 # The first command (lines 2-5) saves the caller's settings of the shell
 # options that this script changes for itself, as the letters that `$-` uses
-# for them:  allexport, errexit, nounset, verbose, and xtrace.  The command
+# for them:  allexport, errexit, nounset, and xtrace.  The command
 # inherits every other option, including every `shopt` option, unchanged.  If
 # this script ever changes another option, add its letter there.
-# The first command then stops this script from tracing itself or echoing its
-# input, which would go to this script's stderr, so that cron would send email
-# for every run.  The redirection discards its own trace.
-# Do not add anything, not even a comment, before or within the first command,
-# because bash echoes to stderr every line that it reads while verbose is on.
-# The verbose check in tests/cronic-test/cronic-test.sh expects that echo to
-# end at the first line that is exactly `} 2> /dev/null`.
-# Verbose is handled only partly:  bash echoes this script's lines through the
-# end of the first command to stderr before that command can turn verbose off.
-# So if the caller exports SHELLOPTS with verbose, or runs `bash -v cronic`,
-# then cron sends email for every run.
-# Likewise, bash runs the file named by BASH_ENV, if any, before this script's
-# first command, so an exported xtrace, verbose, or nounset applies to that file
-# and can make it write to stderr; such a cron job should unset BASH_ENV.
+# The first command then stops this script from tracing itself, which would go
+# to this script's stderr, so that cron would send email for every run.  The
+# redirection discards its own trace.
+# This script does not handle verbose:  if the caller exports SHELLOPTS with
+# verbose, or runs `bash -v cronic`, then bash echoes this script's lines to
+# stderr, so cron sends email for every run.  `cronic --help` says not to.
+# Bash runs the file named by BASH_ENV, if any, before this script's first
+# command, so an exported xtrace or nounset applies to that file and can make
+# it write to stderr; such a cron job should unset BASH_ENV.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.  Do not export this script's variables to the command, even if
@@ -74,16 +69,17 @@ cronic_help() {
   echo "                       is less likely to be overlooked"
   echo "  --                   end the options, so that COMMAND may start with \"-\""
   echo "  -h, --help           print this message"
+  echo "Bash runs the BASH_ENV file, if any, before cronic starts, so"
+  echo "exported shell options can make that file write to stderr."
   echo "Execution traces (from \"set -x\") are not treated as error output."
   echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
   echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
-  echo "Under \"set -v\" exported via SHELLOPTS, or \"bash -v cronic\", bash echoes the"
-  echo "first lines of cronic to stderr before cronic can turn verbose off."
-  echo "Likewise, bash runs the BASH_ENV file, if any, before cronic starts, so"
-  echo "exported shell options can make that file write to stderr."
+  echo "Do not export the verbose option (\"set -v\") via SHELLOPTS: bash would echo"
+  echo "the lines of this script and of a bash COMMAND to stderr, so every run would"
+  echo "produce output."
   exit 0
 }
 
@@ -204,7 +200,7 @@ fi
 # the command finishes, such as the output of an EXIT trap that the command
 # sets.  Of the options that this script changes, only nounset is on here, so
 # the subshell turns it off and turns on the caller's, in a single `set`
-# command, so that the restoring is neither traced nor echoed.  The `:+` avoids
+# command, so that the restoring is not traced.  The `:+` avoids
 # a bare `-`, which has a special meaning to `set`.
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` in it and would remove "errexit" from the SHELLOPTS that the

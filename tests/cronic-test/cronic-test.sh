@@ -494,17 +494,6 @@ check_trace_section "exported SHELLOPTS with xtrace, trace output" \
   "$work/trace-section.goal" \
   "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
 
-# With verbose exported, a successful command produces no report:  `cronic`
-# does not echo, into the command's error output, the commands that restore the
-# caller's options.  `cronic` echoes to its stderr only its lines through its
-# first command, which bash reads before `cronic` turns verbose off.
-sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
-if run_cronic "exported SHELLOPTS with verbose" 0 \
-  "$CRONIC" "$default_shellopts:verbose" true; then
-  compare_streams "exported SHELLOPTS with verbose" \
-    "$work/output" /dev/null "$work/verbose-stderr.goal"
-fi
-
 CRONIC="$REAL_CRONIC"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
