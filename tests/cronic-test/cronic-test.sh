@@ -516,6 +516,31 @@ check "caller's exported functions are seen" 0 silent \
   bash -c 'command declare -F builtin set unset > /dev/null'
 CRONIC="$REAL_CRONIC"
 
+# A function whose name is not an identifier reaches the command, even when
+# the caller exported errexit.  A function that BASH_ENV defined, rather than
+# one that the caller exported, is not exported to the command.
+cat > "$work/cronic-with-odd-names" << 'EOF'
+#!/bin/bash
+my-fn() {
+  echo "my-fn ran"
+}
+export -f my-fn
+set -o errexit
+export SHELLOPTS
+exec "$REAL_CRONIC" "$@"
+EOF
+chmod +x "$work/cronic-with-odd-names"
+echo 'from_bash_env() { :; }' > "$work/bash-env"
+CRONIC="$work/cronic-with-odd-names"
+BASH_ENV="$work/bash-env"
+export BASH_ENV
+check "caller's exported function whose name is not an identifier" 1 \
+  "report:my-fn ran" bash -c 'my-fn; false'
+check "function from BASH_ENV is not exported" 0 silent \
+  bash -c '! printenv "BASH_FUNC_from_bash_env%%"'
+unset BASH_ENV
+CRONIC="$REAL_CRONIC"
+
 # `bash -x cronic` does not trace `cronic` itself, but does trace running the
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.

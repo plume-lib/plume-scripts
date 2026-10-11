@@ -8,15 +8,24 @@
     POSIXLY_CORRECT=y
   fi
   set +vx
-  cronic_caller_functions=$(unset -f command; command declare -f builtin) || :
-  cronic_caller_function_names=${cronic_caller_functions:+ builtin}
+  cronic_exported=$(export -pf)
+  cronic_caller_functions=
+  if [[ $'\n'$cronic_exported$'\n' == *$'\n'"export -f builtin"$'\n'* ]]; then
+    cronic_caller_functions=$(unset -f command; unset POSIXLY_CORRECT; command declare -f builtin)
+  fi
   unset -f builtin
+  cronic_caller_function_names=
   while builtin read -r cronic_name; do
+    cronic_name=${cronic_name#export -f }
     if [[ -n $cronic_name && $cronic_name != cronic_* ]]; then
-      cronic_caller_functions+=$'\n'"$(builtin declare -f -- "$cronic_name")"
       builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
       cronic_caller_function_names+=$cronic_name_quoted
     fi
+  done <<< "$cronic_exported"
+  if [[ -n $cronic_caller_function_names ]]; then
+    cronic_caller_functions+=$'\n'$(unset POSIXLY_CORRECT; builtin eval "builtin declare -f --$cronic_caller_function_names") || :
+  fi
+  while builtin read -r cronic_name; do
     unset -f -- "$cronic_name"
   done <<< "$(builtin compgen -A function)"
   [ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
@@ -53,14 +62,17 @@
 # for every run.  It comes before any comment, because bash echoes every line
 # that it reads while verbose is on.  The redirection discards its own trace.
 # Finally, the first command saves the definitions of the caller's exported
-# functions, which bash has imported, and removes every function, so that none
-# runs in place of a builtin or program that this script uses.  The command
-# gets the functions back.  Assigning POSIXLY_CORRECT turns on posix mode, in
-# which a special builtin, such as `set` or `unset`, runs in place of a function
-# of the same name.  Once `builtin` is saved (via `command`, in a subshell that
-# removes any function named `command`) and removed, it runs the other builtins.
-# Unsetting POSIXLY_CORRECT turns posix mode off again, unless the caller's
-# shell was already in posix mode.
+# functions, which bash has imported, and removes every function, including any
+# that BASH_ENV defined, so that none runs in place of a builtin or program that
+# this script uses.  The command gets the exported functions back.  Assigning
+# POSIXLY_CORRECT turns on posix mode, in which a special builtin, such as
+# `export`, `set`, or `unset`, runs in place of a function of the same name; in
+# posix mode, `export -pf` lists the names of the exported functions.  Once
+# `builtin` is saved (via `command`, in a subshell that removes any function
+# named `command`) and removed, it runs the other builtins.  `declare -f` runs
+# with posix mode off, because posix mode rejects a function name, such as
+# `my-fn`, that is not an identifier.  Unsetting POSIXLY_CORRECT turns posix
+# mode off again, unless the caller's shell was already in posix mode.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -242,7 +254,7 @@ set +e
   eval "unset -v \"\${!cronic_@}\"
     $cronic_caller_functions
     ${cronic_posix_off:+POSIXLY_CORRECT=y}
-    ${cronic_caller_function_names:+export -f$cronic_caller_function_names}
+    ${cronic_caller_function_names:+export -f --$cronic_caller_function_names}
     set +u $cronic_posix_off${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
