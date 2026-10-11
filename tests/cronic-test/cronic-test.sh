@@ -483,9 +483,9 @@ check "caller's exported variables" 0 silent "$work/check-variables" $exported_n
 unset $exported_names
 
 # Names that start with `cronic_` are reserved:  the command does not see a
-# variable or function with such a name that the caller exported, even when the
-# caller also exported functions named like the builtins that `cronic` uses to
-# hide such names.
+# variable or function with such a name that the caller exported.  The caller
+# also exports functions named like builtins that `cronic` uses, which must not
+# run in place of those builtins, though the command does see them.
 cat > "$work/cronic-with-cronic-names" << 'EOF'
 #!/bin/bash
 cronic_mine() {
@@ -494,11 +494,15 @@ cronic_mine() {
 cronic_debug="caller's cronic_debug"
 export -f cronic_mine
 export cronic_debug
+builtin() { echo "function builtin ran" >&2; }
 compgen() { echo "function compgen ran" >&2; }
+declare() { echo "function declare ran" >&2; }
 eval() { echo "function eval ran" >&2; }
+export() { echo "function export ran" >&2; }
 read() { echo "function read ran" >&2; }
+set() { echo "function set ran" >&2; }
 unset() { echo "function unset ran" >&2; }
-export -f compgen eval read unset
+command export -f builtin compgen declare eval export read set unset
 exec "$REAL_CRONIC" "$@"
 EOF
 chmod +x "$work/cronic-with-cronic-names"
@@ -507,7 +511,9 @@ CRONIC="$work/cronic-with-cronic-names"
 check "caller's exported cronic_ variable is not seen" 0 silent \
   sh -c '[ -z "${cronic_debug+set}" ]'
 check "caller's exported cronic_ function is not seen" 0 silent \
-  bash -c '! declare -F cronic_mine'
+  bash -c '! command declare -F cronic_mine'
+check "caller's exported functions are seen" 0 silent \
+  bash -c 'command declare -F builtin set unset > /dev/null'
 CRONIC="$REAL_CRONIC"
 
 # `bash -x cronic` does not trace `cronic` itself, but does trace running the

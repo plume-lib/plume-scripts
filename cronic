@@ -1,7 +1,25 @@
 #!/bin/bash
 {
   cronic_caller_flags=${-//[^euvx]/}
+  if [[ :$SHELLOPTS: == *:posix:* ]]; then
+    cronic_posix_off=
+  else
+    cronic_posix_off="+o posix"
+    POSIXLY_CORRECT=y
+  fi
   set +vx
+  cronic_caller_functions=$(unset -f command; command declare -f builtin) || :
+  cronic_caller_function_names=${cronic_caller_functions:+ builtin}
+  unset -f builtin
+  while builtin read -r cronic_name; do
+    if [[ -n $cronic_name && $cronic_name != cronic_* ]]; then
+      cronic_caller_functions+=$'\n'"$(builtin declare -f -- "$cronic_name")"
+      builtin printf -v cronic_name_quoted ' %q' "$cronic_name"
+      cronic_caller_function_names+=$cronic_name_quoted
+    fi
+    unset -f -- "$cronic_name"
+  done <<< "$(builtin compgen -A function)"
+  [ -z "$cronic_posix_off" ] || unset POSIXLY_CORRECT
 } 2> /dev/null
 
 # Cronic v2 - cron job report wrapper
@@ -34,6 +52,15 @@
 # input, which would go to this script's stderr, so that cron would send email
 # for every run.  It comes before any comment, because bash echoes every line
 # that it reads while verbose is on.  The redirection discards its own trace.
+# Finally, the first command saves the definitions of the caller's exported
+# functions, which bash has imported, and removes every function, so that none
+# runs in place of a builtin or program that this script uses.  The command
+# gets the functions back.  Assigning POSIXLY_CORRECT turns on posix mode, in
+# which a special builtin, such as `set` or `unset`, runs in place of a function
+# of the same name.  Once `builtin` is saved (via `command`, in a subshell that
+# removes any function named `command`) and removed, it runs the other builtins.
+# Unsetting POSIXLY_CORRECT turns posix mode off again, unless the caller's
+# shell was already in posix mode.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -200,28 +227,30 @@ fi
 # not run in place of a program of the same name.  Each function name is read
 # whole, so that a name that contains a glob character is not expanded; and
 # from a here-string, because bash before 5.1 rejects a process substitution in
-# posix mode, which an exported SHELLOPTS can set.  The `eval` expands
-# cronic_caller_flags before `unset` removes it.  It turns off this script's
-# nounset (errexit is off already) in the same command that turns on the
-# caller's options, so that the restoring is neither traced nor echoed.  The
-# `:+` avoids a bare `set -`, which would turn off verbose and xtrace.
-# Each command is run via `builtin`, because the caller's exported functions
-# have been imported, and outside posix mode a function such as `unset` would
-# run in place of the builtin of the same name.
+# posix mode, which an exported SHELLOPTS can set.  The `eval` expands the
+# cronic_caller_* variables before `unset` removes them.  It then defines the
+# caller's functions, which can replace a builtin, so the remaining commands run
+# in posix mode, as special builtins.  The last command turns posix mode off
+# (unless the caller's shell was in posix mode), turns off this script's
+# nounset (errexit is off already), and turns on the caller's options, so that
+# the restoring is neither traced nor echoed.
 set +e
 (
-  while builtin read -r cronic_name; do
-    builtin unset -f "$cronic_name"
-  done <<< "$(builtin compgen -A function cronic_)"
-  builtin eval "builtin unset -v \"\${!cronic_@}\"
-    builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
+  while read -r cronic_name; do
+    unset -f "$cronic_name"
+  done <<< "$(compgen -A function cronic_)"
+  eval "unset -v \"\${!cronic_@}\"
+    $cronic_caller_functions
+    ${cronic_posix_off:+POSIXLY_CORRECT=y}
+    ${cronic_caller_function_names:+export -f$cronic_caller_function_names}
+    set +u $cronic_posix_off${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?
 set -e
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
-builtin unset BASH_XTRACEFD
+unset BASH_XTRACEFD
 
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.
