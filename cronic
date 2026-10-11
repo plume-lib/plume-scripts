@@ -234,12 +234,11 @@ fi
 # reports.  The subshell is not the left operand of `||`, because bash would
 # then ignore `set -e` throughout the subshell, including in a shell function
 # that it runs.
-# The subshell unsets every function and variable whose name starts with
-# `cronic_`, so that the command does not see them, and so that a function does
-# not run in place of a program of the same name.  Each function name is read
-# whole, so that a name that contains a glob character is not expanded; and
-# from a here-string, because bash before 5.1 rejects a process substitution in
-# posix mode, which an exported SHELLOPTS can set.  The `eval` expands the
+# The subshell unsets this script's functions, which are the only ones that
+# remain, and every variable whose name starts with `cronic_`, so that the
+# command does not see them, and so that a function does not run in place of a
+# program of the same name.  The names of this script's functions are
+# identifiers, so they need no quoting.  The `eval` expands the
 # cronic_caller_* variables before `unset` removes them.  It then defines the
 # caller's functions, which can replace a builtin, so the remaining commands run
 # in posix mode, as special builtins.  The last command turns posix mode off
@@ -248,9 +247,8 @@ fi
 # the restoring is neither traced nor echoed.
 set +e
 (
-  while read -r cronic_name; do
-    unset -f "$cronic_name"
-  done <<< "$(compgen -A function cronic_)"
+  # shellcheck disable=SC2046  # each name is a separate argument.
+  unset -f $(compgen -A function)
   eval "unset -v \"\${!cronic_@}\"
     $cronic_caller_functions
     ${cronic_posix_off:+POSIXLY_CORRECT=y}
