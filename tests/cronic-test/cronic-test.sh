@@ -10,6 +10,13 @@
 # printed, and the exit status would be grep's 1 rather than the wrapped
 # command's.  (The temporary files would still be removed, by `cronic`'s EXIT
 # trap, so the left-behind-files check in `check` does not detect that bug.)
+# The checks that catch that bug are the "trace-only stderr" checks that use
+# `stderr-lines` with a literal PS4, and the "nested trace in stderr" check,
+# whose bash script writes its trace lines to stderr whatever the bash version.
+# All of them run only when the test is not run as root.  The checks that use
+# `trace-only`, a bash script, catch it only under a bash earlier than 4.1:  a
+# later bash writes its trace lines to BASH_XTRACEFD, so `cronic` sees no trace
+# lines in stderr and does not run `grep -v`.
 
 set -eu
 
@@ -43,25 +50,27 @@ mkdir "$TMPDIR"
 
 status=0
 
-# has_xtracefd BASH: succeeds if `cronic`, run under the bash program BASH,
-# writes the execution trace to a separate file, via BASH_XTRACEFD, which bash
-# 4.1 or later supports.  If not, then bash writes its trace to stderr, like any
-# other shell, and the tests that depend on the separate file are skipped.
-has_xtracefd() {
-  # shellcheck disable=SC2016  # the expansions are for bash, not this shell.
-  "$1" -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'
-}
-# Whether `cronic`, which runs under /bin/bash, writes the trace to a separate
-# file.
-if has_xtracefd /bin/bash; then
-  bash_xtracefd=true
+# A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
+# (bash 4.1 or later) writes its trace lines to a separate file, so they are
+# not error output, whatever PS4 is.  An earlier bash, such as macOS's
+# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
+# PS4 contains an expansion or an escape, so it reports them as error output.
+# This tests for the features themselves, rather than for the bash version
+# that `cronic` tests for, so that it detects a wrong version test in `cronic`.
+# `cronic` and the bash scripts below all run under the first `bash` in PATH,
+# so that is the bash tested here.  The probe checks whether a trace line
+# reaches the file, rather than whether bash writes to stderr, because bash can
+# write an unrelated warning to stderr, such as for an uninstalled locale.
+if bash -c 'exec {fd}> "$1" && BASH_XTRACEFD=$fd && set -x && :' \
+  bash "$work/xtracefd-probe" 2> /dev/null && [ -s "$work/xtracefd-probe" ]; then
+  bash_has_xtracefd=true
 else
-  bash_xtracefd=false
+  bash_has_xtracefd=false
 fi
 
 # A command whose stderr is nothing but trace lines.
 cat > "$work/trace-only" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 set -x
 echo "the standard output"
 exit "$1"
@@ -70,7 +79,7 @@ chmod +x "$work/trace-only"
 
 # A command that writes real error output in addition to trace lines.
 cat > "$work/trace-and-stderr" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 set -x
 echo "a real error" 1>&2
 exit "$1"
@@ -78,12 +87,22 @@ EOF
 chmod +x "$work/trace-and-stderr"
 
 # A command whose stderr is nothing but `make` directory-change notices.  Both
-# the top-level form (`make:`) and the recursive form (`make[1]:`) appear; both
-# must be filtered out of the reduced error output.
+# the top-level form (`make:`) and the recursive form (`make[1]:`) appear, as do
+# the quoting of GNU make 3.81 (macOS's /usr/bin/make) and the other names
+# that GNU make runs under; all must be filtered out of the reduced error
+# output.
 cat > "$work/make-noise" << 'EOF'
 #!/bin/sh
 echo "make: Entering directory '/tmp/x'" 1>&2
 echo "make[1]: Entering directory '/tmp/x/sub'" 1>&2
+echo 'make[2]: Entering directory `/tmp/x/sub/old'"'" 1>&2
+echo 'make[2]: Leaving directory `/tmp/x/sub/old'"'" 1>&2
+echo "gmake[2]: Entering directory '/tmp/x/sub/g'" 1>&2
+echo "gmake[2]: Leaving directory '/tmp/x/sub/g'" 1>&2
+echo "gnumake[2]: Entering directory '/tmp/x/sub/gnu'" 1>&2
+echo "gnumake[2]: Leaving directory '/tmp/x/sub/gnu'" 1>&2
+echo "mingw32-make[2]: Entering directory '/tmp/x/sub/mingw'" 1>&2
+echo "mingw32-make[2]: Leaving directory '/tmp/x/sub/mingw'" 1>&2
 echo "make[1]: Leaving directory '/tmp/x/sub'" 1>&2
 echo "make: Leaving directory '/tmp/x'" 1>&2
 exit "$1"
@@ -101,6 +120,28 @@ echo "make: Leaving directory '/tmp/x'" 1>&2
 exit "$1"
 EOF
 chmod +x "$work/make-noise-and-stderr"
+
+# A command that writes a trace line and then an error line that contains a
+# NUL byte and a byte that is invalid in UTF-8, so that `grep` would treat the
+# output as binary.
+cat > "$work/binary-stderr" << 'EOF'
+#!/bin/sh
+printf '[trace] echo hi\n' 1>&2
+printf 'bad \377\000 error\n' 1>&2
+EOF
+chmod +x "$work/binary-stderr"
+
+# A bash command whose trace lines go to stderr, as under a bash earlier than
+# 4.1, whatever the bash version.  Its trace lines are nested 3 deep.
+cat > "$work/nested-trace" << 'EOF'
+#!/usr/bin/env bash
+unset BASH_XTRACEFD
+set -x
+outer=$(inner=$(echo deepest); echo "$inner")
+echo "$outer"
+exit "$1"
+EOF
+chmod +x "$work/nested-trace"
 
 # A command that writes, to stderr, lines that start with `+` but are not trace
 # lines.
@@ -212,9 +253,10 @@ check_goals() {
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
 # on COMMAND and checks its exit status, whether it printed a report, and that
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
-# "report:TEXT", which also requires TEXT to appear in the report, or
-# "message:TEXT", which requires TEXT to appear in output that need not be a
-# report.
+# "report:TEXT", which also requires TEXT to appear in the report,
+# "report-once:TEXT", which also requires TEXT to appear on exactly one line of
+# the report, or "message:TEXT", which requires TEXT to appear in output that
+# need not be a report.
 check() {
   description="$1"
   expected_status="$2"
@@ -245,6 +287,15 @@ check() {
       ;;
   esac
   case "$expected_output" in
+    report-once:*)
+      if [ "$(grep -c -e "${expected_output#*:}" "$work/output")" -ne 1 ]; then
+        echo "FAIL: $description: expected exactly one line of the output to" \
+          "contain \"${expected_output#*:}\", but got:"
+        cat "$work/output"
+        status=1
+        return
+      fi
+      ;;
     report:* | message:*)
       if ! grep -q -e "${expected_output#*:}" "$work/output"; then
         echo "FAIL: $description: expected the output to contain" \
@@ -284,6 +335,20 @@ check "make directory-change notices, exit 0" 0 silent "$work/make-noise" 0
 # ... but a real error among them is still reported.
 check "make directory-change notices and real stderr, exit 0" 0 \
   "report:^a real error$" "$work/make-noise-and-stderr" 0
+
+# Error output that does not end with a newline is shown once, on a line of
+# its own, both when trace lines are filtered out of it and when they are not.
+check "stderr without a final newline" 0 "report-once:^oops$" \
+  sh -c 'printf oops >&2'
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+$X '
+export PS4
+check "stderr without a final newline, unfiltered" 0 "report-once:^oops$" \
+  sh -c 'printf oops >&2'
+unset PS4
+
+# Error output that `grep` would treat as binary is still reported.
+check "binary stderr" 0 "report:error$" "$work/binary-stderr"
 
 # Without a command, `cronic` reports a usage error rather than aborting on an
 # unset variable.
@@ -370,6 +435,15 @@ check "builtin command" 0 silent :
 # A builtin that would end the shell does not prevent the report.
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
+# Output that the subshell writes after the command finishes, such as from an
+# EXIT trap that the command sets, is captured rather than leaked.
+check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
+  trap 'echo "from the trap" >&2' EXIT
+check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
+# A builtin runs with `set +u`, as it would in an ordinary shell.
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin with an unset variable" 0 silent \
+  eval ': "$cronic_test_unset_variable"'
 
 # When SHELLOPTS is exported, `cronic`'s own `-e` and `-u` options do not reach
 # the wrapped command, but the caller's options do.
@@ -386,6 +460,14 @@ check "exported SHELLOPTS with nounset, command reads an unset variable" 1 \
   "$default_shellopts:nounset" "$work/read-unset" 0
 check "exported SHELLOPTS with errexit, command ignores a failure" 1 report \
   "$default_shellopts:errexit" bash -c 'false; :'
+# With allexport exported, `cronic` does not export its own variables to the
+# command, but a variable that the command assigns is exported.
+check "exported SHELLOPTS with allexport, no cronic variables exported" 0 silent \
+  "$default_shellopts:allexport" sh -c '! env | grep -q "^cronic_"'
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "exported SHELLOPTS with allexport, command's variable exported" 0 silent \
+  "$default_shellopts:allexport" \
+  eval 'cronic_test_variable=1; sh -c "[ \"\$cronic_test_variable\" = 1 ]"'
 # With xtrace exported, a successful command with only trace output on stderr
 # produces no output at all:  `cronic` does not trace itself.
 check "exported SHELLOPTS with xtrace, trace-only stderr" 0 silent \
@@ -413,7 +495,7 @@ TRACE OUTPUT:
 
 END OF CRONIC OUTPUT.
 EOF
-if $bash_xtracefd; then
+if [ "$bash_has_xtracefd" = true ]; then
   check_goals "exported SHELLOPTS with xtrace, trace output" \
     "$work/trace-report.goal" /dev/null \
     "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
@@ -612,7 +694,7 @@ unset BASH_ENV
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
 # exported, so its own `set -x` is not traced.
 grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"
-if has_xtracefd bash; then
+if [ "$bash_has_xtracefd" = true ]; then
   check_goals "bash -x cronic, trace output" \
     "$work/bash-x-trace-report.goal" /dev/null \
     bash -x "$CRONIC" "$work/trace-and-stderr" 0
@@ -620,46 +702,65 @@ else
   echo "SKIP: bash -x cronic, trace output, because bash is older than 4.1"
 fi
 
-# Bash writes its trace lines to a separate file, so they are not error
-# output, whatever PS4 is.
+# When `bash_has_xtracefd` is true, bash writes its trace lines to a separate
+# file, so they are not error output, whatever PS4 is.
 export PS4
-if $bash_xtracefd; then
-  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
-  PS4='+${LINENO}: '
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${LINENO}: '
+# The real error is reported, whether or not the trace lines are too.
+check "bash, PS4 with expansions, trace lines and real stderr" 0 \
+  "report:^a real error$" "$work/trace-and-stderr" 0
+check "bash, PS4 with expansions, trace in the report" 3 \
+  "report:echo 'the standard output'$" "$work/trace-only" 3
+if [ "$bash_has_xtracefd" = true ]; then
   check "bash, PS4 with expansions, trace-only stderr" 0 silent \
     "$work/trace-only" 0
-  check "bash, PS4 with expansions, trace in the report" 3 \
-    "report:echo 'the standard output'$" "$work/trace-only" 3
-  check "bash, PS4 with expansions, trace lines and real stderr" 0 \
-    "report:^a real error$" "$work/trace-and-stderr" 0
   PS4='+\D{%H}: '
   check "bash, PS4 with an escape, trace-only stderr" 0 silent \
     "$work/trace-only" 0
-  PS4='[trace] '
-  check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
-    "$work/trace-only" 0
-else
-  echo "SKIP: tests of bash with any PS4, because bash is older than 4.1"
 fi
+PS4='[trace] '
+check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
+  "$work/trace-only" 0
 
-# The tests below concern trace lines that a shell other than bash writes to
-# stderr; they are recognized by PS4.  Bash running as root does not import
-# PS4 from the environment, so `cronic` would see the default PS4, and these
-# tests are skipped.
+# The tests below concern trace lines in stderr, as written by a shell other
+# than bash or by a bash that does not use BASH_XTRACEFD; they are recognized
+# by PS4.  Bash running as root does not import PS4 from the environment, so
+# `cronic` would see the default PS4, and these tests are skipped.
 if [ "$(id -u)" -eq 0 ]; then
   echo "SKIP: tests of PS4 in stderr, because bash ignores PS4 when run as root"
   unset PS4
   exit "$status"
 fi
 
+# An earlier bash writes its trace lines to stderr, and when PS4 contains an
+# expansion or an escape, they are reported.
+if [ "$bash_has_xtracefd" = false ]; then
+  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
+  PS4='+${LINENO}: '
+  check "bash before 4.1, PS4 with expansions, trace-only stderr" 0 \
+    "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
+  PS4='+\D{%H}: '
+  check "bash before 4.1, PS4 with an escape, trace-only stderr" 0 \
+    "report:^+[0-9][0-9]: echo 'the standard output'$" "$work/trace-only" 0
+fi
+
 # Trace lines are recognized when PS4 contains regular-expression
 # metacharacters or quotes, and the metacharacters do not match other lines.
 PS4='[trace] '
 check "PS4 with metacharacters, trace-only stderr" 0 silent \
-  "$work/stderr-lines" "[trace] echo hi" "[[trace] echo nested"
+  "$work/stderr-lines" "[trace] echo hi" "[[trace] echo nested" \
+  "[[[trace] echo nested more"
+# The same, for the trace lines that bash writes to stderr.
+check "bash, PS4 with metacharacters, nested trace in stderr" 0 silent \
+  "$work/nested-trace" 0
+check "bash, PS4 with metacharacters, nested trace in the report" 3 \
+  "report:^\[\[\[trace\] echo deepest$" "$work/nested-trace" 3
 check "PS4 with metacharacters, trace lines and real stderr" 0 \
   "report:^a real error$" \
   "$work/stderr-lines" "[trace] echo hi" "a real error"
+check "PS4 with metacharacters, trace lines and binary stderr" 0 \
+  "report:error$" "$work/binary-stderr"
 PS4='+.* '
 check "PS4 with metacharacters, error line that they would match" 0 \
   "report:^+++ b/file$" "$work/stderr-lines" "+++ b/file"

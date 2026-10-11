@@ -88,11 +88,13 @@ marker="cronic temp-file-test marker $work"
 
 # marker_files: prints the files that contain the marker.  Files directly
 # within /tmp, or within a subdirectory of it, are searched, except for this
-# test's own files.  Errors, such as unreadable files, are ignored.
+# test's own files.  Errors, such as unreadable files, are ignored.  `-H`
+# because on macOS, /tmp is a symbolic link, which `find` otherwise does not
+# follow.
 marker_files() {
   {
     find "$TMPDIR" -type f -exec grep -lF -- "$marker" {} + 2> /dev/null || true
-    find /tmp -maxdepth 2 -path "$work" -prune \
+    find -H /tmp -maxdepth 2 -path "$work" -prune \
       -o -type f -user "$(id -u)" -exec grep -lF -- "$marker" {} + \
       2> /dev/null || true
   } | sort -u
