@@ -137,9 +137,8 @@ temp_files() {
 # it left no temporary files behind.  EXPECTED-OUTPUT is "silent", "report",
 # "report:TEXT", which also requires TEXT to appear in the report,
 # "report-once:TEXT", which also requires TEXT to appear on exactly one line of
-# the report, "message:TEXT", which requires TEXT to appear in output that need
-# not be a report, or "exactly:FILE", which requires the output to be the
-# contents of FILE.
+# the report, or "message:TEXT", which requires TEXT to appear in output that
+# need not be a report.
 check() {
   description="$1"
   expected_status="$2"
@@ -190,15 +189,6 @@ check() {
       if ! grep -q -e "${expected_output#*:}" "$work/output"; then
         echo "FAIL: $description: expected the output to contain" \
           "\"${expected_output#*:}\", but got:"
-        cat "$work/output"
-        status=1
-        return
-      fi
-      ;;
-    exactly:*)
-      if ! cmp -s "${expected_output#*:}" "$work/output"; then
-        echo "FAIL: $description: expected the output to be the contents of" \
-          "${expected_output#*:}, but got:"
         cat "$work/output"
         status=1
         return
@@ -351,13 +341,12 @@ check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
 check "builtin with an unset variable" 0 silent \
   eval ': "$cronic_test_unset_variable"'
 # When the caller exports SHELLOPTS, a bash script runs with the caller's
-# options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
-# the script runs no startup file.
+# options rather than with `cronic`'s own `set -eu`.
 # Creates "$work/cronic-with-NAME", which runs `cronic` with SHELLOPTS exported,
-# after `set OPTION` if OPTION is given.  `cronic` reads no startup file, so
-# that the user's BASH_ENV file does not run with the option on.  The
-# wrapper's own trace goes to /dev/null, so that with `set -x`, any trace in
-# the output comes from `cronic`.
+# after `set OPTION` if OPTION is given.  The wrapper unsets BASH_ENV, so that
+# neither `cronic` nor a bash script that it runs reads the user's startup
+# file.  The wrapper's own trace goes to /dev/null, so that with `set -x`, any
+# trace in the output comes from `cronic`.
 make_cronic_wrapper() { # NAME [OPTION]
   cat > "$work/cronic-with-$1" << EOF
 #!/bin/bash
@@ -374,22 +363,21 @@ make_cronic_wrapper nounset -u
 make_cronic_wrapper errexit -e
 make_cronic_wrapper allexport -a
 make_cronic_wrapper xtrace -x
-make_cronic_wrapper verbose -v
 saved_cronic="$CRONIC"
 CRONIC="$work/cronic-with-shellopts"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "bash script with an unset variable, SHELLOPTS exported" 0 silent \
-  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
+  bash -c ': "$cronic_test_unset_variable"'
 check "bash script with a failing command, SHELLOPTS exported" 0 silent \
-  env BASH_ENV= bash -c 'false; true'
+  bash -c 'false; true'
 CRONIC="$work/cronic-with-nounset"
 # shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
 check "bash script with an unset variable, caller's nounset exported" 127 \
   "report:cronic_test_unset_variable" \
-  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
+  bash -c ': "$cronic_test_unset_variable"'
 CRONIC="$work/cronic-with-errexit"
 check "bash script with a failing command, caller's errexit exported" 1 report \
-  env BASH_ENV= bash -c 'false; true'
+  bash -c 'false; true'
 # When the caller exports allexport, `cronic` does not export its own variables
 # to the command, but a variable that the command assigns is exported.
 CRONIC="$work/cronic-with-allexport"
@@ -401,9 +389,9 @@ check "command's variable exported, caller's allexport exported" 0 silent \
 # When the caller exports xtrace, `cronic` traces only the command, not itself.
 CRONIC="$work/cronic-with-xtrace"
 check "bash script, caller's xtrace exported" 0 silent \
-  env BASH_ENV= bash -c 'true'
+  bash -c 'true'
 check "bash script that fails, caller's xtrace exported" 1 "report:^+ false$" \
-  env BASH_ENV= bash -c 'false'
+  bash -c 'false'
 if grep -q cronic_ "$work/output"; then
   echo "FAIL: caller's xtrace exported: the report traces cronic itself:"
   cat "$work/output"
@@ -411,12 +399,6 @@ if grep -q cronic_ "$work/output"; then
 else
   echo "PASS: caller's xtrace exported: the report does not trace cronic itself"
 fi
-# When the caller exports verbose, bash echoes the lines of `cronic` through
-# the block that turns verbose off, but nothing more.
-CRONIC="$work/cronic-with-verbose"
-sed '/^} 2> \/dev\/null$/q' "$saved_cronic" > "$work/expected"
-check "caller's verbose exported: cronic echoes only its first lines" 0 \
-  "exactly:$work/expected" true
 CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For

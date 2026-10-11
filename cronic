@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-{
-  cronic_caller_flags=${-//[^aeuvx]/}
-  set +avx
-  export -n cronic_caller_flags
-} 2> /dev/null
 
 # Cronic v2 - cron job report wrapper
 # Copyright 2007 Chuck Houpt
@@ -24,16 +19,19 @@
 # BASH_XTRACEFD (bash 4.1), only after checking the version; see the
 # BASH_VERSINFO check below.
 
-# The block at the top of this script is first, because with the caller's
-# verbose on, bash echoes each line to stderr as it reads it, until `set +v`
-# runs; so with verbose on, every run echoes those lines.
-# `cronic_caller_flags` holds the caller's shell options that this script
-# changes (including any passed by exporting SHELLOPTS), as the letters that
-# `$-` uses for them; this script restores them for the command.  It turns off
-# verbose and xtrace so that its own commands are not echoed or traced, and
-# allexport so that its own variables are not exported to the command
-# (`cronic_caller_flags`, assigned before that, is un-exported explicitly).
-# The redirection discards the trace of `set +avx` itself.
+# The caller's shell options that this script changes, as the letters that `$-`
+# uses for them, which this script restores for the command.  They include any
+# that the caller passed by exporting SHELLOPTS.  This script turns xtrace off,
+# so that its own commands are not traced to stderr, which would make every run
+# produce output; the redirection discards the trace of `set +x` itself.  It
+# turns allexport off, so that its own variables are not exported to the
+# command; `cronic_caller_flags`, which is assigned before that, is un-exported
+# explicitly.
+{
+  cronic_caller_flags=${-//[^aeux]/}
+  set +ax
+  export -n cronic_caller_flags
+} 2> /dev/null
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -70,6 +68,9 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "Do not export the verbose option (\"set -v\") via SHELLOPTS: bash would echo"
+  echo "the lines of this script and of a bash COMMAND to stderr, so every run would"
+  echo "produce output."
   exit 0
 }
 
@@ -184,12 +185,12 @@ fi
 # otherwise run in place of a program of the same name.  The redirections
 # apply to the whole subshell, so that they also capture what it writes after
 # the command finishes, such as the output of an EXIT trap that the command
-# sets.  The subshell restores the caller's `-a`, `-e`, `-u`, `-v`, and `-x`
-# options, replacing this script's, for a builtin and also for a bash script
-# when the caller exported SHELLOPTS.  It turns off this script's nounset
-# (errexit is off already) in the same command that turns on the caller's
-# options, so that only the command is traced.  The `:+` avoids a bare `-`,
-# which has a special meaning to `set`.
+# sets.  The subshell restores the caller's `-a`, `-e`, `-u`, and `-x` options,
+# replacing this script's, for a builtin and also for a bash script when the
+# caller exported SHELLOPTS.  It turns off this script's nounset (errexit is off
+# already) in the same command that turns on the caller's options, so that only
+# the command is traced.  The `:+` avoids a bare `-`, which has a special
+# meaning to `set`.
 set +e
 (
   set +u${cronic_caller_flags:+ -$cronic_caller_flags}
