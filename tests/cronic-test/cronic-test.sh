@@ -268,6 +268,76 @@ check "builtin command" 0 silent :
 # A builtin that would end the shell does not prevent the report.
 check "exit builtin" 3 report exit 3
 check "exec builtin" 3 report exec "$work/trace-only" 3
+# Output that the subshell writes after the command finishes, such as from an
+# EXIT trap that the command sets, is captured rather than leaked.
+check "EXIT trap writes to stderr" 0 "report:^from the trap$" \
+  trap 'echo "from the trap" >&2' EXIT
+check "EXIT trap writes to stdout" 0 silent trap 'echo "from the trap"' EXIT
+# A builtin runs with `set +u`, as it would in an ordinary shell.
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "builtin with an unset variable" 0 silent \
+  eval ': "$cronic_test_unset_variable"'
+# When the caller exports SHELLOPTS, a bash script runs with the caller's
+# options rather than with `cronic`'s own `set -eu`.  BASH_ENV is empty so that
+# the script runs no startup file.
+cat > "$work/cronic-with-shellopts" << EOF
+#!/bin/bash
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+cat > "$work/cronic-with-nounset" << EOF
+#!/bin/bash
+set -u
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+cat > "$work/cronic-with-errexit" << EOF
+#!/bin/bash
+set -e
+export SHELLOPTS
+exec "$CRONIC" "\$@"
+EOF
+# The wrapper's own trace goes to /dev/null, and `cronic` reads no startup
+# file, so that any trace in the output comes from `cronic`.
+cat > "$work/cronic-with-xtrace" << EOF
+#!/bin/bash
+unset BASH_ENV
+exec 3>&2 2> /dev/null
+set -x
+export SHELLOPTS
+exec "$CRONIC" "\$@" 2>&3 3>&-
+EOF
+chmod +x "$work/cronic-with-shellopts" "$work/cronic-with-nounset" \
+  "$work/cronic-with-errexit" "$work/cronic-with-xtrace"
+saved_cronic="$CRONIC"
+CRONIC="$work/cronic-with-shellopts"
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "bash script with an unset variable, SHELLOPTS exported" 0 silent \
+  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
+check "bash script with a failing command, SHELLOPTS exported" 0 silent \
+  env BASH_ENV= bash -c 'false; true'
+CRONIC="$work/cronic-with-nounset"
+# shellcheck disable=SC2016 # The expansion is for the wrapped command to do.
+check "bash script with an unset variable, caller's nounset exported" 127 \
+  "report:cronic_test_unset_variable" \
+  env BASH_ENV= bash -c ': "$cronic_test_unset_variable"'
+CRONIC="$work/cronic-with-errexit"
+check "bash script with a failing command, caller's errexit exported" 1 report \
+  env BASH_ENV= bash -c 'false; true'
+# When the caller exports xtrace, `cronic` traces only the command, not itself.
+CRONIC="$work/cronic-with-xtrace"
+check "bash script, caller's xtrace exported" 0 silent \
+  env BASH_ENV= bash -c 'true'
+check "bash script that fails, caller's xtrace exported" 1 "report:^+ false$" \
+  env BASH_ENV= bash -c 'false'
+if grep -q cronic_ "$work/output"; then
+  echo "FAIL: caller's xtrace exported: the report traces cronic itself:"
+  cat "$work/output"
+  status=1
+else
+  echo "PASS: caller's xtrace exported: the report does not trace cronic itself"
+fi
+CRONIC="$saved_cronic"
 
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
