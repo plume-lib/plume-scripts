@@ -701,6 +701,11 @@ echo 'grep() { echo "function grep ran"; }; readonly -f grep' > "$work/bash-env"
 BASH_ENV="$work/bash-env"
 export BASH_ENV
 check "readonly function from BASH_ENV" 1 "message:readonly function" true
+# Likewise, a `cronic_` variable that BASH_ENV made readonly cannot be removed,
+# so the command, which would exit with status 5, does not run.
+echo 'readonly cronic_mine=x' > "$work/bash-env"
+check "readonly cronic_ variable from BASH_ENV" 1 "report:readonly variable" \
+  sh -c 'exit 5'
 unset BASH_ENV
 
 # `bash -x cronic` traces neither `cronic` itself nor the line that runs the

@@ -275,7 +275,9 @@ fi
 # command does not see them, and so that a function does not run in place of a
 # program of the same name.  The names of this script's functions are
 # identifiers, so they need no quoting.  The `eval` expands the cronic_*
-# variables before `unset` removes them.  It then defines the caller's
+# variables before `unset` removes them.  If `unset` cannot remove one, such as
+# one that BASH_ENV made readonly, then the subshell exits without running the
+# command, and the report shows the error.  The `eval` then defines the caller's
 # functions, which can replace a builtin, so the remaining commands run via
 # `builtin`.
 #
@@ -302,7 +304,7 @@ set +e
 (
   # shellcheck disable=SC2046  # each name is a separate argument.
   unset -f $(compgen -A function)
-  eval "unset -v \"\${!cronic_@}\"
+  eval "unset -v \"\${!cronic_@}\" || exit 1
     $cronic_caller_functions
     ${cronic_caller_function_names:+builtin export -f --$cronic_caller_function_names}
     builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
