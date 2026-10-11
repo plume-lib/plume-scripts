@@ -1,6 +1,6 @@
 #!/bin/bash
 {
-  cronic_caller_flags=${-//[^euvx]/}
+  cronic_caller_opts=$SHELLOPTS
   set +vx
 } 2> /dev/null
 
@@ -21,15 +21,21 @@
 # This script runs under bash 3.2, which is /bin/bash on macOS, so it uses a
 # feature of a later bash only after checking the version.
 
-# The first command saves the caller's shell options, as the letters that `$-`
-# uses for them, before this script changes them for itself.  This script
-# changes only errexit, nounset, verbose, and xtrace, so the command inherits
-# the caller's other `set -o` options, and its `shopt` options, without any
-# restoring; an option that this script changes must be added to the pattern.
+# The first command saves the caller's `set -o` shell options, as the
+# colon-separated list of those that are on, before this script changes any of
+# them for itself.  This script changes no `shopt` option, so the command
+# inherits those without any restoring.
 # The first command then stops this script from tracing itself or echoing its
 # input, which would go to this script's stderr, so that cron would send email
 # for every run.  It comes before any comment, because bash echoes every line
 # that it reads while verbose is on.  The redirection discards its own trace.
+# Verbose is handled only partly:  bash echoes this script's lines through the
+# end of the first command to stderr before that command can turn verbose off.
+# So if the caller exports SHELLOPTS with verbose, or runs `bash -v cronic`,
+# then cron sends email for every run.
+# Likewise, bash runs the file named by BASH_ENV, if any, before this script's
+# first command, so an exported xtrace, verbose, or nounset applies to that file
+# and can make it write to stderr; such a cron job should unset BASH_ENV.
 
 # Exit if a command exits with a non-zero status, and treat unset variables
 # as an error.
@@ -66,6 +72,10 @@ cronic_help() {
   echo "stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
+  echo "Under \"set -v\" exported via SHELLOPTS, or \"bash -v cronic\", bash echoes the"
+  echo "first lines of cronic to stderr before cronic can turn verbose off."
+  echo "Likewise, bash runs the BASH_ENV file, if any, before cronic starts, so"
+  echo "exported shell options can make that file write to stderr."
   exit 0
 }
 
@@ -182,12 +192,14 @@ fi
 # such as `exit` or `exec` cannot end this script before it reports.
 # `command` because a function of this script, such as `cronic_usage`, would
 # otherwise run in place of a program of the same name.  The subshell turns off
-# this script's nounset (errexit is off already) in the same command that turns
-# on the caller's options, so that the restoring is neither traced nor echoed.
-# The `:+` avoids a bare `set -`, which would turn off verbose and xtrace.
+# every option that is on, which includes nounset, and turns on the caller's, in
+# a single `set` command, so that the restoring is neither traced nor echoed.
+# SHELLOPTS is not empty here, because nounset is on.  The `:+` avoids a bare
+# `set -o`, which would print the options, when the caller had none on.
 set +e
 (
-  set +u${cronic_caller_flags:+ -$cronic_caller_flags}
+  # shellcheck disable=SC2086  # each option name and +o or -o is an argument.
+  set +o ${SHELLOPTS//:/ +o } ${cronic_caller_opts:+-o ${cronic_caller_opts//:/ -o }}
   command -- "$@"
 ) > "$cronic_out" 2> "$cronic_trace"
 cronic_result=$?

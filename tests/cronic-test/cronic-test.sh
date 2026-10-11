@@ -16,6 +16,8 @@ set -eu
 # below.  It could write to stderr, especially when an exported SHELLOPTS turns
 # on `-u` for it.
 unset BASH_ENV
+# Use the default PS4, which the goal files and the trace lines below assume.
+unset PS4
 # Do not pass this script's own options, such as `-e` and `-u`, to `cronic` and
 # to the commands below.  If SHELLOPTS is exported, then run this script again
 # without it, because bash makes SHELLOPTS read-only, so it cannot be unset.
@@ -151,26 +153,43 @@ run_cronic() {
   fi
 }
 
-# check_trace_section DESCRIPTION GOAL-FILE COMMAND...: runs COMMAND, which
-# runs `cronic`, and checks that it exits with status 0, leaves no temporary
-# files, writes nothing to stderr, and produces a report whose "TRACE OUTPUT"
-# section, through the following empty line, is the contents of GOAL-FILE.
-check_trace_section() {
-  description="$1"
-  goal="$2"
-  shift 2
-
-  run_cronic "$description" 0 "$@" || return 0
-  sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
-  if [ ! -s "$work/stderr" ] && cmp -s "$goal" "$work/trace-section"; then
-    echo "PASS: $description"
+# compare_streams DESCRIPTION OUTPUT OUTPUT-GOAL STDERR-GOAL: after run_cronic,
+# reports success if the file OUTPUT, which is `cronic`'s output or a part of
+# it, has the contents of OUTPUT-GOAL, and `cronic`'s stderr has the contents of
+# STDERR-GOAL.
+compare_streams() {
+  if cmp -s "$3" "$2" && cmp -s "$4" "$work/stderr"; then
+    echo "PASS: $1"
   else
-    echo "FAIL: $description: output:"
+    echo "FAIL: $1: output:"
     cat "$work/output"
     echo "stderr:"
     cat "$work/stderr"
     status=1
   fi
+}
+
+# check_trace_section DESCRIPTION BASH GOAL-FILE COMMAND...: runs COMMAND,
+# which runs `cronic` under the bash program BASH, and checks that it exits
+# with status 0, leaves no temporary files, writes nothing to stderr, and
+# produces a report whose "TRACE OUTPUT" section, through the following empty
+# line, is the contents of GOAL-FILE.  Skips the check if BASH is older than
+# 4.1, which lacks BASH_XTRACEFD, so that the report has no "TRACE OUTPUT".
+check_trace_section() {
+  description="$1"
+  bash_program="$2"
+  goal="$3"
+  shift 3
+
+  # shellcheck disable=SC2016  # the expansions are for bash, not this shell.
+  if ! "$bash_program" -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1)))'; then
+    echo "SKIP: $description, because $bash_program is older than 4.1"
+    return 0
+  fi
+
+  run_cronic "$description" 0 "$@" || return 0
+  sed -n '/^TRACE OUTPUT:$/,/^$/p' "$work/output" > "$work/trace-section"
+  compare_streams "$description" "$work/trace-section" "$goal" /dev/null
 }
 
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-OUTPUT COMMAND...: runs `cronic`
@@ -366,7 +385,7 @@ TRACE OUTPUT:
 + exit 0
 
 EOF
-check_trace_section "exported SHELLOPTS with xtrace, trace output" \
+check_trace_section "exported SHELLOPTS with xtrace, trace output" /bin/bash \
   "$work/trace-section.goal" \
   "$CRONIC" "$default_shellopts:xtrace" "$work/trace-and-stderr" 0
 
@@ -377,15 +396,8 @@ check_trace_section "exported SHELLOPTS with xtrace, trace output" \
 sed '/^} 2> \/dev\/null$/q' "$REAL_CRONIC" > "$work/verbose-stderr.goal"
 if run_cronic "exported SHELLOPTS with verbose" 0 \
   "$CRONIC" "$default_shellopts:verbose" true; then
-  if [ ! -s "$work/output" ] && cmp -s "$work/verbose-stderr.goal" "$work/stderr"; then
-    echo "PASS: exported SHELLOPTS with verbose"
-  else
-    echo "FAIL: exported SHELLOPTS with verbose: output:"
-    cat "$work/output"
-    echo "stderr:"
-    cat "$work/stderr"
-    status=1
-  fi
+  compare_streams "exported SHELLOPTS with verbose" \
+    "$work/output" /dev/null "$work/verbose-stderr.goal"
 fi
 
 CRONIC="$REAL_CRONIC"
@@ -437,7 +449,7 @@ TRACE OUTPUT:
 + exit 0
 
 EOF
-check_trace_section "bash -x cronic, trace output" \
+check_trace_section "bash -x cronic, trace output" bash \
   "$work/bash-x-trace-section.goal" \
   bash -x "$CRONIC" "$work/trace-and-stderr" 0
 
