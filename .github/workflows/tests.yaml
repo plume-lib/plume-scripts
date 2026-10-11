@@ -34,3 +34,19 @@ jobs:
           command -v xxd
           command -v bc
       - run: make -C tests test
+  # This job tests `cronic` under macOS's /bin/bash, which is bash 3.2, and
+  # macOS's BSD utilities.  `cronic` and the bash scripts in its tests run
+  # under the first `bash` in PATH, so /bin is put first, ahead of any
+  # Homebrew bash.
+  cronic-macos:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          show-progress: false
+          persist-credentials: false
+      - run: echo /bin >> "$GITHUB_PATH"
+      - run: bash --version
+      - run: make -C tests/cronic-test test
