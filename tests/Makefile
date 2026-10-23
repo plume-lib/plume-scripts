@@ -27,6 +27,7 @@ TEST_DIRS = \
 	sort-compiler-output-test \
 	sort-directory-order-test \
 	squeeze-blank-lines-test \
+	stale-default-branch-test \
 	tmp-directory-test \
 	uniq-contents-test \
 	unknown-branch-test \
