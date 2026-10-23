@@ -144,9 +144,12 @@ cronic_help() {
   echo "script's.  This script never traces itself, so \"bash -x cronic COMMAND\""
   echo "traces only the running of COMMAND."
   echo "Execution traces (from \"set -x\") are not treated as error output."
-  echo "Bash 4.1 or later writes them to a separate file, via BASH_XTRACEFD; they"
-  echo "appear in the report under \"TRACE OUTPUT\".  Other shells write them to"
-  echo "stderr, from which lines that start with PS4 are removed.  That removal"
+  echo "If the caller exports xtrace via SHELLOPTS, bash 4.1 or later writes them"
+  echo "to a separate file, via BASH_XTRACEFD; they appear in the report under"
+  echo "\"TRACE OUTPUT\".  Otherwise, BASH_XTRACEFD is not exported to COMMAND,"
+  echo "because a bash started by a program that closes the inherited descriptor,"
+  echo "such as Gradle, would report an error.  Then, and in other shells, traces"
+  echo "go to stderr, from which lines that start with PS4 are removed.  That removal"
   echo "is skipped if PS4 contains \"\$\", a backquote, a backslash, or a newline,"
   echo "because such a PS4 can expand differently on each line."
   echo "If the caller's xtrace is on, cronic's own trace of running COMMAND is"
@@ -260,9 +263,23 @@ trap 'cronic_cleanup; trap - TERM EXIT; kill -s TERM $$' TERM
 # (as 10 or higher), so that it does not collide with a descriptor, such as 3,
 # that the wrapped command uses for its own purposes.  Bash before 4.1 supports
 # neither BASH_XTRACEFD nor descriptor allocation.
+#
+# BASH_XTRACEFD is exported only if the caller exported xtrace, via SHELLOPTS,
+# because only then is the command's trace expected.  Otherwise, it is
+# un-exported, even if the caller exported it.  A program such as Gradle, or
+# any other Java program, closes every descriptor above 2 when it starts a
+# process.  A bash that such a program starts, even one that does no tracing,
+# would get an exported BASH_XTRACEFD that names a closed descriptor, and would
+# report so on stderr.  Unexported, BASH_XTRACEFD still applies to a builtin
+# or exported function that is the command, which runs in this shell's subshell.
 if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 1))); then
   exec {cronic_xtrace_fd}> "$cronic_xtrace"
-  export BASH_XTRACEFD=$cronic_xtrace_fd
+  BASH_XTRACEFD=$cronic_xtrace_fd
+  if [[ $cronic_caller_flags == *x* && $(declare -p SHELLOPTS) =~ ^declare\ -[a-zA-Z]*x ]]; then
+    export BASH_XTRACEFD
+  else
+    export -n BASH_XTRACEFD
+  fi
 fi
 
 # The command runs in a subshell rather than via `exec`, so that it can be a

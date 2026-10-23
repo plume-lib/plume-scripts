@@ -15,9 +15,9 @@
 # `stderr-lines` with a literal PS4, and the "nested trace in stderr" check,
 # whose bash script writes its trace lines to stderr whatever the bash version.
 # All of them run only when the test is not run as root.  The checks that use
-# `trace-only`, a bash script, catch it only under a bash earlier than 4.1:  a
-# later bash writes its trace lines to BASH_XTRACEFD, so `cronic` sees no trace
-# lines in stderr and does not run `grep -v`.
+# `trace-only`, a bash script, catch it too, unless the caller exports xtrace
+# and bash is 4.1 or later:  then bash writes its trace lines to BASH_XTRACEFD,
+# so `cronic` sees no trace lines in stderr and does not run `grep -v`.
 
 set -eu
 
@@ -44,10 +44,11 @@ mkdir "$TMPDIR"
 status=0
 
 # A bash that supports BASH_XTRACEFD and the allocation of a file descriptor
-# (bash 4.1 or later) writes its trace lines to a separate file, so they are
-# not error output, whatever PS4 is.  An earlier bash, such as macOS's
-# /bin/bash, writes them to stderr, where `cronic` cannot recognize them when
-# PS4 contains an expansion or an escape, so it reports them as error output.
+# (bash 4.1 or later) writes its trace lines to a separate file when the caller
+# exports xtrace, so they are not error output, whatever PS4 is.  Otherwise, or
+# with an earlier bash, such as macOS's /bin/bash, bash writes them to stderr,
+# where `cronic` cannot recognize them when PS4 contains an expansion or an
+# escape, so it reports them as error output.
 #
 # This tests for the features themselves, rather than for the bash version
 # that `cronic` tests for, so that it detects a wrong version test in `cronic`.
@@ -153,6 +154,19 @@ cat > "$work/stderr-lines" << 'EOF'
 printf '%s\n' "$@" 1>&2
 EOF
 chmod +x "$work/stderr-lines"
+
+# A command that closes every file descriptor above 2, as a Java program such
+# as Gradle does when it starts a process, and then runs bash.  If BASH_XTRACEFD
+# is exported and names a descriptor that is now closed, that bash reports so on
+# stderr.
+cat > "$work/close-fds-then-bash" << 'EOF'
+#!/usr/bin/env bash
+for ((fd = 3; fd < 64; fd++)); do
+  eval "exec $fd>&-"
+done
+exec bash -c 'echo "from bash"'
+EOF
+chmod +x "$work/close-fds-then-bash"
 
 # Runs `cronic` with SHELLOPTS set to its first argument and exported, and
 # with these exported shell functions:
@@ -555,7 +569,8 @@ CRONIC="$REAL_CRONIC"
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
 # uppercase, both with and without any "cronic_" prefix (for example,
-# `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it.
+# `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it, and
+# so is `BASH_XTRACEFD`, which `cronic` assigns and un-exports.
 # The lowercase names that `cronic` assigns, such as `cronic_out`, are not
 # exported here, because environment variables conventionally have uppercase
 # names; the next test checks a few of them.
@@ -568,7 +583,7 @@ exported_names=
 for name in $variable_names; do
   upper=$(echo "$name" | tr '[:lower:]' '[:upper:]')
   for exported in "$upper" "${upper#CRONIC_}"; do
-    [ "$exported" = TMPDIR ] && continue
+    case $exported in TMPDIR | BASH_XTRACEFD) continue ;; esac
     exported_names="$exported_names $exported"
   done
 done
@@ -710,14 +725,51 @@ unset BASH_ENV
 
 # `bash -x cronic` traces neither `cronic` itself nor the line that runs the
 # command.  The command does not inherit xtrace, because SHELLOPTS is not
-# exported, so its own `set -x` is not traced.
-grep -v '^+ set -x$' "$work/trace-report.goal" > "$work/bash-x-trace-report.goal"
+# exported, so its own `set -x` is not traced.  Nor does the command see
+# BASH_XTRACEFD, so its trace goes to stderr; the trace lines, which start with
+# PS4, are not error output.
+cat > "$work/bash-x-trace-report.goal" << EOF
+Cronic detected failure or error output for the command:
+$work/trace-and-stderr 0
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+a real error
+
+STANDARD OUTPUT:
+
+TRACE-ERROR OUTPUT:
++ echo 'a real error'
+a real error
++ exit 0
+
+END OF CRONIC OUTPUT.
+EOF
 check_trace_goals "bash -x cronic, trace output" \
   "$work/bash-x-trace-report.goal" /dev/null \
   bash -x "$CRONIC" "$work/trace-and-stderr" 0
 
-# When `bash_has_xtracefd` is true, bash writes its trace lines to a separate
-# file, so they are not error output, whatever PS4 is.
+# Unless the caller exports xtrace, the command does not see BASH_XTRACEFD, so a
+# bash that runs after the descriptor is closed reports no error.
+# shellcheck disable=SC2016 # The expansion is for `sh` to do.
+check "BASH_XTRACEFD not exported" 0 silent \
+  sh -c '[ -z "${BASH_XTRACEFD+set}" ]'
+check "bash after the descriptors are closed" 0 silent \
+  "$work/close-fds-then-bash"
+check_goals "bash -x cronic, bash after the descriptors are closed" \
+  /dev/null /dev/null bash -x "$CRONIC" "$work/close-fds-then-bash"
+# A builtin that is the command runs in `cronic`'s subshell, so it still writes
+# its trace via BASH_XTRACEFD, even with a PS4 that `cronic` cannot recognize.
+if [ "$bash_has_xtracefd" = true ]; then
+  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
+  check "builtin, unrecognizable PS4, trace-only stderr" 0 silent \
+    eval 'PS4="+\$LINENO: "; set -x; :'
+fi
+
+# When `bash_has_xtracefd` is true and the caller exports xtrace, bash writes
+# its trace lines to a separate file, so they are not error output, whatever
+# PS4 is.
 export PS4
 # shellcheck disable=SC2016 # The expansion is for the traced command to do.
 PS4='+${LINENO}: '
@@ -727,11 +779,13 @@ check "bash, PS4 with expansions, trace lines and real stderr" 0 \
 check "bash, PS4 with expansions, trace in the report" 3 \
   "report:echo 'the standard output'$" "$work/trace-only" 3
 if [ "$bash_has_xtracefd" = true ]; then
-  check "bash, PS4 with expansions, trace-only stderr" 0 silent \
-    "$work/trace-only" 0
+  CRONIC="$work/cronic-with-shellopts"
+  check "exported xtrace, PS4 with expansions, trace-only stderr" 0 silent \
+    "$default_shellopts:xtrace" "$work/trace-only" 0
   PS4='+\D{%H}: '
-  check "bash, PS4 with an escape, trace-only stderr" 0 silent \
-    "$work/trace-only" 0
+  check "exported xtrace, PS4 with an escape, trace-only stderr" 0 silent \
+    "$default_shellopts:xtrace" "$work/trace-only" 0
+  CRONIC="$REAL_CRONIC"
 fi
 PS4='[trace] '
 check "bash, PS4 with metacharacters, trace-only stderr" 0 silent \
@@ -747,17 +801,15 @@ if [ "$(id -u)" -eq 0 ]; then
   exit "$status"
 fi
 
-# An earlier bash writes its trace lines to stderr, and when PS4 contains an
-# expansion or an escape, they are reported.
-if [ "$bash_has_xtracefd" = false ]; then
-  # shellcheck disable=SC2016 # The expansion is for the traced command to do.
-  PS4='+${LINENO}: '
-  check "bash before 4.1, PS4 with expansions, trace-only stderr" 0 \
-    "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
-  PS4='+\D{%H}: '
-  check "bash before 4.1, PS4 with an escape, trace-only stderr" 0 \
-    "report:^+[0-9][0-9]: echo 'the standard output'$" "$work/trace-only" 0
-fi
+# Unless the caller exports xtrace, bash writes its trace lines to stderr, and
+# when PS4 contains an expansion or an escape, they are reported.
+# shellcheck disable=SC2016 # The expansion is for the traced command to do.
+PS4='+${LINENO}: '
+check "bash, PS4 with expansions, trace-only stderr" 0 \
+  "report:^+3: echo 'the standard output'$" "$work/trace-only" 0
+PS4='+\D{%H}: '
+check "bash, PS4 with an escape, trace-only stderr" 0 \
+  "report:^+[0-9][0-9]: echo 'the standard output'$" "$work/trace-only" 0
 
 # Trace lines are recognized when PS4 contains regular-expression
 # metacharacters or quotes, and the metacharacters do not match other lines.
