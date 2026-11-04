@@ -26,7 +26,11 @@
 # named by BASH_ENV writes to stderr.  COMMAND does not see a function named
 # `builtin` that the caller exported, because this script removes it so that it
 # can run builtins via `builtin`.  If COMMAND starts a background process that
-# keeps its stderr open, this script waits for that process to exit.
+# keeps its stderr open, the report omits what that process writes to stderr
+# more than 5 seconds after COMMAND exits.  If COMMAND reopens its standard
+# output with truncation, as `> /dev/stdout` does on Linux, the report's
+# combined standard and error output omits the output that COMMAND wrote before
+# then, although the report still shows the error output by itself.
 
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
@@ -168,8 +172,11 @@ cronic_help() {
   echo "cronic cannot capture that file's output, and exported shell options can make"
   echo "that file write to stderr.  To prevent that, unset BASH_ENV."
   echo "If COMMAND starts a background process that keeps COMMAND's stderr open,"
-  echo "cronic waits for that process to exit.  To prevent that, redirect the"
-  echo "background process's stderr."
+  echo "cronic waits up to 5 seconds after COMMAND exits for that process to close"
+  echo "it, and the report omits what that process writes to stderr after then."
+  echo "If COMMAND reopens its standard output with truncation, as \`> /dev/stdout\`"
+  echo "does on Linux, the standard and error output together omit what COMMAND"
+  echo "wrote before then; the report still shows the error output by itself."
   exit 0
 }
 
@@ -240,6 +247,8 @@ cronic_debug=false
 # written through them.
 cronic_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
 cronic_combined=$cronic_tmpdir/combined
+cronic_stderr_fifo=$cronic_tmpdir/stderr.fifo
+cronic_tee_err=$cronic_tmpdir/tee.err
 cronic_err=$cronic_tmpdir/err
 cronic_reduced_err=$cronic_tmpdir/err.reduced
 cronic_trace=$cronic_tmpdir/trace
@@ -322,33 +331,59 @@ fi
 # The report shows the standard output and the error output together, in the
 # order in which the command wrote them, and it also shows the error output by
 # itself.  So the subshell's standard output is appended to the file
-# cronic_combined, and its stderr goes through `tee`, which writes it to the
-# file cronic_trace and appends it to cronic_combined.  Both files are opened
-# for appending, so that neither write overwrites the other.  The order is
-# exact only for writes that are separated in time:  an error line that
-# immediately precedes a line of standard output can be appended after it,
-# because the error line passes through `tee`.  Exact order is impossible,
-# because only a single file descriptor for both streams would preserve it,
-# and then `cronic` could not tell which output was error output.  The
-# subshell is an element of a pipeline, rather than redirecting its stderr to a
-# process substitution `2> >(tee ...)`, because bash waits for every element
-# of a pipeline to finish, whereas bash 3.2 cannot wait for a process
-# substitution, so the report could omit error output that `tee` has not yet
-# written.
+# cronic_combined, and its stderr goes, through a FIFO, to `tee`, which writes
+# it to the file cronic_trace and appends it to cronic_combined.  Both the
+# subshell and `tee` open cronic_combined for appending, so that neither
+# overwrites what the other wrote.  The order is exact only for writes that are
+# separated in time:  an error line that immediately precedes a line of
+# standard output can be appended after it, because the error line passes
+# through `tee`.  Exact order is impossible, because only a single file
+# descriptor for both streams would preserve it, and then `cronic` could not
+# tell which output was error output.
 #
-# Because bash waits for `tee`, and `tee` finishes only when every process
-# that holds the subshell's stderr has closed it, `cronic` also waits for any
-# background process that the command started without redirecting its stderr.
+# A command that reopens its standard output with truncation, as
+# `> /dev/stdout` or `tee /dev/stdout` does on Linux, truncates cronic_combined,
+# erasing the error output stored there.  The file cronic_trace still holds it,
+# so the report still shows it, in the error-output section.
+#
+# `tee` runs in the background, rather than as an element of a pipeline, so
+# that `cronic` need not wait for it.  `tee` finishes only when every process
+# that holds the subshell's stderr has closed it, so a background process that
+# the command started without redirecting its stderr, such as a server started
+# by `nohup` (which redirects stderr only when it is a terminal), would make
+# `cronic` wait until that process exits.  So after the subshell finishes,
+# `cronic` waits at most 5 seconds for `tee`, which is ample time for `tee` to
+# copy what the subshell wrote, and then reports.  A `tee` that is still running
+# keeps copying into the deleted files, so the background process does not get
+# SIGPIPE when it writes to its stderr.  `tee` writes its own error messages to
+# a file, which `cronic` copies to its stderr, rather than to `cronic`'s stderr
+# directly, so that a `tee` that is still running does not hold `cronic`'s
+# stderr, for which cron waits before sending mail.  `tee` is not run in a
+# process substitution `2> >(tee ...)`, because bash 3.2 does not set `$!` to
+# the process id of a process substitution.
+#
+# `tee` ignores the signals that `cronic` handles.  `cronic` and `tee` are in
+# the same process group, and so receive the same signal when it is sent to
+# that group, as by Ctrl-C or by a supervisor that stops a service.  If such a
+# signal killed `tee`, then a command that survives the signal, such as one that
+# handles it by writing a message to stderr and cleaning up, would itself be
+# killed by SIGPIPE when it next wrote to stderr.  `tee` still finishes when
+# the command does.
 #
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` throughout the subshell, including in a shell function that it
 # runs, and would remove "errexit" from the SHELLOPTS that the command inherits.
-# Being an element of a pipeline does not affect `set -e`.
 #
 # Limitation:  if the command is a builtin that runs code in the subshell, such
 # as `source` or `eval`, that code runs with the caller's options even if the
 # caller does not export SHELLOPTS.  So if the caller does not use `set -u`,
 # that code silently expands an unset variable to the empty string.
+mkfifo "$cronic_stderr_fifo"
+(
+  trap '' HUP INT TERM
+  exec tee "$cronic_trace" < "$cronic_stderr_fifo"
+) >> "$cronic_combined" 2> "$cronic_tee_err" &
+cronic_tee_pid=$!
 set +e
 (
   # shellcheck disable=SC2046  # each name is a separate argument.
@@ -358,23 +393,39 @@ set +e
     ${cronic_caller_function_names:+builtin export -f --$cronic_caller_function_names}
     builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
-) 2>&1 >> "$cronic_combined" | tee "$cronic_trace" >> "$cronic_combined"
-cronic_result=${PIPESTATUS[0]}
+) >> "$cronic_combined" 2> "$cronic_stderr_fifo"
+cronic_result=$?
 set -e
 
+# Wait at most 5 seconds, in steps of a tenth of a second, for `tee` to finish.
+cronic_tenths=0
+while kill -0 "$cronic_tee_pid" 2> /dev/null && [ $cronic_tenths -lt 50 ]; do
+  sleep 0.1
+  cronic_tenths=$((cronic_tenths + 1))
+done
+cat "$cronic_tee_err" >&2
+
 # The command wrote no standard output if and only if the combined output is
-# the same as the error output.  This is checked before a newline is appended
-# to the error output, below.
-if cmp -s "$cronic_combined" "$cronic_trace"; then
+# as long as the error output, because the combined output is the standard
+# output and the error output, appended.  This is checked before a newline is
+# appended to either file, below.
+if [ "$(wc -c < "$cronic_combined")" -eq "$(wc -c < "$cronic_trace")" ]; then
   cronic_has_stdout=0
 else
   cronic_has_stdout=1
 fi
-# End the combined output with a newline, if it is not empty, so that its last
-# line is not on the line of the report's next heading.
-if [ -s "$cronic_combined" ] && [ "$(tail -c 1 "$cronic_combined" | wc -l)" -eq 0 ]; then
-  echo >> "$cronic_combined"
-fi
+
+# Appends a newline to the given file, if the file is not empty and does not
+# end with a newline.
+cronic_end_with_newline() {
+  if [ -s "$1" ] && [ "$(tail -c 1 "$1" | wc -l)" -eq 0 ]; then
+    echo >> "$1"
+  fi
+}
+
+# End the combined output with a newline, so that its last line is not on the
+# line of the report's next heading.
+cronic_end_with_newline "$cronic_combined"
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
@@ -396,9 +447,7 @@ fi
 # unfiltered stderr even when `grep` removed no line, and the report would
 # show the same output twice.  The newline also keeps the last line of stderr
 # off the line of the report's next heading.
-if [ -s "$cronic_trace" ] && [ "$(tail -c 1 "$cronic_trace" | wc -l)" -eq 0 ]; then
-  echo >> "$cronic_trace"
-fi
+cronic_end_with_newline "$cronic_trace"
 
 # Prints a basic regular expression that matches its argument literally.
 # The argument must not contain a backslash.

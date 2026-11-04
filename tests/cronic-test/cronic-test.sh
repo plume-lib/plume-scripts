@@ -409,6 +409,41 @@ check_goals "standard output without a final newline" \
   "$work/stdout-without-newline-report.goal" /dev/null \
   "$CRONIC" sh -c 'echo err >&2; sleep 0.3; printf out'
 
+# A background process that keeps the command's stderr open does not make
+# `cronic` wait until that process exits, and the error output that the command
+# wrote is still reported.
+start=$(date +%s)
+# shellcheck disable=SC2016 # The expansions are for `sh -c` to do.
+check "background process that holds stderr" 0 "report:^the error$" \
+  sh -c 'sleep 60 > /dev/null & echo $! > "$1"; echo "the error" >&2' \
+  sh "$work/background-pid"
+elapsed=$(($(date +%s) - start))
+kill "$(cat "$work/background-pid")" 2> /dev/null || :
+if [ "$elapsed" -ge 30 ]; then
+  echo "FAIL: background process that holds stderr: cronic took $elapsed seconds"
+  status=1
+else
+  echo "PASS: background process that holds stderr, elapsed time"
+fi
+
+# A command that survives a signal sent to cronic's process group can still
+# write to stderr afterward, without being killed by SIGPIPE.  `set -m` puts
+# `cronic` in a process group of its own, so that the signal does not reach
+# this test.
+bash -c 'set -m
+  "$1" sh -c "trap \"\" TERM; sleep 1; echo \"late error\" >&2; echo reached > \"\$1\"" \
+    sh "$2" > /dev/null 2>&1 &
+  cronic_pid=$!
+  sleep 0.3
+  kill -TERM -- -$cronic_pid
+  wait $cronic_pid' bash "$CRONIC" "$work/reached" 2> /dev/null || :
+if [ -s "$work/reached" ]; then
+  echo "PASS: command that survives a signal to the process group"
+else
+  echo "FAIL: command that survives a signal to the process group was killed"
+  status=1
+fi
+
 # The standard output of a failing command is reported, once.
 check "standard output of a failing command" 3 \
   "report-once:^the standard output$" "$work/trace-only" 3
