@@ -236,7 +236,7 @@ INLINE_LITERAL_TEXT
       $iflag='',            next if $arg eq '-noi';     ## don't ignore case
       $norc=1,              next if $arg eq '-norc';    ## don't load rc file
       $showrc=1,            next if $arg eq '-showrc';  ## show rc file
-      $underlineOK=1,       next if $arg eq '-u';       ## look throuh underln.
+      $underlineOK=1,       next if $arg eq '-u';       ## look through underln.
       $words=1,             next if $arg eq '-w';       ## match "words" only
       $literal=1,           next if $arg eq '-F';       ## args are literal
       $literal=1,           next if $arg eq '-lit';     ## args are literal
@@ -1147,7 +1147,7 @@ sub dodir
 		## If we're at the end of the file, then we can use $_ as
 		## is.  Otherwise, we need to remove the final partial-line
 		## and save it so that it'll be at the beginning of the
-		## next read (where the rest of the line will be layed in
+		## next read (where the rest of the line will be laid in
 		## right after it).  $hold will be what we should save
 		## until next time.
 		##

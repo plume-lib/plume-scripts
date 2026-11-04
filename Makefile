@@ -2,7 +2,7 @@
 
 all: checkbashisms
 
-# `checkbashisms` is not included by source because it is licensed under the GPL.
+# `checkbashisms` is not included in plume-scripts because it is licensed under the GPL.
 # It is downloaded by the rule below, which runs only when `checkbashisms` is
 # absent *and* something asks for it.  (Downloading in a `$(shell ...)`
 # assignment would instead download during every `make` invocation, including
