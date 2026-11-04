@@ -25,7 +25,8 @@
 # the caller exports the verbose option or runs `bash -v cronic`, or if the file
 # named by BASH_ENV writes to stderr.  COMMAND does not see a function named
 # `builtin` that the caller exported, because this script removes it so that it
-# can run builtins via `builtin`.
+# can run builtins via `builtin`.  If COMMAND starts a background process that
+# keeps its stderr open, this script waits for that process to exit.
 
 # This script runs under the first `bash` in PATH, which on macOS may be
 # /bin/bash, bash 3.2.  So it uses a feature of a later bash, such as
@@ -126,6 +127,12 @@ cronic_usage() {
 cronic_help() {
   cronic_usage_line
   echo "Runs COMMAND, and produces output only if it fails or writes to stderr."
+  echo "The output is a report that shows the error output, and then, if COMMAND"
+  echo "wrote to stdout, the standard and error output together, in the order in"
+  echo "which COMMAND wrote them.  That order is approximate:  an error line written"
+  echo "just before a line of standard output can appear after it.  And if COMMAND"
+  echo "buffers its standard output, as many programs do when it is not a terminal,"
+  echo "then that output appears when COMMAND flushes it, not when COMMAND wrote it."
   echo "  --expected-status N  treat exit status N (0 to 255), rather than 0, as success;"
   echo "                       may also be written --expected-status=N"
   echo "  --permit-stderr      do not treat error output as a failure"
@@ -160,6 +167,9 @@ cronic_help() {
   echo "Bash runs the file named by BASH_ENV, if any, before cronic's own code, so"
   echo "cronic cannot capture that file's output, and exported shell options can make"
   echo "that file write to stderr.  To prevent that, unset BASH_ENV."
+  echo "If COMMAND starts a background process that keeps COMMAND's stderr open,"
+  echo "cronic waits for that process to exit.  To prevent that, redirect the"
+  echo "background process's stderr."
   exit 0
 }
 
@@ -229,7 +239,7 @@ cronic_debug=false
 # pre-create those paths as symlinks and have the wrapped command's output
 # written through them.
 cronic_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/cronic.XXXXXX") || exit 1
-cronic_out=$cronic_tmpdir/out
+cronic_combined=$cronic_tmpdir/combined
 cronic_err=$cronic_tmpdir/err
 cronic_reduced_err=$cronic_tmpdir/err.reduced
 cronic_trace=$cronic_tmpdir/trace
@@ -309,9 +319,31 @@ fi
 # it writes after the command finishes, such as the output of an EXIT trap that
 # the command sets.
 #
+# The report shows the standard output and the error output together, in the
+# order in which the command wrote them, and it also shows the error output by
+# itself.  So the subshell's standard output is appended to the file
+# cronic_combined, and its stderr goes through `tee`, which writes it to the
+# file cronic_trace and appends it to cronic_combined.  Both files are opened
+# for appending, so that neither write overwrites the other.  The order is
+# exact only for writes that are separated in time:  an error line that
+# immediately precedes a line of standard output can be appended after it,
+# because the error line passes through `tee`.  Exact order is impossible,
+# because only a single file descriptor for both streams would preserve it,
+# and then `cronic` could not tell which output was error output.  The
+# subshell is an element of a pipeline, rather than redirecting its stderr to a
+# process substitution `2> >(tee ...)`, because bash waits for every element
+# of a pipeline to finish, whereas bash 3.2 cannot wait for a process
+# substitution, so the report could omit error output that `tee` has not yet
+# written.
+#
+# Because bash waits for `tee`, and `tee` finishes only when every process
+# that holds the subshell's stderr has closed it, `cronic` also waits for any
+# background process that the command started without redirecting its stderr.
+#
 # The subshell is not the operand of `||` or the like, because then bash would
 # ignore `set -e` throughout the subshell, including in a shell function that it
 # runs, and would remove "errexit" from the SHELLOPTS that the command inherits.
+# Being an element of a pipeline does not affect `set -e`.
 #
 # Limitation:  if the command is a builtin that runs code in the subshell, such
 # as `source` or `eval`, that code runs with the caller's options even if the
@@ -326,9 +358,23 @@ set +e
     ${cronic_caller_function_names:+builtin export -f --$cronic_caller_function_names}
     builtin set +u${cronic_caller_flags:+ -$cronic_caller_flags}"
   "$@"
-) > "$cronic_out" 2> "$cronic_trace"
-cronic_result=$?
+) 2>&1 >> "$cronic_combined" | tee "$cronic_trace" >> "$cronic_combined"
+cronic_result=${PIPESTATUS[0]}
 set -e
+
+# The command wrote no standard output if and only if the combined output is
+# the same as the error output.  This is checked before a newline is appended
+# to the error output, below.
+if cmp -s "$cronic_combined" "$cronic_trace"; then
+  cronic_has_stdout=0
+else
+  cronic_has_stdout=1
+fi
+# End the combined output with a newline, if it is not empty, so that its last
+# line is not on the line of the report's next heading.
+if [ -s "$cronic_combined" ] && [ "$(tail -c 1 "$cronic_combined" | wc -l)" -eq 0 ]; then
+  echo >> "$cronic_combined"
+fi
 
 # Unsetting BASH_XTRACEFD also closes its file descriptor.
 unset BASH_XTRACEFD
@@ -420,7 +466,7 @@ grep -a -E -v \
   -e '^[[:alnum:]_.-]*make(\[[0-9]+\])?: (Entering|Leaving) directory '"[\`']"'.*'"'"'$' \
   "$cronic_err" > "$cronic_reduced_err" || [ $? -eq 1 ] || cronic_reduced_err=$cronic_err
 
-if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
+if [ "$cronic_result" -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ] && [ -s "$cronic_reduced_err" ]; }; then
   echo "Cronic detected failure or error output for the command:"
   echo "$@"
   echo
@@ -444,27 +490,30 @@ if [ $cronic_result -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0 ]
       echo
     fi
   fi
-  echo "STANDARD OUTPUT:"
-  cat "$cronic_out"
-  if ! cmp -s "$cronic_trace" "$cronic_err"; then
+  # Without standard output, this section would repeat the error output.
+  if [ $cronic_has_stdout -eq 1 ]; then
+    echo "STANDARD AND ERROR OUTPUT, IN ORDER:"
+    cat "$cronic_combined"
     echo
+  fi
+  if ! cmp -s "$cronic_trace" "$cronic_err"; then
     echo "TRACE-ERROR OUTPUT:"
     cat "$cronic_trace"
+    echo
   fi
   if [ -s "$cronic_xtrace" ]; then
-    echo
     echo "TRACE OUTPUT:"
     cat "$cronic_xtrace"
+    echo
   fi
   if [ $cronic_duplicate_stderr -eq 1 ]; then
-    echo
     echo "ERROR OUTPUT:"
     cat "$cronic_err"
+    echo
   fi
-  echo
   echo "END OF CRONIC OUTPUT."
 fi
 
 # The temporary files are removed by the EXIT trap.
 
-exit $cronic_result
+exit "$cronic_result"

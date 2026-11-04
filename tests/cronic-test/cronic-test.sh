@@ -356,6 +356,63 @@ check "stderr without a final newline, unfiltered" 0 "report-once:^oops$" \
   sh -c 'printf oops >&2'
 unset PS4
 
+# The report shows the standard output and the error output together, in the
+# order in which the command wrote them, after the error output by itself.  The
+# command pauses between writes, because `cronic` preserves the order only of
+# writes that are separated in time.
+cat > "$work/interleaved" << 'EOF'
+#!/bin/sh
+echo "out 1"
+sleep 0.3
+echo "err 1" >&2
+sleep 0.3
+echo "out 2"
+EOF
+chmod +x "$work/interleaved"
+cat > "$work/interleaved-report.goal" << EOF
+Cronic detected failure or error output for the command:
+$work/interleaved
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+err 1
+
+STANDARD AND ERROR OUTPUT, IN ORDER:
+out 1
+err 1
+out 2
+
+END OF CRONIC OUTPUT.
+EOF
+check_goals "standard and error output, in order" \
+  "$work/interleaved-report.goal" /dev/null "$CRONIC" "$work/interleaved"
+
+# Standard output that does not end with a newline is followed by a blank line,
+# as every other section of the report is.
+cat > "$work/stdout-without-newline-report.goal" << EOF
+Cronic detected failure or error output for the command:
+sh -c echo err >&2; sleep 0.3; printf out
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+err
+
+STANDARD AND ERROR OUTPUT, IN ORDER:
+err
+out
+
+END OF CRONIC OUTPUT.
+EOF
+check_goals "standard output without a final newline" \
+  "$work/stdout-without-newline-report.goal" /dev/null \
+  "$CRONIC" sh -c 'echo err >&2; sleep 0.3; printf out'
+
+# The standard output of a failing command is reported, once.
+check "standard output of a failing command" 3 \
+  "report-once:^the standard output$" "$work/trace-only" 3
+
 # Error output that `grep` would treat as binary is still reported.
 check "binary stderr" 0 "report:error$" "$work/binary-stderr"
 
@@ -496,8 +553,6 @@ RESULT CODE: 0  (success)
 ERROR OUTPUT:
 a real error
 
-STANDARD OUTPUT:
-
 TRACE OUTPUT:
 + set -x
 + echo 'a real error'
@@ -520,8 +575,6 @@ RESULT CODE: 0  (success)
 
 ERROR OUTPUT:
 trapped
-
-STANDARD OUTPUT:
 
 TRACE OUTPUT:
 ++ trap 'echo trapped >&2' EXIT
@@ -569,9 +622,9 @@ CRONIC="$REAL_CRONIC"
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
 # uppercase, both with and without any "cronic_" prefix (for example,
-# `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it, and
-# so is `BASH_XTRACEFD`, which `cronic` assigns and un-exports.
-# The lowercase names that `cronic` assigns, such as `cronic_out`, are not
+# `CRONIC_COMBINED` and `COMBINED`).  `TMPDIR` is omitted, because `cronic`
+# reads it, and so is `BASH_XTRACEFD`, which `cronic` assigns and un-exports.
+# The lowercase names that `cronic` assigns, such as `cronic_combined`, are not
 # exported here, because environment variables conventionally have uppercase
 # names; the next test checks a few of them.
 variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
@@ -736,8 +789,6 @@ RESULT CODE: 0  (success)
 
 ERROR OUTPUT:
 a real error
-
-STANDARD OUTPUT:
 
 TRACE-ERROR OUTPUT:
 + echo 'a real error'
