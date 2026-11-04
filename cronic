@@ -492,7 +492,7 @@ if [ "$cronic_result" -ne "$cronic_expected" ] || { [ $cronic_permitstderr -eq 0
   fi
   # Without standard output, this section would repeat the error output.
   if [ $cronic_has_stdout -eq 1 ]; then
-    echo "STANDARD AND ERROR OUTPUT, IN ORDER:"
+    echo "STANDARD AND ERROR OUTPUT:"
     cat "$cronic_combined"
     echo
   fi
