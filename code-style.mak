@@ -137,7 +137,7 @@ showvars::
 	@echo "CODE_STYLE_EXCLUSIONS_USER=${CODE_STYLE_EXCLUSIONS_USER}"
 	@echo "PLUME_SCRIPTS=${PLUME_SCRIPTS}"
 
-# `checkbashisms` is not included by source because it uses the GPL.
+# `checkbashisms` is not included in plume-scripts because it is licensed under the GPL.
 ifeq (,$(wildcard ${PLUME_SCRIPTS}/checkbashisms))
 dummy := $(shell cd ${PLUME_SCRIPTS} \
    && wget -q https://homes.cs.washington.edu/~mernst/software/checkbashisms \
