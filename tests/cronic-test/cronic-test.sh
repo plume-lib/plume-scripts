@@ -426,6 +426,25 @@ else
   echo "PASS: background process that holds stderr, elapsed time"
 fi
 
+# A background process that writes to the command's stderr after `cronic` stops
+# copying it is not killed by SIGPIPE.
+# shellcheck disable=SC2016 # The expansions are for `sh -c` to do.
+check "background process that writes to stderr late" 0 "report:^the error$" \
+  sh -c '(sleep 7; echo "late error" >&2; echo reached > "$1") > /dev/null &
+    echo "the error" >&2' \
+  sh "$work/late-reached"
+tenths=0
+while [ ! -s "$work/late-reached" ] && [ $tenths -lt 150 ]; do
+  sleep 0.1
+  tenths=$((tenths + 1))
+done
+if [ -s "$work/late-reached" ]; then
+  echo "PASS: background process that writes to stderr late"
+else
+  echo "FAIL: background process that writes to stderr late was killed"
+  status=1
+fi
+
 # A command that survives a signal sent to cronic's process group can still
 # write to stderr afterward, without being killed by SIGPIPE.  `set -m` puts
 # `cronic` in a process group of its own, so that the signal does not reach

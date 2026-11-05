@@ -253,6 +253,35 @@ cronic_err=$cronic_tmpdir/err
 cronic_reduced_err=$cronic_tmpdir/err.reduced
 cronic_trace=$cronic_tmpdir/trace
 cronic_xtrace=$cronic_tmpdir/xtrace
+# The process id of the `tee` that copies the command's stderr, or empty if
+# `tee` has not started or has been stopped.
+cronic_tee_pid=
+
+# Replaces the `tee` that copies the command's stderr, if it is still running,
+# by a process that reads the FIFO and discards what it reads, so that the
+# temporary files stop growing.  The FIFO always has a reader, so a background
+# process that writes to its stderr does not get SIGPIPE:  this shell holds the
+# FIFO open for reading from before the new reader starts until after `tee` is
+# killed.  Opening the FIFO only for reading blocks until some process holds it
+# open for writing, so this shell first opens it for both reading and writing,
+# which does not block.  The new reader's descriptor is opened only for reading,
+# because a reader that also held the FIFO open for writing would never read
+# end-of-file and would never finish.  `tee` ignores the signals that this shell
+# handles, so it is killed by SIGKILL.
+cronic_stop_tee() {
+  if [ -n "$cronic_tee_pid" ] && kill -0 "$cronic_tee_pid" 2> /dev/null; then
+    exec 3<> "$cronic_stderr_fifo"
+    exec 4< "$cronic_stderr_fifo"
+    exec 3>&-
+    (
+      trap '' HUP INT TERM
+      exec cat > /dev/null
+    ) <&4 4<&- 2> /dev/null &
+    kill -s KILL "$cronic_tee_pid" 2> /dev/null || :
+    exec 4<&-
+  fi
+  cronic_tee_pid=
+}
 
 # Remove the temporary files however this script terminates, including when it
 # is interrupted before it reaches the end.  When cronic_debug is true, the
@@ -260,6 +289,7 @@ cronic_xtrace=$cronic_tmpdir/xtrace
 # appended to stderr.
 # shellcheck disable=SC2329  # the function is invoked from the trap handlers below.
 cronic_cleanup() {
+  cronic_stop_tee
   [ "$cronic_debug" = "true" ] || rm -rf "$cronic_tmpdir"
 }
 trap cronic_cleanup EXIT
@@ -353,14 +383,15 @@ fi
 # by `nohup` (which redirects stderr only when it is a terminal), would make
 # `cronic` wait until that process exits.  So after the subshell finishes,
 # `cronic` waits at most 5 seconds for `tee`, which is ample time for `tee` to
-# copy what the subshell wrote, and then reports.  A `tee` that is still running
-# keeps copying into the deleted files, so the background process does not get
-# SIGPIPE when it writes to its stderr.  `tee` writes its own error messages to
-# a file, which `cronic` copies to its stderr, rather than to `cronic`'s stderr
-# directly, so that a `tee` that is still running does not hold `cronic`'s
-# stderr, for which cron waits before sending mail.  `tee` is not run in a
-# process substitution `2> >(tee ...)`, because bash 3.2 does not set `$!` to
-# the process id of a process substitution.
+# copy what the subshell wrote.  Then, if `tee` is still running, `cronic`
+# replaces it by a process that discards what the background process writes to
+# its stderr, so that the background process does not get SIGPIPE and the
+# temporary files do not grow; then `cronic` reports.  `tee` writes its own
+# error messages to a file, which `cronic` copies to its stderr, rather than to
+# `cronic`'s stderr directly, so that a `tee` that is still running does not
+# hold `cronic`'s stderr, for which cron waits before sending mail.  `tee` is
+# not run in a process substitution `2> >(tee ...)`, because bash 3.2 does not
+# set `$!` to the process id of a process substitution.
 #
 # `tee` ignores the signals that `cronic` handles.  `cronic` and `tee` are in
 # the same process group, and so receive the same signal when it is sent to
@@ -403,6 +434,7 @@ while kill -0 "$cronic_tee_pid" 2> /dev/null && [ $cronic_tenths -lt 50 ]; do
   sleep 0.1
   cronic_tenths=$((cronic_tenths + 1))
 done
+cronic_stop_tee
 cat "$cronic_tee_err" >&2
 
 # The command wrote no standard output if and only if the combined output is
