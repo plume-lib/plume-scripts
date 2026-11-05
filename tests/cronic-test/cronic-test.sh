@@ -437,6 +437,13 @@ bash -c 'set -m
   sleep 0.3
   kill -TERM -- -$cronic_pid
   wait $cronic_pid' bash "$CRONIC" "$work/reached" 2> /dev/null || :
+# `cronic` can exit before the command does, as it does under bash 3.2.  So wait
+# at most 10 seconds, in steps of a tenth of a second, for the command.
+tenths=0
+while [ ! -s "$work/reached" ] && [ $tenths -lt 100 ]; do
+  sleep 0.1
+  tenths=$((tenths + 1))
+done
 if [ -s "$work/reached" ]; then
   echo "PASS: command that survives a signal to the process group"
 else
