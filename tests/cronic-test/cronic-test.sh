@@ -356,6 +356,124 @@ check "stderr without a final newline, unfiltered" 0 "report-once:^oops$" \
   sh -c 'printf oops >&2'
 unset PS4
 
+# The report shows the standard output and the error output together, in the
+# order in which the command wrote them, after the error output by itself.  The
+# command pauses between writes, because `cronic` preserves the order only of
+# writes that are separated in time.
+cat > "$work/interleaved" << 'EOF'
+#!/bin/sh
+echo "out 1"
+sleep 0.3
+echo "err 1" >&2
+sleep 0.3
+echo "out 2"
+EOF
+chmod +x "$work/interleaved"
+cat > "$work/interleaved-report.goal" << EOF
+Cronic detected failure or error output for the command:
+$work/interleaved
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+err 1
+
+STANDARD AND ERROR OUTPUT:
+out 1
+err 1
+out 2
+
+END OF CRONIC OUTPUT.
+EOF
+check_goals "standard and error output, in order" \
+  "$work/interleaved-report.goal" /dev/null "$CRONIC" "$work/interleaved"
+
+# Standard output that does not end with a newline is followed by a blank line,
+# as every other section of the report is.
+cat > "$work/stdout-without-newline-report.goal" << EOF
+Cronic detected failure or error output for the command:
+sh -c echo err >&2; sleep 0.3; printf out
+
+RESULT CODE: 0  (success)
+
+ERROR OUTPUT:
+err
+
+STANDARD AND ERROR OUTPUT:
+err
+out
+
+END OF CRONIC OUTPUT.
+EOF
+check_goals "standard output without a final newline" \
+  "$work/stdout-without-newline-report.goal" /dev/null \
+  "$CRONIC" sh -c 'echo err >&2; sleep 0.3; printf out'
+
+# A background process that keeps the command's stderr open does not make
+# `cronic` wait until that process exits, and the error output that the command
+# wrote is still reported.
+start=$(date +%s)
+# shellcheck disable=SC2016 # The expansions are for `sh -c` to do.
+check "background process that holds stderr" 0 "report:^the error$" \
+  sh -c 'sleep 60 > /dev/null & echo $! > "$1"; echo "the error" >&2' \
+  sh "$work/background-pid"
+elapsed=$(($(date +%s) - start))
+kill "$(cat "$work/background-pid")" 2> /dev/null || :
+if [ "$elapsed" -ge 30 ]; then
+  echo "FAIL: background process that holds stderr: cronic took $elapsed seconds"
+  status=1
+else
+  echo "PASS: background process that holds stderr, elapsed time"
+fi
+
+# A background process that writes to the command's stderr after `cronic` stops
+# copying it is not killed by SIGPIPE.
+# shellcheck disable=SC2016 # The expansions are for `sh -c` to do.
+check "background process that writes to stderr late" 0 "report:^the error$" \
+  sh -c '(sleep 7; echo "late error" >&2; echo reached > "$1") > /dev/null &
+    echo "the error" >&2' \
+  sh "$work/late-reached"
+tenths=0
+while [ ! -s "$work/late-reached" ] && [ $tenths -lt 150 ]; do
+  sleep 0.1
+  tenths=$((tenths + 1))
+done
+if [ -s "$work/late-reached" ]; then
+  echo "PASS: background process that writes to stderr late"
+else
+  echo "FAIL: background process that writes to stderr late was killed"
+  status=1
+fi
+
+# A command that survives a signal sent to cronic's process group can still
+# write to stderr afterward, without being killed by SIGPIPE.  `set -m` puts
+# `cronic` in a process group of its own, so that the signal does not reach
+# this test.
+bash -c 'set -m
+  "$1" sh -c "trap \"\" TERM; sleep 1; echo \"late error\" >&2; echo reached > \"\$1\"" \
+    sh "$2" > /dev/null 2>&1 &
+  cronic_pid=$!
+  sleep 0.3
+  kill -TERM -- -$cronic_pid
+  wait $cronic_pid' bash "$CRONIC" "$work/reached" 2> /dev/null || :
+# `cronic` can exit before the command does, as it does under bash 3.2.  So wait
+# at most 10 seconds, in steps of a tenth of a second, for the command.
+tenths=0
+while [ ! -s "$work/reached" ] && [ $tenths -lt 100 ]; do
+  sleep 0.1
+  tenths=$((tenths + 1))
+done
+if [ -s "$work/reached" ]; then
+  echo "PASS: command that survives a signal to the process group"
+else
+  echo "FAIL: command that survives a signal to the process group was killed"
+  status=1
+fi
+
+# The standard output of a failing command is reported, once.
+check "standard output of a failing command" 3 \
+  "report-once:^the standard output$" "$work/trace-only" 3
+
 # Error output that `grep` would treat as binary is still reported.
 check "binary stderr" 0 "report:error$" "$work/binary-stderr"
 
@@ -496,8 +614,6 @@ RESULT CODE: 0  (success)
 ERROR OUTPUT:
 a real error
 
-STANDARD OUTPUT:
-
 TRACE OUTPUT:
 + set -x
 + echo 'a real error'
@@ -520,8 +636,6 @@ RESULT CODE: 0  (success)
 
 ERROR OUTPUT:
 trapped
-
-STANDARD OUTPUT:
 
 TRACE OUTPUT:
 ++ trap 'echo trapped >&2' EXIT
@@ -569,9 +683,9 @@ CRONIC="$REAL_CRONIC"
 # The wrapped command sees the caller's exported variables unchanged.  For
 # each variable that `cronic` assigns, the caller exports that name in
 # uppercase, both with and without any "cronic_" prefix (for example,
-# `CRONIC_OUT` and `OUT`).  `TMPDIR` is omitted, because `cronic` reads it, and
-# so is `BASH_XTRACEFD`, which `cronic` assigns and un-exports.
-# The lowercase names that `cronic` assigns, such as `cronic_out`, are not
+# `CRONIC_COMBINED` and `COMBINED`).  `TMPDIR` is omitted, because `cronic`
+# reads it, and so is `BASH_XTRACEFD`, which `cronic` assigns and un-exports.
+# The lowercase names that `cronic` assigns, such as `cronic_combined`, are not
 # exported here, because environment variables conventionally have uppercase
 # names; the next test checks a few of them.
 variable_names=$(sed -n 's/^ *\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$CRONIC" | sort -u)
@@ -736,8 +850,6 @@ RESULT CODE: 0  (success)
 
 ERROR OUTPUT:
 a real error
-
-STANDARD OUTPUT:
 
 TRACE-ERROR OUTPUT:
 + echo 'a real error'
