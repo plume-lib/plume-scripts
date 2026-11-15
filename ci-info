@@ -38,6 +38,8 @@
 #    (Don't use it with `git log`, which interprets its argument differently.)
 # CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID/SHA.
 # CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID/SHA.
+#    For an Azure Pipelines pull request, it is the merge commit that Azure
+#    checks out, which is on no branch of the repository.
 #
 # If called not under CI, or under CI but not in the main or toplevel
 # clone, then gets information from the local repository.
@@ -555,11 +557,21 @@ if [ -n "$SYSTEM_PULLREQUEST_TARGETBRANCH" ]; then
   # WARNING!  $BUILD_SOURCEBRANCHNAME is just a name, not a full ref path.  For example,
   # $BUILD_SOURCEBRANCHNAME may be "merge" when $BUILD_SOURCEBRANCH is "refs/pull/2971/merge".
   CI_BRANCH=$SYSTEM_PULLREQUEST_SOURCEBRANCH
-  # For CI_COMMIT_RANGE_START:  HEAD = $BUILD_SOURCEVERSION is a commit created by Azure; it isn't
-  # in the repo.  Its first child HEAD^1 is the target branch (e.g., master); use that because
-  # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
+  # HEAD = $BUILD_SOURCEVERSION is the merge commit refs/pull/N/merge, which
+  # Azure checks out.  Its first parent HEAD^1 is the target branch (e.g.,
+  # master), and its second parent is the pull request's head.  The range
+  # HEAD^1...HEAD is the pull request's changes, as merged into the target
+  # branch.  Its line numbers are those of the checked-out files, which are the
+  # files that a client's tools examine.  Its merge base is HEAD^1, which is in
+  # every clone except one made with `fetchDepth: 1`.  By contrast, the fork
+  # point of the pull request's branch is absent from a shallow clone when the
+  # branch lags its target branch by more commits than the clone's depth.
+  if ! git rev-parse --verify --quiet HEAD^1 > /dev/null 2>&1; then
+    # This clone has only HEAD, as `fetchDepth: 1` makes.
+    unshallow
+  fi
   CI_COMMIT_RANGE_START=$(head1)
-  CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
+  CI_COMMIT_RANGE_END=$(git rev-parse HEAD)
   CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
 elif [ -n "$BUILD_SOURCEBRANCH" ]; then
   # Azure Pipelines build for a branch (possibly master).
