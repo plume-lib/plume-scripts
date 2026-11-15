@@ -34,6 +34,8 @@
 #    (Don't use it with `git log`, which interprets its argument differently.)
 # CI_COMMIT_RANGE_START: The start element of CI_COMMIT_RANGE, a commit ID/SHA.
 # CI_COMMIT_RANGE_END: The end element of CI_COMMIT_RANGE, a commit ID/SHA.
+#    For an Azure Pipelines pull request, it is the merge commit that Azure
+#    checks out, which is on no branch of the repository.
 # CI_ORGANIZATION and CI_BRANCH, which `ci-org-and-branch` also sets.
 #
 # If called not under CI, or under CI but not in the main or toplevel
