@@ -253,6 +253,13 @@ _sgr_set_git_range_body() {
     # $SYSTEM_PULLREQUEST_TARGETBRANCH is not fetched into this repo.
     CI_COMMIT_RANGE_START=$(_sgr_head1)
     CI_COMMIT_RANGE_END=$SYSTEM_PULLREQUEST_SOURCECOMMITID
+    if ! _sgr_commit_range_is_usable; then
+      # Azure clones only the last few commits -- as many as the checkout step's
+      # `fetchDepth` says -- so the clone lacks the fork point when the pull
+      # request's branch lags its target branch by more commits than that.  Both
+      # endpoints are in the clone, so completing the clone reaches the fork point.
+      _sgr_unshallow
+    fi
     CI_COMMIT_RANGE=${CI_COMMIT_RANGE_START}...${CI_COMMIT_RANGE_END}
   elif [ -n "$BUILD_SOURCEBRANCH" ]; then
     # Azure Pipelines build for a branch (possibly master).
