@@ -247,6 +247,16 @@ head1() {
   fi
 }
 
+# Returns true if commit $1 is a merge commit, that is, has two or more
+# parents.  This reads the commit itself, because in a shallow clone, `git show`
+# and `git rev-list` show no parents for a commit at the clone's depth limit,
+# such as HEAD in a clone created with `git clone --depth=1`.
+is_merge() {
+  # Only the header precedes the first empty line; the message could contain a
+  # line that starts with "parent ".
+  [ "$(git cat-file commit "$1" | sed '/^$/q' | grep -c '^parent ')" -ge 2 ]
+}
+
 # Converts a shallow clone into a complete one.
 unshallow() {
   if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
@@ -891,7 +901,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
     emit_echo "Setting CI_COMMIT_RANGE from CI_BRANCH=$CI_BRANCH"
   fi
   if [ "$CI_BRANCH" = "$DEFAULT_BRANCH_NAME" ]; then
-    if git show --summary HEAD | grep -q ^Merge:; then
+    if is_merge HEAD; then
       CI_COMMIT_RANGE_START=$(merge_base HEAD^1 HEAD^2)
     else
       CI_COMMIT_RANGE_START=$(head1)
@@ -912,23 +922,26 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
         base_branch=${base_branch:-$DEFAULT_BRANCH_NAME}
         fetch_base_branch
         if [ -n "$base_tip" ]; then
+          # If the end has no merge base with the fetched tip, as for an orphan
+          # branch such as "gh-pages", leave the start empty for the code below.
+          # Do not fall back to "origin/$DEFAULT_BRANCH_NAME":  the fetch has
+          # just updated it, so it has no merge base with the end either, and
+          # `git diff` would reject the range.
           CI_COMMIT_RANGE_START=$(merge_base "$base_tip" "$CI_COMMIT_RANGE_END")
           if [ -n "$CI_COMMIT_RANGE_START" ] && [ "$DEBUG" = "--debug" ]; then
             emit_echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START as the fork point from ${base_branch}"
           fi
+        elif git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
+          CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
+          if [ "$DEBUG" = "--debug" ]; then
+            emit_echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$DEFAULT_BRANCH_NAME"
+          fi
         fi
         if [ -z "$CI_COMMIT_RANGE_START" ]; then
-          if git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
-            CI_COMMIT_RANGE_START=$(git rev-parse "origin/$DEFAULT_BRANCH_NAME")
-            if [ "$DEBUG" = "--debug" ]; then
-              emit_echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$DEFAULT_BRANCH_NAME"
-            fi
+          if is_merge HEAD; then
+            CI_COMMIT_RANGE_START=$(merge_base HEAD^1 HEAD^2)
           else
-            if git show --summary HEAD | grep -q ^Merge:; then
-              CI_COMMIT_RANGE_START=$(merge_base HEAD^1 HEAD^2)
-            else
-              CI_COMMIT_RANGE_START=$(head1)
-            fi
+            CI_COMMIT_RANGE_START=$(head1)
           fi
         fi
         ;;
@@ -959,7 +972,7 @@ if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
   if [ "$VERBOSE" = "--verbose" ]; then
     emit_echo "Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
   fi
-  if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
+  if is_merge "$CI_COMMIT_RANGE_END"; then
     CI_COMMIT_RANGE_START=$(merge_base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
   else
     if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1; then

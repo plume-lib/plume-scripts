@@ -18,7 +18,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 PLUME_SCRIPTS="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+trap 'rm -rf "$work"' EXIT
+# On a signal, exit, which runs the EXIT trap, rather than continue without $work.
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 ### The origin repository
 
@@ -77,8 +81,8 @@ status=0
 # check ORIGIN BRANCH COMMIT EXPECTED_START EXPECTED_FILES DESCRIPTION: makes a
 # clone of ORIGIN the way that `actions/checkout` makes it for a push of COMMIT
 # to BRANCH, sources `set-git-range` in it, and checks the range's start and
-# end and the files that its diff changes.  DESCRIPTION is used for
-# diagnostics.
+# end and the files that its diff changes.  DESCRIPTION names the case in the
+# PASS or FAIL line that this prints.
 check() {
   origin="$1"
   branch="$2"
