@@ -22,8 +22,9 @@
 # mirror only to make that decision; Gradle never downloads from it.  This script does not retry a
 # failure to find a version that matches a dynamic version such as "1.+", because the existence of
 # the module's list of versions does not show that a matching version exists.
-
-set -o pipefail
+#
+# Each retry passes --refresh-dependencies to Gradle, because Gradle by default caches for 24 hours
+# the fact that an artifact is missing, and would otherwise not ask the repository for it again.
 
 # The prefix of each Maven Central URL that Gradle reports, and the corresponding prefix on the
 # mirror.
@@ -98,14 +99,19 @@ retry_might_help() {
   return 1
 }
 
+# Extra arguments to ./gradlew; empty for the first run.
+refresh=()
 for delay in ${GRADLEW_RETRY_DELAYS-60 180}; do
-  ./gradlew "$@" 2>&1 | tee "$log"
-  status=$?
+  ./gradlew "${refresh[@]}" "$@" 2>&1 | tee "$log"
+  # Gradle's status, not that of `tee`.  If `tee` fails, the log may be incomplete, which at worst
+  # prevents a retry.
+  status=${PIPESTATUS[0]}
   if [ "$status" -eq 0 ] || ! retry_might_help; then
     exit "$status"
   fi
   echo "gradlew-retry: Gradle could not resolve a dependency; retrying in $delay seconds."
   sleep "$delay"
+  refresh=(--refresh-dependencies)
 done
 # Not `exec`, so that the EXIT trap removes $log.
-./gradlew "$@"
+./gradlew "${refresh[@]}" "$@"
