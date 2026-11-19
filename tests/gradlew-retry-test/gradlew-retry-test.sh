@@ -53,7 +53,6 @@ existing_urls
 # arguments, in file `runs` and then runs BODY, a shell command.  Within BODY, $run is the number of
 # this run, starting at 1.
 make_gradlew() {
-  rm -f "$work/runs"
   cat > "$work/gradlew" << EOF
 #!/bin/sh
 echo "\$*" >> runs
@@ -79,6 +78,7 @@ EOF
 # check DESCRIPTION EXPECTED-STATUS EXPECTED-RUNS: runs `gradlew-retry build` in the work directory
 # and reports whether its exit status and the number of runs of ./gradlew are as expected.
 check() {
+  rm -f "$work/runs"
   actual_status=0
   (cd "$work" && PATH="$check_path" "$GRADLEW_RETRY" build > output 2>&1) || actual_status=$?
   actual_runs=$(wc -l < "$work/runs" | tr -d ' ')
