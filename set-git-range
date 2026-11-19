@@ -194,11 +194,33 @@ _sgr_head1() {
   fi
 }
 
+# Returns true if commit $1 is a merge commit, that is, has two or more
+# parents.  This reads the commit itself, because in a shallow clone, `git show`
+# and `git rev-list` show no parents for a commit at the clone's depth limit,
+# such as HEAD in a clone created with `git clone --depth=1`.
+_sgr_is_merge() {
+  # Only the header precedes the first empty line; the message could contain a
+  # line that starts with "parent ".
+  [ "$(git cat-file commit "$1" | sed '/^$/q' | grep -c '^parent ')" -ge 2 ]
+}
+
 # Converts a shallow clone into a complete one.
 _sgr_unshallow() {
   if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
     git fetch --unshallow origin
   fi
+}
+
+# Prints the merge base of commits $1 and $2, or nothing if they have none.
+# A shallow clone can lack the merge base, as when a merge commit's second
+# parent brings in more commits than the clone's depth; in that case, this
+# completes the clone.
+_sgr_merge_base() {
+  # Hide the first try's errors, which a shallow clone can cause.  Show the
+  # second try's, which explain a failure that completing the clone did not fix.
+  git merge-base "$1" "$2" 2> /dev/null && return
+  _sgr_unshallow > /dev/null
+  git merge-base "$1" "$2"
 }
 
 # Fetches $base_branch, the branch that a pull request is against, and sets
@@ -399,15 +421,10 @@ _sgr_set_git_range_body() {
       echo "${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}." >&2
       _sgr_fetch_base_branch
       if [ -n "$base_tip" ]; then
-        CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-        if [ -z "$CI_COMMIT_RANGE_START" ]; then
-          # In a shallow clone, `git merge-base` either gives the right answer
-          # or no answer, so completing the clone is needed only now.  The base
-          # branch does not need to be fetched again; only this clone's own
-          # history was missing.
-          _sgr_unshallow
-          CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-        fi
+        # `_sgr_merge_base` completes the clone if needed.  The base branch
+        # need not be fetched again, because only this clone's own history can
+        # be missing.
+        CI_COMMIT_RANGE_START=$(_sgr_merge_base "$base_tip" "$CI_COMMIT_RANGE_END")
       fi
       if [ -z "$CI_COMMIT_RANGE_START" ]; then
         # Last resort.  Under CircleCI, HEAD is the pull request's head branch,
@@ -541,8 +558,8 @@ _sgr_set_git_range_body() {
     # a job where neither could be determined would then take this arm and get
     # a range covering only the last commit, with nothing said about the guess.
     if [ -n "$CI_BRANCH" ] && [ "$CI_BRANCH" = "$CI_DEFAULT_BRANCH_NAME" ]; then
-      if git show --summary HEAD | grep -q ^Merge:; then
-        CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
+      if _sgr_is_merge HEAD; then
+        CI_COMMIT_RANGE_START=$(_sgr_merge_base HEAD^1 HEAD^2)
       else
         CI_COMMIT_RANGE_START=$(_sgr_head1)
       fi
@@ -582,15 +599,36 @@ _sgr_set_git_range_body() {
       case $CI_BRANCH in
         renovate/*) CI_COMMIT_RANGE_START=$(_sgr_head1) ;;
         *)
-          if [ -z "$head_in_default_branch" ] \
-            && git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
-            CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
-            if [ -n "$debug" ]; then
-              echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$CI_DEFAULT_BRANCH_NAME" >&2
+          CI_COMMIT_RANGE_START=""
+          if [ -z "$head_in_default_branch" ]; then
+            # Fetch the default branch rather than trusting
+            # "origin/$CI_DEFAULT_BRANCH_NAME", which can be arbitrarily out of
+            # date or absent.  For example, the GitHub Actions `actions/checkout`
+            # step fetches only the commit being built, and when CircleCI
+            # restores a clone from its cache, its checkout step fetches only the
+            # branch being built.
+            base_branch=${base_branch:-$CI_DEFAULT_BRANCH_NAME}
+            _sgr_fetch_base_branch
+            if [ -n "$base_tip" ]; then
+              # If HEAD has no merge base with the fetched tip, as for an orphan
+              # branch such as "gh-pages", leave the start empty for the code
+              # below.  Do not fall back to "origin/$CI_DEFAULT_BRANCH_NAME":
+              # the fetch has just updated it, so it has no merge base with HEAD
+              # either, and `git diff` would reject the range.
+              CI_COMMIT_RANGE_START=$(_sgr_merge_base "$base_tip" HEAD)
+              if [ -n "$CI_COMMIT_RANGE_START" ] && [ -n "$debug" ]; then
+                echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START as the fork point from ${base_branch}" >&2
+              fi
+            elif git rev-parse --verify --quiet "origin/$CI_DEFAULT_BRANCH_NAME" > /dev/null 2>&1; then
+              CI_COMMIT_RANGE_START=$(git rev-parse "origin/$CI_DEFAULT_BRANCH_NAME")
+              if [ -n "$debug" ]; then
+                echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START from git rev-parse origin/$CI_DEFAULT_BRANCH_NAME" >&2
+              fi
             fi
-          else
-            if git show --summary HEAD | grep -q ^Merge:; then
-              CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
+          fi
+          if [ -z "$CI_COMMIT_RANGE_START" ]; then
+            if _sgr_is_merge HEAD; then
+              CI_COMMIT_RANGE_START=$(_sgr_merge_base HEAD^1 HEAD^2)
             else
               CI_COMMIT_RANGE_START=$(_sgr_head1)
             fi
@@ -650,8 +688,8 @@ _sgr_set_git_range_body() {
     if [ -n "$verbose" ]; then
       echo "Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE" >&2
     fi
-    if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
-      CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
+    if _sgr_is_merge "$CI_COMMIT_RANGE_END"; then
+      CI_COMMIT_RANGE_START=$(_sgr_merge_base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
     else
       if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1; then
         CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")
@@ -722,8 +760,8 @@ _sgr_status=$?
 
 # Clean up before restoring `set -e`, which makes the shell exit here if the
 # client uses `set -e` and this script failed.
-unset -f _sgr_set_git_range_body _sgr_redact_tokens _sgr_head1 _sgr_unshallow \
-  _sgr_fetch_base_branch _sgr_commit_range_is_usable
+unset -f _sgr_set_git_range_body _sgr_redact_tokens _sgr_head1 _sgr_is_merge \
+  _sgr_unshallow _sgr_merge_base _sgr_fetch_base_branch _sgr_commit_range_is_usable
 if [ -n "$_sgr_had_errexit" ]; then
   set -e
 fi

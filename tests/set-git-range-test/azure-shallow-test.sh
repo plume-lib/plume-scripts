@@ -21,7 +21,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 PLUME_SCRIPTS="$(CDPATH='' cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+trap 'rm -rf "$work"' EXIT
+# On a signal, exit, which runs the EXIT trap, rather than continue without $work.
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 ### The origin repository:  main, a pull request branch that forked from it
 ### long ago, and the merge commit that Azure would build.
