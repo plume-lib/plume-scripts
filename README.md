@@ -116,6 +116,15 @@ with everything that `set-ci-org-and-branch`, which it sources, sets.
 Works under Azure Pipelines, CircleCI, GitHub Actions, and Travis CI.
 [Documentation](set-git-range) at top of file.
 
+### gradlew-retry
+
+Runs `./gradlew` and, if Gradle could not resolve a dependency, runs it again,
+by default up to 2 more times, after 60 and then 180 seconds.  This avoids CI
+failures when a repository such as Maven Central transiently fails to serve an
+artifact.  A 404 for an artifact that does not exist, and other failures such
+as a compilation error, are not retried.
+[Documentation](gradlew-retry) at top of file.
+
 ## Search and replace
 
 ### preplace

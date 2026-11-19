@@ -12,6 +12,7 @@ TEST_DIRS = \
 	github-organization-test \
 	github-pr-number-test \
 	github-ref-name-test \
+	gradlew-retry-test \
 	http-status-test \
 	is-ci-test \
 	jacoco-coverage-ratchet-test \
