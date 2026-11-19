@@ -254,6 +254,18 @@ unshallow() {
   fi
 }
 
+# Prints the merge base of commits $1 and $2, or nothing if they have none.
+# A shallow clone can lack the merge base, as when a merge commit's second
+# parent brings in more commits than the clone's depth; in that case, this
+# completes the clone.
+merge_base() {
+  # Hide the first try's errors, which a shallow clone can cause.  Show the
+  # second try's, which explain a failure that completing the clone did not fix.
+  git merge-base "$1" "$2" 2> /dev/null && return
+  unshallow > /dev/null
+  git merge-base "$1" "$2"
+}
+
 # Fetches $base_branch, the branch that a pull request is against, and sets
 # $base_tip to its commit.  Does nothing on a second call, because fetching a
 # branch fetches its complete history, so once is enough.
@@ -710,15 +722,10 @@ elif [ -n "$CIRCLECI" ]; then
       emit_echo "${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}."
       fetch_base_branch
       if [ -n "$base_tip" ]; then
-        CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-        if [ -z "$CI_COMMIT_RANGE_START" ]; then
-          # In a shallow clone, `git merge-base` either gives the right answer
-          # or no answer, so completing the clone is needed only now.  The base
-          # branch does not need to be fetched again; only this clone's own
-          # history was missing.
-          unshallow
-          CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-        fi
+        # `merge_base` completes the clone if needed.  The base branch need not
+        # be fetched again, because only this clone's own history can be
+        # missing.
+        CI_COMMIT_RANGE_START=$(merge_base "$base_tip" "$CI_COMMIT_RANGE_END")
       fi
       if [ -z "$CI_COMMIT_RANGE_START" ]; then
         # Last resort.  Under CircleCI, HEAD is the pull request's head branch,
@@ -885,7 +892,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
   fi
   if [ "$CI_BRANCH" = "$DEFAULT_BRANCH_NAME" ]; then
     if git show --summary HEAD | grep -q ^Merge:; then
-      CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
+      CI_COMMIT_RANGE_START=$(merge_base HEAD^1 HEAD^2)
     else
       CI_COMMIT_RANGE_START=$(head1)
     fi
@@ -905,13 +912,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
         base_branch=${base_branch:-$DEFAULT_BRANCH_NAME}
         fetch_base_branch
         if [ -n "$base_tip" ]; then
-          CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-          if [ -z "$CI_COMMIT_RANGE_START" ]; then
-            # In a shallow clone, `git merge-base` either gives the right answer
-            # or no answer, so completing the clone is needed only now.
-            unshallow
-            CI_COMMIT_RANGE_START=$(git merge-base "$base_tip" "$CI_COMMIT_RANGE_END" 2> /dev/null)
-          fi
+          CI_COMMIT_RANGE_START=$(merge_base "$base_tip" "$CI_COMMIT_RANGE_END")
           if [ -n "$CI_COMMIT_RANGE_START" ] && [ "$DEBUG" = "--debug" ]; then
             emit_echo "Set CI_COMMIT_RANGE_START=$CI_COMMIT_RANGE_START as the fork point from ${base_branch}"
           fi
@@ -924,7 +925,7 @@ if [ -z "$CI_COMMIT_RANGE" ]; then
             fi
           else
             if git show --summary HEAD | grep -q ^Merge:; then
-              CI_COMMIT_RANGE_START=$(git merge-base HEAD^1 HEAD^2)
+              CI_COMMIT_RANGE_START=$(merge_base HEAD^1 HEAD^2)
             else
               CI_COMMIT_RANGE_START=$(head1)
             fi
@@ -959,7 +960,7 @@ if [ "$CI_COMMIT_RANGE_START" = "$CI_COMMIT_RANGE_END" ]; then
     emit_echo "Resetting CI_COMMIT_RANGE_START because CI_COMMIT_RANGE=$CI_COMMIT_RANGE"
   fi
   if git show --summary "$CI_COMMIT_RANGE_END" | grep -q ^Merge:; then
-    CI_COMMIT_RANGE_START=$(git merge-base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
+    CI_COMMIT_RANGE_START=$(merge_base "$CI_COMMIT_RANGE_END^1" "$CI_COMMIT_RANGE_END^2")
   else
     if git rev-parse --verify --quiet "$CI_COMMIT_RANGE_END^1" > /dev/null 2>&1; then
       CI_COMMIT_RANGE_START=$(git rev-parse "$CI_COMMIT_RANGE_END^1")

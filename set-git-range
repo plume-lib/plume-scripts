@@ -206,9 +206,11 @@ _sgr_unshallow() {
 # parent brings in more commits than the clone's depth; in that case, this
 # completes the clone.
 _sgr_merge_base() {
+  # Hide the first try's errors, which a shallow clone can cause.  Show the
+  # second try's, which explain a failure that completing the clone did not fix.
   git merge-base "$1" "$2" 2> /dev/null && return
   _sgr_unshallow > /dev/null
-  git merge-base "$1" "$2" 2> /dev/null
+  git merge-base "$1" "$2"
 }
 
 # Fetches $base_branch, the branch that a pull request is against, and sets
@@ -409,8 +411,9 @@ _sgr_set_git_range_body() {
       echo "${SCRIPT_NAME}: computing commit range start locally, as the fork point from ${base_branch:-the default branch}." >&2
       _sgr_fetch_base_branch
       if [ -n "$base_tip" ]; then
-        # The base branch does not need to be fetched again if the clone is
-        # completed; only this clone's own history can be missing.
+        # `_sgr_merge_base` completes the clone if needed.  The base branch
+        # need not be fetched again, because only this clone's own history can
+        # be missing.
         CI_COMMIT_RANGE_START=$(_sgr_merge_base "$base_tip" "$CI_COMMIT_RANGE_END")
       fi
       if [ -z "$CI_COMMIT_RANGE_START" ]; then
