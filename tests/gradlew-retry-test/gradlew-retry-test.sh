@@ -76,11 +76,28 @@ make_gradlew 'echo "> Could not resolve all files for configuration x."
 echo "   > Could not GET '\''https://example.org/x.pom'\''. Received status code 502"; exit 1'
 check "a 5xx status is retried twice" 1 3
 
-make_gradlew 'echo "Plugin [id: '\''org.example'\'', version: '\''1.0'\''] was not found"; exit 1'
-check "a missing plugin is retried twice" 1 3
+make_gradlew 'echo "> Could not resolve all files for configuration x."
+echo "   > Could not GET '\''https://example.org/x.pom'\''."
+echo "      > Read timed out"; exit 1'
+check "a timeout is retried twice" 1 3
 
-if ! curl --silent --fail --head --max-time 20 --output /dev/null "$CENTRAL/$EXISTING"; then
-  echo "SKIP: gradlew-retry tests of a 404: Maven Central is unreachable"
+make_gradlew 'echo "> Could not resolve all files for configuration x."
+echo "   > Cannot resolve external dependency org.example:x:1.0 because no repositories are defined."; exit 1'
+check "a build that declares no repositories is not retried" 1 1
+
+make_gradlew 'echo "> Could not resolve all files for configuration x."
+echo "   > Could not GET '\''https://example.org/x.pom'\''. Received status code 401 from server: Unauthorized"; exit 1'
+check "a 401 status is not retried" 1 1
+
+make_gradlew 'echo "Plugin [id: '\''org.example'\''] was not found in any of the following sources:"; exit 1'
+check "a missing plugin without a version is not retried" 1 1
+
+PLUGIN_PORTAL=https://plugins.gradle.org/m2
+EXISTING_PLUGIN_MARKER=com/diffplug/spotless/com.diffplug.spotless.gradle.plugin/6.25.0/com.diffplug.spotless.gradle.plugin-6.25.0.pom
+
+if ! curl --silent --fail --head --max-time 20 --output /dev/null "$CENTRAL/$EXISTING" \
+  || ! curl --silent --fail --head --location --max-time 20 --output /dev/null "$PLUGIN_PORTAL/$EXISTING_PLUGIN_MARKER"; then
+  echo "SKIP: gradlew-retry tests of a 404: Maven Central or the Gradle Plugin Portal is unreachable"
   exit "$status"
 fi
 
@@ -96,5 +113,23 @@ check "a persistent 404 for an existing artifact is retried twice" 1 3
 
 make_gradlew 'cat nonexistent.txt; exit 1'
 check "a 404 for a nonexistent artifact is not retried" 1 1
+
+cat > "$work/dynamic.txt" << EOF
+> Could not resolve all files for configuration ':compileClasspath'.
+   > Could not find any version that matches org.apache.commons:commons-lang3:99.+.
+     Versions that do not match:
+       - 3.17.0
+     Searched in the following locations:
+       - $CENTRAL/org/apache/commons/commons-lang3/maven-metadata.xml
+       - $CENTRAL/org/apache/commons/commons-lang3/
+EOF
+make_gradlew 'cat dynamic.txt; exit 1'
+check "an unmatched dynamic version is not retried" 1 1
+
+make_gradlew 'echo "Plugin [id: '\''com.diffplug.spotless'\'', version: '\''6.25.0'\'', apply: false] was not found in any of the following sources:"; exit 1'
+check "a missing plugin that exists is retried twice" 1 3
+
+make_gradlew 'echo "Plugin [id: '\''com.diffplug.spotles'\'', version: '\''6.25.0'\''] was not found in any of the following sources:"; exit 1'
+check "a missing plugin that does not exist is not retried" 1 1
 
 exit "$status"
