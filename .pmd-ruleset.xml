@@ -332,7 +332,6 @@
      -->
 
     <!-- performance rules -->
-    <rule ref="category/java/performance.xml/AddEmptyString" />
     <rule ref="category/java/performance.xml/AvoidArrayLoops" />
     <rule ref="category/java/performance.xml/AvoidCalendarDateCreation" />
     <rule ref="category/java/performance.xml/AvoidFileStream" />
